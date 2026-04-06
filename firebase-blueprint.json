@@ -1,0 +1,58 @@
+{
+  "entities": {
+    "Service": {
+      "title": "Service",
+      "description": "A main service offered by the company",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "image": { "type": "string" },
+        "features": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["name", "description", "image"]
+    },
+    "SpecializedService": {
+      "title": "Specialized Service",
+      "description": "A specialized transport service",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "desc": { "type": "string" },
+        "image": { "type": "string" },
+        "iconName": { "type": "string", "description": "Lucide icon name" },
+        "iconImage": { "type": "string", "description": "Custom icon image URL" }
+      },
+      "required": ["title", "desc", "image"]
+    },
+    "SiteSettings": {
+      "title": "Site Settings",
+      "description": "Global site content and settings",
+      "type": "object",
+      "properties": {
+        "heroTitle": { "type": "string" },
+        "heroSubtitle": { "type": "string" },
+        "phone": { "type": "string" },
+        "whatsapp": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/services/{serviceId}": {
+      "schema": "Service",
+      "description": "Main services collection"
+    },
+    "/specialized_services/{specializedServiceId}": {
+      "schema": "SpecializedService",
+      "description": "Specialized services collection"
+    },
+    "/settings/site": {
+      "schema": "SiteSettings",
+      "description": "Global site settings"
+    }
+  }
+}

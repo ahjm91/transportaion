@@ -1,0 +1,15 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "Noto Sans Arabic", ui-sans-serif, system-ui, sans-serif;
+  --color-gold: #D4AF37;
+  --color-dark: #0A0A0A;
+}
+
+@layer base {
+  body {
+    @apply bg-white text-gray-900 antialiased;
+    direction: rtl;
+  }
+}

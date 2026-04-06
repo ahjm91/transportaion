@@ -1,0 +1,7 @@
+{
+  "name": "Alhatab VIP Taxi - خدمات التوصيل الفاخرة",
+  "description": "خدمات توصيل لوميزين وتاكسي فاخر في مملكة البحرين وجميع دول الخليج.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
