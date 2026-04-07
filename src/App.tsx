@@ -27,7 +27,14 @@ import {
   Save,
   Image as ImageIcon,
   Loader2,
-  Upload
+  Upload,
+  FileText,
+  Download,
+  Search,
+  Filter,
+  DollarSign,
+  TrendingUp,
+  PieChart
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
@@ -88,6 +95,27 @@ interface SiteSettings {
   whatsapp: string;
 }
 
+interface Trip {
+  id: string;
+  customerName: string;
+  phone: string;
+  passengers: number;
+  bags: number;
+  direction: string;
+  pickup: string;
+  dropoff: string;
+  date: string;
+  time: string;
+  amount: number;
+  driverType: 'In' | 'Out';
+  driverName: string;
+  driverCost: number;
+  profit: number;
+  paymentStatus: 'Paid' | 'Unpaid' | 'Pending';
+  notes: string;
+  createdAt: string;
+}
+
 export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isTermsOpen, setIsTermsOpen] = useState(false);
@@ -96,9 +124,30 @@ export default function App() {
   const [isUploading, setIsUploading] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [activeTab, setActiveTab] = useState<'content' | 'accounting'>('content');
+  const [isTripFormOpen, setIsTripFormOpen] = useState(false);
+  const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
+  const [tripFormData, setTripFormData] = useState<Partial<Trip>>({
+    customerName: '',
+    phone: '',
+    passengers: 1,
+    bags: 0,
+    direction: '',
+    pickup: '',
+    dropoff: '',
+    date: new Date().toISOString().split('T')[0],
+    time: '10:00',
+    amount: 0,
+    driverType: 'In',
+    driverName: '',
+    driverCost: 0,
+    paymentStatus: 'Pending',
+    notes: ''
+  });
   
   const [services, setServices] = useState<Service[]>([]);
   const [specializedServices, setSpecializedServices] = useState<SpecializedService[]>([]);
+  const [trips, setTrips] = useState<Trip[]>([]);
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({
     heroTitle: 'Alhatab VIP Taxi',
     heroSubtitle: 'فخامة التنقل',
@@ -145,13 +194,50 @@ export default function App() {
       }
     });
 
+    let unsubscribeTrips = () => {};
+    if (isAdmin) {
+      unsubscribeTrips = onSnapshot(collection(db, 'trips'), (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Trip));
+        setTrips(data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      });
+    }
+
     return () => {
       unsubscribeAuth();
       unsubscribeServices();
       unsubscribeSpecialized();
       unsubscribeSettings();
+      unsubscribeTrips();
     };
-  }, []);
+  }, [isAdmin]);
+
+  // Auto-fix broken specialized service images
+  useEffect(() => {
+    if (isAdmin && specializedServices.length > 0) {
+      const brokenQatar = [
+        'https://images.unsplash.com/photo-1594841763055-6693f0c003cb?auto=format&fit=crop&q=80&w=800',
+        'https://images.unsplash.com/photo-1578891752244-dd7d675bc914?auto=format&fit=crop&q=80&w=800'
+      ];
+      const brokenKuwait = [
+        'https://images.unsplash.com/photo-1516640997890-5026049981f6?auto=format&fit=crop&q=80&w=800',
+        'https://images.unsplash.com/photo-1554254114-f16668702f3c?auto=format&fit=crop&q=80&w=800'
+      ];
+      
+      const qatar = specializedServices.find(s => brokenQatar.includes(s.image));
+      if (qatar) {
+        updateDoc(doc(db, 'specialized_services', qatar.id), {
+          image: 'https://picsum.photos/seed/qatar/800/600'
+        });
+      }
+      
+      const kuwait = specializedServices.find(s => brokenKuwait.includes(s.image));
+      if (kuwait) {
+        updateDoc(doc(db, 'specialized_services', kuwait.id), {
+          image: 'https://picsum.photos/seed/kuwait/800/600'
+        });
+      }
+    }
+  }, [isAdmin, specializedServices]);
 
   const handleLogin = async () => {
     try {
@@ -291,13 +377,13 @@ export default function App() {
         title: 'رحلات قطر',
         desc: 'استمتع برحلة دولية فاخرة إلى الدوحة، مع إطلالات بانورامية على أفق المدينة الحديث والخليج الغربي.',
         iconName: 'MapPin',
-        image: 'https://images.unsplash.com/photo-1594841763055-6693f0c003cb?auto=format&fit=crop&q=80&w=800'
+        image: 'https://picsum.photos/seed/qatar/800/600'
       },
       {
         title: 'رحلات الكويت',
         desc: 'رحلات برية مباشرة إلى دولة الكويت، نصل بك إلى قلب العاصمة مع إطلالة على أبراج الكويت الشهيرة.',
         iconName: 'MapPin',
-        image: 'https://images.unsplash.com/photo-1516640997890-5026049981f6?auto=format&fit=crop&q=80&w=800'
+        image: 'https://picsum.photos/seed/kuwait/800/600'
       },
       {
         title: 'رحلات مكة والمدينة',
@@ -328,6 +414,18 @@ export default function App() {
         desc: 'رحلات تسوق عصرية إلى أرقى مولات الخبر والدمام، حيث الطابع التجاري الحديث والرفاهية المطلقة.',
         iconName: 'ShoppingBag',
         image: 'https://images.unsplash.com/photo-1589883661923-6476cb0ae9f2?auto=format&fit=crop&q=80&w=800'
+      },
+      {
+        title: 'رحلات الأردن',
+        desc: 'رحلات برية مميزة إلى المملكة الأردنية الهاشمية، نصل بك إلى عمان والبتراء مع توفير أعلى سبل الراحة والأمان.',
+        iconName: 'MapPin',
+        image: 'https://images.unsplash.com/photo-1547234935-80c7145ec969?auto=format&fit=crop&q=80&w=800'
+      },
+      {
+        title: 'رحلات عمان',
+        desc: 'استكشف جمال سلطنة عمان معنا، رحلات دولية مريحة إلى مسقط وصلالة عبر أحدث السيارات الفاخرة.',
+        iconName: 'MapPin',
+        image: 'https://images.unsplash.com/photo-1544197150-b99a580bb7a8?auto=format&fit=crop&q=80&w=800'
       }
     ];
 
@@ -346,6 +444,94 @@ export default function App() {
     });
 
     alert('تم تهيئة قاعدة البيانات بنجاح!');
+  };
+
+  const handleSaveTrip = async () => {
+    if (!isAdmin) return;
+    
+    const amount = Number(tripFormData.amount) || 0;
+    const driverCost = Number(tripFormData.driverCost) || 0;
+    const profit = amount - driverCost;
+    
+    const data = {
+      ...tripFormData,
+      amount,
+      driverCost,
+      profit,
+      createdAt: editingTrip ? editingTrip.createdAt : new Date().toISOString()
+    };
+
+    const path = 'trips';
+    try {
+      if (editingTrip) {
+        await updateDoc(doc(db, path, editingTrip.id), data);
+      } else {
+        await addDoc(collection(db, path), data);
+      }
+      setIsTripFormOpen(false);
+      setEditingTrip(null);
+      setTripFormData({
+        customerName: '',
+        phone: '',
+        passengers: 1,
+        bags: 0,
+        direction: '',
+        pickup: '',
+        dropoff: '',
+        date: new Date().toISOString().split('T')[0],
+        time: '10:00',
+        amount: 0,
+        driverType: 'In',
+        driverName: '',
+        driverCost: 0,
+        paymentStatus: 'Pending',
+        notes: ''
+      });
+    } catch (error: any) {
+      const errInfo = {
+        error: error.message,
+        operationType: editingTrip ? 'update' : 'create',
+        path: editingTrip ? `${path}/${editingTrip.id}` : path,
+        authInfo: {
+          userId: auth.currentUser?.uid,
+          email: auth.currentUser?.email,
+          emailVerified: auth.currentUser?.emailVerified,
+        }
+      };
+      console.error('Firestore Error:', JSON.stringify(errInfo));
+      alert('حدث خطأ أثناء حفظ البيانات. يرجى التحقق من الصلاحيات.');
+    }
+  };
+
+  const exportTripsToCSV = () => {
+    const headers = [
+      'Trip ID', 'Customer Name', 'Phone', 'Passengers', 'Bags', 
+      'Direction', 'Pickup', 'Drop-off', 'Date', 'Time', 
+      'Amount (BHD)', 'Driver Type', 'Driver Name', 'Driver Cost (BHD)', 
+      'Profit (BHD)', 'Payment Status', 'Notes'
+    ];
+
+    const rows = trips.map(t => [
+      t.id, t.customerName, t.phone, t.passengers, t.bags,
+      t.direction, t.pickup, t.dropoff, t.date, t.time,
+      t.amount, t.driverType, t.driverName, t.driverCost,
+      t.profit, t.paymentStatus, t.notes
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `trips_report_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -1138,7 +1324,26 @@ export default function App() {
                   </div>
                   <div>
                     <h3 className="text-2xl font-bold text-dark">لوحة التحكم</h3>
-                    <p className="text-sm text-gray-500">إدارة محتوى الموقع والصور</p>
+                    <div className="flex gap-4 mt-1">
+                      <button 
+                        onClick={() => setActiveTab('content')}
+                        className={cn(
+                          "text-sm font-bold transition-colors",
+                          activeTab === 'content' ? "text-gold" : "text-gray-400 hover:text-gray-600"
+                        )}
+                      >
+                        إدارة المحتوى
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('accounting')}
+                        className={cn(
+                          "text-sm font-bold transition-colors",
+                          activeTab === 'accounting' ? "text-gold" : "text-gray-400 hover:text-gray-600"
+                        )}
+                      >
+                        النظام المحاسبي
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
@@ -1196,247 +1401,210 @@ export default function App() {
               
               <div className="p-8 overflow-y-auto" dir="rtl">
                 <div className="space-y-12">
-                  {/* Site Settings */}
-                  <section>
-                    <h4 className="text-xl font-bold mb-6 flex items-center gap-2">
-                      <Car className="text-gold w-6 h-6" />
-                      إعدادات الموقع العامة
-                    </h4>
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="text-sm font-bold text-gray-600">عنوان الهيرو</label>
-                        <input 
-                          type="text" 
-                          className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
-                          value={siteSettings.heroTitle}
-                          onChange={e => {
-                            const newSettings = { ...siteSettings, heroTitle: e.target.value };
-                            setSiteSettings(newSettings);
-                            updateDoc(doc(db, 'settings', 'site'), newSettings);
-                          }}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-bold text-gray-600">العنوان الفرعي</label>
-                        <input 
-                          type="text" 
-                          className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
-                          value={siteSettings.heroSubtitle}
-                          onChange={e => {
-                            const newSettings = { ...siteSettings, heroSubtitle: e.target.value };
-                            setSiteSettings(newSettings);
-                            updateDoc(doc(db, 'settings', 'site'), newSettings);
-                          }}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-bold text-gray-600">رقم الهاتف</label>
-                        <input 
-                          type="text" 
-                          className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
-                          value={siteSettings.phone}
-                          onChange={e => {
-                            const newSettings = { ...siteSettings, phone: e.target.value };
-                            setSiteSettings(newSettings);
-                            updateDoc(doc(db, 'settings', 'site'), newSettings);
-                          }}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-bold text-gray-600">رقم الواتساب (بدون +)</label>
-                        <input 
-                          type="text" 
-                          className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
-                          value={siteSettings.whatsapp}
-                          onChange={e => {
-                            const newSettings = { ...siteSettings, whatsapp: e.target.value };
-                            setSiteSettings(newSettings);
-                            updateDoc(doc(db, 'settings', 'site'), newSettings);
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </section>
-
-                  {/* Services Management */}
-                  <section>
-                    <div className="flex justify-between items-center mb-6">
-                      <h4 className="text-xl font-bold flex items-center gap-2">
-                        <Star className="text-gold w-6 h-6" />
-                        إدارة الخدمات الرئيسية
-                      </h4>
-                      <button 
-                        onClick={() => addDoc(collection(db, 'services'), {
-                          name: 'خدمة جديدة',
-                          description: 'وصف الخدمة هنا',
-                          image: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=800',
-                          features: ['ميزة 1']
-                        })}
-                        className="bg-gold text-white px-4 py-2 rounded-xl flex items-center gap-2 font-bold"
-                      >
-                        <Plus className="w-5 h-5" />
-                        إضافة خدمة
-                      </button>
-                    </div>
-                    <div className="grid gap-6">
-                      {services.map(service => (
-                        <div key={service.id} className="bg-gray-50 p-6 rounded-3xl border border-gray-200">
-                          <div className="grid md:grid-cols-3 gap-6">
-                            <div className="space-y-4">
-                              <div className="relative h-40 rounded-2xl overflow-hidden bg-gray-200 group/img">
-                              <div 
-                                className="w-full h-full bg-cover bg-center"
-                                style={{ backgroundImage: `url(${service.image})` }}
-                                key={service.image}
-                              />
-                              <div className="absolute top-2 right-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded">
-                                {service.image.substring(0, 30)}...
-                              </div>
-                                <label className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity cursor-pointer">
-                                  {isUploading === service.id + 'image' ? (
-                                    <Loader2 className="text-white w-8 h-8 animate-spin" />
-                                  ) : (
-                                    <>
-                                      <Upload className="text-white w-8 h-8 mb-2" />
-                                      <span className="text-white text-xs font-bold">رفع صورة من الجهاز</span>
-                                    </>
-                                  )}
-                                  <input 
-                                    type="file" 
-                                    className="hidden" 
-                                    accept="image/*"
-                                    onChange={(e) => {
-                                      const file = e.target.files?.[0];
-                                      if (file) handleImageUpload(file, 'services', service.id);
-                                    }}
-                                  />
-                                </label>
-                              </div>
-                              <div className="flex gap-2">
-                                <input 
-                                  type="text" 
-                                  placeholder="رابط الصورة"
-                                  className="flex-1 text-xs bg-white border-gray-200 rounded-lg p-2"
-                                  value={service.image}
-                                  onChange={e => updateDoc(doc(db, 'services', service.id), { image: e.target.value })}
-                                />
-                                <button 
-                                  onClick={() => updateDoc(doc(db, 'services', service.id), { image: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=800' })}
-                                  className="text-[10px] bg-gray-200 px-2 rounded hover:bg-gray-300"
-                                >
-                                  إعادة تعيين
-                                </button>
-                              </div>
-                            </div>
-                            <div className="md:col-span-2 space-y-4">
-                              <div className="flex justify-between">
-                                <input 
-                                  type="text" 
-                                  className="text-xl font-bold bg-transparent border-b border-gray-300 focus:border-gold outline-none w-full"
-                                  value={service.name}
-                                  onChange={e => updateDoc(doc(db, 'services', service.id), { name: e.target.value })}
-                                />
-                                <button 
-                                  onClick={() => deleteDoc(doc(db, 'services', service.id))}
-                                  className="text-red-500 p-2 hover:bg-red-50 rounded-lg transition-colors"
-                                >
-                                  <Trash2 className="w-5 h-5" />
-                                </button>
-                              </div>
-                              <textarea 
-                                className="w-full bg-white border-gray-200 rounded-xl p-3 text-sm h-24"
-                                value={service.description}
-                                onChange={e => updateDoc(doc(db, 'services', service.id), { description: e.target.value })}
-                              />
-                            </div>
+                  {activeTab === 'content' ? (
+                    <>
+                      {/* Site Settings */}
+                      <section>
+                        <h4 className="text-xl font-bold mb-6 flex items-center gap-2">
+                          <Car className="text-gold w-6 h-6" />
+                          إعدادات الموقع العامة
+                        </h4>
+                        <div className="grid md:grid-cols-2 gap-6">
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-600">عنوان الهيرو</label>
+                            <input 
+                              type="text" 
+                              className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
+                              value={siteSettings.heroTitle}
+                              onChange={e => {
+                                const newSettings = { ...siteSettings, heroTitle: e.target.value };
+                                setSiteSettings(newSettings);
+                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-600">العنوان الفرعي</label>
+                            <input 
+                              type="text" 
+                              className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
+                              value={siteSettings.heroSubtitle}
+                              onChange={e => {
+                                const newSettings = { ...siteSettings, heroSubtitle: e.target.value };
+                                setSiteSettings(newSettings);
+                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-600">رقم الهاتف</label>
+                            <input 
+                              type="text" 
+                              className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
+                              value={siteSettings.phone}
+                              onChange={e => {
+                                const newSettings = { ...siteSettings, phone: e.target.value };
+                                setSiteSettings(newSettings);
+                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-600">رقم الواتساب (بدون +)</label>
+                            <input 
+                              type="text" 
+                              className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
+                              value={siteSettings.whatsapp}
+                              onChange={e => {
+                                const newSettings = { ...siteSettings, whatsapp: e.target.value };
+                                setSiteSettings(newSettings);
+                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                              }}
+                            />
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </section>
+                      </section>
 
-                  {/* Specialized Services Management */}
-                  <section>
-                    <div className="flex justify-between items-center mb-6">
-                      <h4 className="text-xl font-bold flex items-center gap-2">
-                        <MapPin className="text-gold w-6 h-6" />
-                        إدارة الخدمات المتخصصة (الرحلات)
-                      </h4>
-                      <button 
-                        onClick={() => addDoc(collection(db, 'specialized_services'), {
-                          title: 'رحلة جديدة',
-                          desc: 'وصف الرحلة هنا',
-                          image: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&q=80&w=800',
-                          iconName: 'MapPin'
-                        })}
-                        className="bg-gold text-white px-4 py-2 rounded-xl flex items-center gap-2 font-bold"
-                      >
-                        <Plus className="w-5 h-5" />
-                        إضافة رحلة
-                      </button>
-                    </div>
-                    <div className="grid md:grid-cols-2 gap-6">
-                      {specializedServices.map(service => {
-                        const Icon = {
-                          Clock, MapPin, Star, Users, Camera, ShoppingBag
-                        }[service.iconName] || MapPin;
-                        
-                        return (
-                          <div key={service.id} className="bg-gray-50 p-6 rounded-3xl border border-gray-200 space-y-4">
-                          <div className="flex gap-4">
-                            <div className="relative w-24 h-24 rounded-2xl overflow-hidden shrink-0 bg-gray-200 group/img">
-                              <div 
-                                className="w-full h-full bg-cover bg-center"
-                                style={{ backgroundImage: `url(${service.image})` }}
-                                key={service.image}
-                              />
-                              <div className="absolute top-1 right-1 bg-black/50 text-white text-[8px] px-1 rounded">
-                                {service.image.substring(0, 15)}...
+                      {/* Services Management */}
+                      <section>
+                        <div className="flex justify-between items-center mb-6">
+                          <h4 className="text-xl font-bold flex items-center gap-2">
+                            <Star className="text-gold w-6 h-6" />
+                            إدارة الخدمات الرئيسية
+                          </h4>
+                          <button 
+                            onClick={() => addDoc(collection(db, 'services'), {
+                              name: 'خدمة جديدة',
+                              description: 'وصف الخدمة هنا',
+                              image: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=800',
+                              features: ['ميزة 1']
+                            })}
+                            className="bg-gold text-white px-4 py-2 rounded-xl flex items-center gap-2 font-bold"
+                          >
+                            <Plus className="w-5 h-5" />
+                            إضافة خدمة
+                          </button>
+                        </div>
+                        <div className="grid gap-6">
+                          {services.map(service => (
+                            <div key={service.id} className="bg-gray-50 p-6 rounded-3xl border border-gray-200">
+                              <div className="grid md:grid-cols-3 gap-6">
+                                <div className="space-y-4">
+                                  <div className="relative h-40 rounded-2xl overflow-hidden bg-gray-200 group/img">
+                                  <div 
+                                    className="w-full h-full bg-cover bg-center"
+                                    style={{ backgroundImage: `url(${service.image})` }}
+                                    key={service.image}
+                                  />
+                                  <div className="absolute top-2 right-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded">
+                                    {service.image.substring(0, 30)}...
+                                  </div>
+                                    <label className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity cursor-pointer">
+                                      {isUploading === service.id + 'image' ? (
+                                        <Loader2 className="text-white w-8 h-8 animate-spin" />
+                                      ) : (
+                                        <>
+                                          <Upload className="text-white w-8 h-8 mb-2" />
+                                          <span className="text-white text-xs font-bold">رفع صورة من الجهاز</span>
+                                        </>
+                                      )}
+                                      <input 
+                                        type="file" 
+                                        className="hidden" 
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) handleImageUpload(file, 'services', service.id);
+                                        }}
+                                      />
+                                    </label>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <input 
+                                      type="text" 
+                                      placeholder="رابط الصورة"
+                                      className="flex-1 text-xs bg-white border-gray-200 rounded-lg p-2"
+                                      value={service.image}
+                                      onChange={e => updateDoc(doc(db, 'services', service.id), { image: e.target.value })}
+                                    />
+                                    <button 
+                                      onClick={() => updateDoc(doc(db, 'services', service.id), { image: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=800' })}
+                                      className="text-[10px] bg-gray-200 px-2 rounded hover:bg-gray-300"
+                                    >
+                                      إعادة تعيين
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="md:col-span-2 space-y-4">
+                                  <div className="flex justify-between">
+                                    <input 
+                                      type="text" 
+                                      className="text-xl font-bold bg-transparent border-b border-gray-300 focus:border-gold outline-none w-full"
+                                      value={service.name}
+                                      onChange={e => updateDoc(doc(db, 'services', service.id), { name: e.target.value })}
+                                    />
+                                    <button 
+                                      onClick={() => deleteDoc(doc(db, 'services', service.id))}
+                                      className="text-red-500 p-2 hover:bg-red-50 rounded-lg transition-colors"
+                                    >
+                                      <Trash2 className="w-5 h-5" />
+                                    </button>
+                                  </div>
+                                  <textarea 
+                                    className="w-full bg-white border-gray-200 rounded-xl p-3 text-sm h-24"
+                                    value={service.description}
+                                    onChange={e => updateDoc(doc(db, 'services', service.id), { description: e.target.value })}
+                                  />
+                                </div>
                               </div>
-                              <label className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity cursor-pointer">
-                                {isUploading === service.id + 'image' ? (
-                                  <Loader2 className="text-white w-5 h-5 animate-spin" />
-                                ) : (
-                                  <Upload className="text-white w-5 h-5" />
-                                )}
-                                <input 
-                                  type="file" 
-                                  className="hidden" 
-                                  accept="image/*"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) handleImageUpload(file, 'specialized_services', service.id);
-                                  }}
-                                />
-                              </label>
                             </div>
-                            <div className="flex-1 space-y-2">
-                              <div className="flex justify-between">
-                                <input 
-                                  type="text" 
-                                  className="font-bold bg-transparent border-b border-gray-300 focus:border-gold outline-none w-full"
-                                  value={service.title}
-                                  onChange={e => updateDoc(doc(db, 'specialized_services', service.id), { title: e.target.value })}
-                                />
-                                <button 
-                                  onClick={() => deleteDoc(doc(db, 'specialized_services', service.id))}
-                                  className="text-red-500 p-1 hover:bg-red-50 rounded-lg transition-colors"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <div className="w-10 h-10 rounded-lg bg-white border border-gray-200 flex items-center justify-center overflow-hidden relative group/icon">
-                                  {service.iconImage ? (
-                                    <img src={service.iconImage} alt="" className="w-full h-full object-cover" />
-                                  ) : (
-                                    <Icon className="w-5 h-5 text-gold" />
-                                  )}
-                                  <label className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/icon:opacity-100 transition-opacity cursor-pointer">
-                                    {isUploading === service.id + 'iconImage' ? (
-                                      <Loader2 className="text-white w-3 h-3 animate-spin" />
+                          ))}
+                        </div>
+                      </section>
+
+                      {/* Specialized Services Management */}
+                      <section>
+                        <div className="flex justify-between items-center mb-6">
+                          <h4 className="text-xl font-bold flex items-center gap-2">
+                            <MapPin className="text-gold w-6 h-6" />
+                            إدارة الخدمات المتخصصة (الرحلات)
+                          </h4>
+                          <button 
+                            onClick={() => addDoc(collection(db, 'specialized_services'), {
+                              title: 'رحلة جديدة',
+                              desc: 'وصف الرحلة هنا',
+                              image: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&q=80&w=800',
+                              iconName: 'MapPin'
+                            })}
+                            className="bg-gold text-white px-4 py-2 rounded-xl flex items-center gap-2 font-bold"
+                          >
+                            <Plus className="w-5 h-5" />
+                            إضافة رحلة
+                          </button>
+                        </div>
+                        <div className="grid md:grid-cols-2 gap-6">
+                          {specializedServices.map(service => {
+                            const Icon = {
+                              Clock, MapPin, Star, Users, Camera, ShoppingBag
+                            }[service.iconName] || MapPin;
+                            
+                            return (
+                              <div key={service.id} className="bg-gray-50 p-6 rounded-3xl border border-gray-200 space-y-4">
+                              <div className="flex gap-4">
+                                <div className="relative w-24 h-24 rounded-2xl overflow-hidden shrink-0 bg-gray-200 group/img">
+                                  <div 
+                                    className="w-full h-full bg-cover bg-center"
+                                    style={{ backgroundImage: `url(${service.image})` }}
+                                    key={service.image}
+                                  />
+                                  <div className="absolute top-1 right-1 bg-black/50 text-white text-[8px] px-1 rounded">
+                                    {service.image.substring(0, 15)}...
+                                  </div>
+                                  <label className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity cursor-pointer">
+                                    {isUploading === service.id + 'image' ? (
+                                      <Loader2 className="text-white w-5 h-5 animate-spin" />
                                     ) : (
-                                      <Upload className="text-white w-3 h-3" />
+                                      <Upload className="text-white w-5 h-5" />
                                     )}
                                     <input 
                                       type="file" 
@@ -1444,60 +1612,293 @@ export default function App() {
                                       accept="image/*"
                                       onChange={(e) => {
                                         const file = e.target.files?.[0];
-                                        if (file) handleImageUpload(file, 'specialized_services', service.id, 'iconImage');
+                                        if (file) handleImageUpload(file, 'specialized_services', service.id);
                                       }}
                                     />
                                   </label>
                                 </div>
-                                <div className="flex-1 space-y-1">
-                                  <input 
-                                    type="text" 
-                                    placeholder="رابط أيقونة مخصصة"
-                                    className="w-full text-[10px] bg-white border-gray-200 rounded p-1"
-                                    value={service.iconImage || ''}
-                                    onChange={e => updateDoc(doc(db, 'specialized_services', service.id), { iconImage: e.target.value })}
-                                  />
-                                  <select 
-                                    className="w-full text-[10px] bg-white border-gray-200 rounded p-1"
-                                    value={service.iconName}
-                                    onChange={e => updateDoc(doc(db, 'specialized_services', service.id), { iconName: e.target.value })}
-                                  >
-                                    <option value="Clock">ساعة</option>
-                                    <option value="MapPin">موقع</option>
-                                    <option value="Star">نجمة</option>
-                                    <option value="Users">أشخاص</option>
-                                    <option value="Camera">كاميرا</option>
-                                    <option value="ShoppingBag">حقيبة تسوق</option>
-                                  </select>
+                                <div className="flex-1 space-y-2">
+                                  <div className="flex justify-between">
+                                    <input 
+                                      type="text" 
+                                      className="font-bold bg-transparent border-b border-gray-300 focus:border-gold outline-none w-full"
+                                      value={service.title}
+                                      onChange={e => updateDoc(doc(db, 'specialized_services', service.id), { title: e.target.value })}
+                                    />
+                                    <button 
+                                      onClick={() => deleteDoc(doc(db, 'specialized_services', service.id))}
+                                      className="text-red-500 p-1 hover:bg-red-50 rounded-lg transition-colors"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-10 h-10 rounded-lg bg-white border border-gray-200 flex items-center justify-center overflow-hidden relative group/icon">
+                                      {service.iconImage ? (
+                                        <img src={service.iconImage} alt="" className="w-full h-full object-cover" />
+                                      ) : (
+                                        <Icon className="w-5 h-5 text-gold" />
+                                      )}
+                                      <label className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/icon:opacity-100 transition-opacity cursor-pointer">
+                                        {isUploading === service.id + 'iconImage' ? (
+                                          <Loader2 className="text-white w-3 h-3 animate-spin" />
+                                        ) : (
+                                          <Upload className="text-white w-3 h-3" />
+                                        )}
+                                        <input 
+                                          type="file" 
+                                          className="hidden" 
+                                          accept="image/*"
+                                          onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) handleImageUpload(file, 'specialized_services', service.id, 'iconImage');
+                                          }}
+                                        />
+                                      </label>
+                                    </div>
+                                    <div className="flex-1 space-y-1">
+                                      <input 
+                                        type="text" 
+                                        placeholder="رابط أيقونة مخصصة"
+                                        className="w-full text-[10px] bg-white border-gray-200 rounded p-1"
+                                        value={service.iconImage || ''}
+                                        onChange={e => updateDoc(doc(db, 'specialized_services', service.id), { iconImage: e.target.value })}
+                                      />
+                                      <select 
+                                        className="w-full text-[10px] bg-white border-gray-200 rounded p-1"
+                                        value={service.iconName}
+                                        onChange={e => updateDoc(doc(db, 'specialized_services', service.id), { iconName: e.target.value })}
+                                      >
+                                        <option value="Clock">ساعة</option>
+                                        <option value="MapPin">موقع</option>
+                                        <option value="Star">نجمة</option>
+                                        <option value="Users">أشخاص</option>
+                                        <option value="Camera">كاميرا</option>
+                                        <option value="ShoppingBag">حقيبة تسوق</option>
+                                      </select>
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
+                              <div className="flex gap-2">
+                                <input 
+                                  type="text" 
+                                  placeholder="رابط الصورة"
+                                  className="flex-1 text-xs bg-white border-gray-200 rounded-lg p-2"
+                                  value={service.image}
+                                  onChange={e => updateDoc(doc(db, 'specialized_services', service.id), { image: e.target.value })}
+                                />
+                                <button 
+                                  onClick={() => updateDoc(doc(db, 'specialized_services', service.id), { image: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&q=80&w=800' })}
+                                  className="text-[10px] bg-gray-200 px-2 rounded hover:bg-gray-300"
+                                >
+                                  إعادة تعيين
+                                </button>
+                              </div>
+                              <textarea 
+                                className="w-full bg-white border-gray-200 rounded-xl p-3 text-sm h-20"
+                                value={service.desc}
+                                onChange={e => updateDoc(doc(db, 'specialized_services', service.id), { desc: e.target.value })}
+                              />
                             </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <input 
-                              type="text" 
-                              placeholder="رابط الصورة"
-                              className="flex-1 text-xs bg-white border-gray-200 rounded-lg p-2"
-                              value={service.image}
-                              onChange={e => updateDoc(doc(db, 'specialized_services', service.id), { image: e.target.value })}
-                            />
-                            <button 
-                              onClick={() => updateDoc(doc(db, 'specialized_services', service.id), { image: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&q=80&w=800' })}
-                              className="text-[10px] bg-gray-200 px-2 rounded hover:bg-gray-300"
-                            >
-                              إعادة تعيين
-                            </button>
-                          </div>
-                          <textarea 
-                            className="w-full bg-white border-gray-200 rounded-xl p-3 text-sm h-20"
-                            value={service.desc}
-                            onChange={e => updateDoc(doc(db, 'specialized_services', service.id), { desc: e.target.value })}
-                          />
+                          );
+                        })}
                         </div>
-                      );
-                    })}
-                    </div>
-                  </section>
+                      </section>
+                    </>
+                  ) : (
+                    <section className="space-y-8">
+                      {/* Accounting Stats */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+                          <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 mb-3">
+                            <TrendingUp className="w-5 h-5" />
+                          </div>
+                          <p className="text-xs text-gray-500 font-bold mb-1">إجمالي الرحلات</p>
+                          <p className="text-2xl font-black text-dark">{trips.length}</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+                          <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center text-green-600 mb-3">
+                            <DollarSign className="w-5 h-5" />
+                          </div>
+                          <p className="text-xs text-gray-500 font-bold mb-1">إجمالي الأرباح</p>
+                          <p className="text-2xl font-black text-dark">
+                            {trips.reduce((acc, t) => acc + (t.profit || 0), 0).toFixed(2)} <span className="text-xs">BHD</span>
+                          </p>
+                        </div>
+                        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+                          <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600 mb-3">
+                            <Users className="w-5 h-5" />
+                          </div>
+                          <p className="text-xs text-gray-500 font-bold mb-1">تكلفة السائقين</p>
+                          <p className="text-2xl font-black text-dark">
+                            {trips.reduce((acc, t) => acc + (t.driverCost || 0), 0).toFixed(2)} <span className="text-xs">BHD</span>
+                          </p>
+                        </div>
+                        <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+                          <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center text-purple-600 mb-3">
+                            <Calendar className="w-5 h-5" />
+                          </div>
+                          <p className="text-xs text-gray-500 font-bold mb-1">حجوزات اليوم</p>
+                          <p className="text-2xl font-black text-dark">
+                            {trips.filter(t => t.date === new Date().toISOString().split('T')[0]).length}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Accounting Controls */}
+                      <div className="flex flex-wrap gap-4 justify-between items-center">
+                        <div className="flex gap-4">
+                          <button 
+                            onClick={() => {
+                              setEditingTrip(null);
+                              setTripFormData({
+                                customerName: '',
+                                phone: '',
+                                passengers: 1,
+                                bags: 0,
+                                direction: '',
+                                pickup: '',
+                                dropoff: '',
+                                date: new Date().toISOString().split('T')[0],
+                                time: '10:00',
+                                amount: 0,
+                                driverType: 'In',
+                                driverName: '',
+                                driverCost: 0,
+                                paymentStatus: 'Pending',
+                                notes: ''
+                              });
+                              setIsTripFormOpen(true);
+                            }}
+                            className="bg-gold text-white px-6 py-3 rounded-2xl flex items-center gap-2 font-bold shadow-lg shadow-gold/20 hover:scale-105 transition-all"
+                          >
+                            <Plus className="w-5 h-5" />
+                            إضافة رحلة جديدة
+                          </button>
+                          <button 
+                            onClick={exportTripsToCSV}
+                            className="bg-white text-dark border border-gray-200 px-6 py-3 rounded-2xl flex items-center gap-2 font-bold hover:bg-gray-50 transition-all"
+                          >
+                            <Download className="w-5 h-5" />
+                            تصدير Excel
+                          </button>
+                        </div>
+                        
+                        <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl">
+                          {['الكل', 'مدفوع', 'غير مدفوع', 'معلق'].map(status => (
+                            <button 
+                              key={status}
+                              className="px-4 py-2 rounded-xl text-xs font-bold transition-all"
+                            >
+                              {status}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Accounting Table */}
+                      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-right text-xs">
+                            <thead>
+                              <tr className="bg-gray-50 border-b border-gray-100">
+                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Trip ID</th>
+                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Customer Name</th>
+                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Phone</th>
+                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap text-center">No. of Passengers</th>
+                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider text-center">Bags</th>
+                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Trip Direction</th>
+                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Pickup Location</th>
+                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Drop-off Location</th>
+                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Trip Date</th>
+                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Trip Time</th>
+                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Trip Amount (BHD)</th>
+                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Driver Type (In/Out)</th>
+                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Driver Name</th>
+                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Driver Cost (BHD)</th>
+                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Company Profit (BHD)</th>
+                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Payment Status</th>
+                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider">Notes</th>
+                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                              {trips.map((trip, idx) => (
+                                <tr key={trip.id} className="hover:bg-gray-50/50 transition-colors">
+                                  <td className="p-4 font-bold text-gray-400">{(trips.length - idx).toString().padStart(3, '0')}</td>
+                                  <td className="p-4 font-bold text-dark whitespace-nowrap">{trip.customerName}</td>
+                                  <td className="p-4 font-bold text-dark whitespace-nowrap">{trip.phone}</td>
+                                  <td className="p-4 font-bold text-dark text-center">{trip.passengers}</td>
+                                  <td className="p-4 font-bold text-dark text-center">{trip.bags}</td>
+                                  <td className="p-4 font-bold text-dark whitespace-nowrap">{trip.direction}</td>
+                                  <td className="p-4 font-bold text-dark whitespace-nowrap">{trip.pickup}</td>
+                                  <td className="p-4 font-bold text-dark whitespace-nowrap">{trip.dropoff}</td>
+                                  <td className="p-4 font-bold text-dark whitespace-nowrap">{trip.date}</td>
+                                  <td className="p-4 font-bold text-dark whitespace-nowrap">{trip.time}</td>
+                                  <td className="p-4 font-black text-dark">{trip.amount}</td>
+                                  <td className="p-4">
+                                    <span className={cn(
+                                      "px-2 py-0.5 rounded font-bold",
+                                      trip.driverType === 'In' ? "bg-blue-50 text-blue-600" : "bg-purple-50 text-purple-600"
+                                    )}>
+                                      {trip.driverType === 'In' ? 'In' : 'Out'}
+                                    </span>
+                                  </td>
+                                  <td className="p-4 font-bold text-dark whitespace-nowrap">{trip.driverName}</td>
+                                  <td className="p-4 font-bold text-dark">{trip.driverCost}</td>
+                                  <td className="p-4 font-black text-green-600">{trip.profit?.toFixed(2)}</td>
+                                  <td className="p-4">
+                                    <span className={cn(
+                                      "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
+                                      trip.paymentStatus === 'Paid' ? "bg-green-100 text-green-700" :
+                                      trip.paymentStatus === 'Unpaid' ? "bg-red-100 text-red-700" :
+                                      "bg-amber-100 text-amber-700"
+                                    )}>
+                                      {trip.paymentStatus === 'Paid' ? 'Paid' :
+                                       trip.paymentStatus === 'Unpaid' ? 'Unpaid' : 'Pending'}
+                                    </span>
+                                  </td>
+                                  <td className="p-4 text-gray-400 max-w-[150px] truncate">{trip.notes || '—'}</td>
+                                  <td className="p-4">
+                                    <div className="flex gap-2">
+                                      <button 
+                                        onClick={() => {
+                                          setEditingTrip(trip);
+                                          setTripFormData(trip);
+                                          setIsTripFormOpen(true);
+                                        }}
+                                        className="p-2 hover:bg-blue-50 text-blue-600 rounded-xl transition-colors"
+                                      >
+                                        <Settings className="w-4 h-4" />
+                                      </button>
+                                      <button 
+                                        onClick={() => {
+                                          if (window.confirm('هل أنت متأكد من حذف هذه الرحلة؟')) {
+                                            deleteDoc(doc(db, 'trips', trip.id));
+                                          }
+                                        }}
+                                        className="p-2 hover:bg-red-50 text-red-600 rounded-xl transition-colors"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                              {trips.length === 0 && (
+                                <tr>
+                                  <td colSpan={18} className="p-12 text-center text-gray-400 font-bold">
+                                    لا توجد رحلات مسجلة حالياً
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </section>
+                  )}
                 </div>
               </div>
               
@@ -1507,6 +1908,235 @@ export default function App() {
                   className="bg-dark text-white px-12 py-4 rounded-2xl font-bold hover:bg-gray-800 transition-all"
                 >
                   حفظ وإغلاق
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Trip Form Modal */}
+      <AnimatePresence>
+        {isTripFormOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsTripFormOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative bg-white w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+              dir="rtl"
+            >
+              <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <div>
+                  <h3 className="text-2xl font-black text-dark">
+                    {editingTrip ? 'تعديل بيانات الرحلة' : 'إضافة رحلة جديدة'}
+                  </h3>
+                  <p className="text-gray-500 text-sm font-bold">أدخل تفاصيل الرحلة والبيانات المالية</p>
+                </div>
+                <button 
+                  onClick={() => setIsTripFormOpen(false)}
+                  className="w-12 h-12 bg-white border border-gray-200 rounded-2xl flex items-center justify-center text-gray-400 hover:text-dark transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="p-8 overflow-y-auto space-y-8">
+                {/* Customer Info */}
+                <div className="grid md:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase">اسم العميل</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                      value={tripFormData.customerName}
+                      onChange={e => setTripFormData({ ...tripFormData, customerName: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase">رقم الهاتف</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                      value={tripFormData.phone}
+                      onChange={e => setTripFormData({ ...tripFormData, phone: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-gray-400 uppercase">الركاب</label>
+                      <input 
+                        type="number" 
+                        className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                        value={tripFormData.passengers}
+                        onChange={e => setTripFormData({ ...tripFormData, passengers: parseInt(e.target.value) || 0 })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-gray-400 uppercase">الحقائب</label>
+                      <input 
+                        type="number" 
+                        className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                        value={tripFormData.bags}
+                        onChange={e => setTripFormData({ ...tripFormData, bags: parseInt(e.target.value) || 0 })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Trip Details */}
+                <div className="grid md:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase">مسار الرحلة</label>
+                    <input 
+                      type="text" 
+                      placeholder="مثال: المطار ← الفندق"
+                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                      value={tripFormData.direction}
+                      onChange={e => setTripFormData({ ...tripFormData, direction: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase">نقطة الاستلام</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                      value={tripFormData.pickup}
+                      onChange={e => setTripFormData({ ...tripFormData, pickup: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase">نقطة التوصيل</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                      value={tripFormData.dropoff}
+                      onChange={e => setTripFormData({ ...tripFormData, dropoff: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase">التاريخ</label>
+                    <input 
+                      type="date" 
+                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                      value={tripFormData.date}
+                      onChange={e => setTripFormData({ ...tripFormData, date: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase">الوقت</label>
+                    <input 
+                      type="time" 
+                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                      value={tripFormData.time}
+                      onChange={e => setTripFormData({ ...tripFormData, time: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase">مبلغ الرحلة (BHD)</label>
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold text-gold"
+                      value={tripFormData.amount}
+                      onChange={e => setTripFormData({ ...tripFormData, amount: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
+                    />
+                  </div>
+                </div>
+
+                {/* Driver Info */}
+                <div className="bg-gray-50 p-8 rounded-[2.5rem] border border-gray-100 grid md:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase">نوع السائق</label>
+                    <div className="flex gap-2 p-1 bg-white rounded-xl border border-gray-200">
+                      <button 
+                        onClick={() => setTripFormData({ ...tripFormData, driverType: 'In' })}
+                        className={cn(
+                          "flex-1 py-2 rounded-lg text-xs font-bold transition-all",
+                          tripFormData.driverType === 'In' ? "bg-dark text-white" : "text-gray-400 hover:bg-gray-50"
+                        )}
+                      >
+                        داخلي
+                      </button>
+                      <button 
+                        onClick={() => setTripFormData({ ...tripFormData, driverType: 'Out' })}
+                        className={cn(
+                          "flex-1 py-2 rounded-lg text-xs font-bold transition-all",
+                          tripFormData.driverType === 'Out' ? "bg-dark text-white" : "text-gray-400 hover:bg-gray-50"
+                        )}
+                      >
+                        خارجي
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase">اسم السائق</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-white border-gray-200 rounded-2xl p-4 font-bold"
+                      value={tripFormData.driverName}
+                      onChange={e => setTripFormData({ ...tripFormData, driverName: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase">تكلفة السائق (BHD)</label>
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      className="w-full bg-white border-gray-200 rounded-2xl p-4 font-bold"
+                      value={tripFormData.driverCost}
+                      onChange={e => setTripFormData({ ...tripFormData, driverCost: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase">حالة الدفع</label>
+                    <select 
+                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                      value={tripFormData.paymentStatus}
+                      onChange={e => setTripFormData({ ...tripFormData, paymentStatus: e.target.value as any })}
+                    >
+                      <option value="Pending">معلق</option>
+                      <option value="Paid">مدفوع</option>
+                      <option value="Unpaid">غير مدفوع</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase">ملاحظات</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                      value={tripFormData.notes}
+                      onChange={e => setTripFormData({ ...tripFormData, notes: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-8 bg-gray-50 border-t border-gray-100 flex justify-end gap-4">
+                <button 
+                  onClick={() => setIsTripFormOpen(false)}
+                  className="px-8 py-4 rounded-2xl font-bold text-gray-500 hover:bg-gray-100 transition-all"
+                >
+                  إلغاء
+                </button>
+                <button 
+                  onClick={handleSaveTrip}
+                  className="bg-gold text-white px-12 py-4 rounded-2xl font-bold hover:bg-gold/90 transition-all shadow-lg shadow-gold/20"
+                >
+                  {editingTrip ? 'تحديث البيانات' : 'إضافة الرحلة'}
                 </button>
               </div>
             </motion.div>

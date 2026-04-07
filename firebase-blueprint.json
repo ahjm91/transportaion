@@ -39,6 +39,32 @@
         "phone": { "type": "string" },
         "whatsapp": { "type": "string" }
       }
+    },
+    "Trip": {
+      "title": "Trip",
+      "description": "A recorded trip for accounting purposes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerName": { "type": "string" },
+        "phone": { "type": "string" },
+        "passengers": { "type": "number" },
+        "bags": { "type": "number" },
+        "direction": { "type": "string" },
+        "pickup": { "type": "string" },
+        "dropoff": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "amount": { "type": "number" },
+        "driverType": { "type": "string", "enum": ["In", "Out"] },
+        "driverName": { "type": "string" },
+        "driverCost": { "type": "number" },
+        "profit": { "type": "number" },
+        "paymentStatus": { "type": "string", "enum": ["Paid", "Unpaid", "Pending"] },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["customerName", "phone", "amount", "driverCost", "date"]
     }
   },
   "firestore": {
@@ -53,6 +79,10 @@
     "/settings/site": {
       "schema": "SiteSettings",
       "description": "Global site settings"
+    },
+    "/trips/{tripId}": {
+      "schema": "Trip",
+      "description": "Accounting trips collection"
     }
   }
 }
