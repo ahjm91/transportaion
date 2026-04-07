@@ -34,7 +34,9 @@ import {
   Filter,
   DollarSign,
   TrendingUp,
-  PieChart
+  PieChart,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
@@ -86,6 +88,7 @@ interface SpecializedService {
   image: string;
   iconName: string;
   iconImage?: string;
+  order: number;
 }
 
 interface SiteSettings {
@@ -183,7 +186,7 @@ export default function App() {
     const unsubscribeSpecialized = onSnapshot(collection(db, 'specialized_services'), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SpecializedService));
       console.log('Specialized Services updated from Firestore:', data);
-      setSpecializedServices(data);
+      setSpecializedServices(data.sort((a, b) => (a.order || 0) - (b.order || 0)));
     }, (error) => {
       console.error('Firestore specialized services listener error:', error);
     });
@@ -211,9 +214,10 @@ export default function App() {
     };
   }, [isAdmin]);
 
-  // Auto-fix broken specialized service images
+  // Auto-fix broken specialized service images and missing order
   useEffect(() => {
     if (isAdmin && specializedServices.length > 0) {
+      // Fix images
       const brokenQatar = [
         'https://images.unsplash.com/photo-1594841763055-6693f0c003cb?auto=format&fit=crop&q=80&w=800',
         'https://images.unsplash.com/photo-1578891752244-dd7d675bc914?auto=format&fit=crop&q=80&w=800'
@@ -234,6 +238,16 @@ export default function App() {
       if (kuwait) {
         updateDoc(doc(db, 'specialized_services', kuwait.id), {
           image: 'https://picsum.photos/seed/kuwait/800/600'
+        });
+      }
+
+      // Fix missing order
+      const missingOrder = specializedServices.some(s => s.order === undefined);
+      if (missingOrder) {
+        specializedServices.forEach((s, i) => {
+          if (s.order === undefined) {
+            updateDoc(doc(db, 'specialized_services', s.id), { order: i });
+          }
         });
       }
     }
@@ -359,73 +373,85 @@ export default function App() {
         title: 'توصيل واستقبال المطار',
         desc: 'خدمة راقية من وإلى جميع مطارات دول الخليج العربي، مع استقبال خاص في صالات الانتظار ومتابعة دقيقة لمواعيد الرحلات.',
         iconName: 'Clock',
-        image: 'https://images.unsplash.com/photo-1542296332-2e4473faf563?auto=format&fit=crop&q=80&w=800'
+        image: 'https://images.unsplash.com/photo-1542296332-2e4473faf563?auto=format&fit=crop&q=80&w=800',
+        order: 0
       },
       {
         title: 'رحلات دبي',
         desc: 'احجز رحلتك أنت وعائلتك من وإلى دبي بأحدث السيارات الفاخرة، واستمتع بسفر بري مريح وآمن.',
         iconName: 'MapPin',
-        image: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&q=80&w=800'
+        image: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&q=80&w=800',
+        order: 1
       },
       {
         title: 'رحلات أبو ظبي',
         desc: 'احجز رحلتك من وإلى أبو ظبي مع Alhatab VIP Taxi، حيث الراحة والرفاهية في كل كيلومتر.',
         iconName: 'MapPin',
-        image: 'https://images.unsplash.com/photo-1584132967334-10e028bd69f7?auto=format&fit=crop&q=80&w=800'
+        image: 'https://images.unsplash.com/photo-1584132967334-10e028bd69f7?auto=format&fit=crop&q=80&w=800',
+        order: 2
       },
       {
         title: 'رحلات قطر',
         desc: 'استمتع برحلة دولية فاخرة إلى الدوحة، مع إطلالات بانورامية على أفق المدينة الحديث والخليج الغربي.',
         iconName: 'MapPin',
-        image: 'https://picsum.photos/seed/qatar/800/600'
+        image: 'https://picsum.photos/seed/qatar/800/600',
+        order: 3
       },
       {
         title: 'رحلات الكويت',
         desc: 'رحلات برية مباشرة إلى دولة الكويت، نصل بك إلى قلب العاصمة مع إطلالة على أبراج الكويت الشهيرة.',
         iconName: 'MapPin',
-        image: 'https://picsum.photos/seed/kuwait/800/600'
+        image: 'https://picsum.photos/seed/kuwait/800/600',
+        order: 4
       },
       {
         title: 'رحلات مكة والمدينة',
         desc: 'احجز رحلاتك للمدينة المنورة ومكة المكرمة، نوفر لك أقصى درجات الراحة والسكينة في رحلتك الإيمانية.',
         iconName: 'Star',
-        image: 'https://images.unsplash.com/photo-1591604129939-f1efa4d9f7fa?auto=format&fit=crop&q=80&w=800'
+        image: 'https://images.unsplash.com/photo-1591604129939-f1efa4d9f7fa?auto=format&fit=crop&q=80&w=800',
+        order: 5
       },
       {
         title: 'المناسبات والفعاليات',
         desc: 'نوفر أسطولاً فاخرًا لخدمة ضيوفكم في الأفراح، المؤتمرات، والفعاليات الرسمية، مع سائقين بزي رسمي وخدمة VIP.',
         iconName: 'Users',
-        image: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80&w=800'
+        image: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&q=80&w=800',
+        order: 6
       },
       {
         title: 'رحلات العراق',
         desc: 'توصيل بري آمن إلى العراق، نأخذك في رحلة مريحة لاستكشاف المعالم التاريخية والعمرانية العريقة في بغداد.',
         iconName: 'MapPin',
-        image: 'https://images.unsplash.com/photo-1528132599739-df63974b7735?auto=format&fit=crop&q=80&w=800'
+        image: 'https://images.unsplash.com/photo-1528132599739-df63974b7735?auto=format&fit=crop&q=80&w=800',
+        order: 7
       },
       {
         title: 'جولات الأحساء السياحية',
         desc: 'اكتشف سحر الأحساء وتراثها العمراني الفريد، من جبل القارة إلى المزارع الخلابة والمعالم التاريخية.',
         iconName: 'Camera',
-        image: 'https://images.unsplash.com/photo-1647166545674-ce28ce93bdca?auto=format&fit=crop&q=80&w=800'
+        image: 'https://images.unsplash.com/photo-1647166545674-ce28ce93bdca?auto=format&fit=crop&q=80&w=800',
+        order: 8
       },
       {
         title: 'تسوق المنطقة الشرقية',
         desc: 'رحلات تسوق عصرية إلى أرقى مولات الخبر والدمام، حيث الطابع التجاري الحديث والرفاهية المطلقة.',
         iconName: 'ShoppingBag',
-        image: 'https://images.unsplash.com/photo-1589883661923-6476cb0ae9f2?auto=format&fit=crop&q=80&w=800'
+        image: 'https://images.unsplash.com/photo-1589883661923-6476cb0ae9f2?auto=format&fit=crop&q=80&w=800',
+        order: 9
       },
       {
         title: 'رحلات الأردن',
         desc: 'رحلات برية مميزة إلى المملكة الأردنية الهاشمية، نصل بك إلى عمان والبتراء مع توفير أعلى سبل الراحة والأمان.',
         iconName: 'MapPin',
-        image: 'https://images.unsplash.com/photo-1547234935-80c7145ec969?auto=format&fit=crop&q=80&w=800'
+        image: 'https://images.unsplash.com/photo-1547234935-80c7145ec969?auto=format&fit=crop&q=80&w=800',
+        order: 10
       },
       {
         title: 'رحلات عمان',
         desc: 'استكشف جمال سلطنة عمان معنا، رحلات دولية مريحة إلى مسقط وصلالة عبر أحدث السيارات الفاخرة.',
         iconName: 'MapPin',
-        image: 'https://images.unsplash.com/photo-1544197150-b99a580bb7a8?auto=format&fit=crop&q=80&w=800'
+        image: 'https://images.unsplash.com/photo-1544197150-b99a580bb7a8?auto=format&fit=crop&q=80&w=800',
+        order: 11
       }
     ];
 
@@ -444,6 +470,23 @@ export default function App() {
     });
 
     alert('تم تهيئة قاعدة البيانات بنجاح!');
+  };
+
+  const moveSpecializedService = async (index: number, direction: 'up' | 'down') => {
+    if (!isAdmin) return;
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= specializedServices.length) return;
+
+    const current = specializedServices[index];
+    const target = specializedServices[newIndex];
+
+    try {
+      // Use a batch or sequential updates to swap orders
+      await updateDoc(doc(db, 'specialized_services', current.id), { order: newIndex });
+      await updateDoc(doc(db, 'specialized_services', target.id), { order: index });
+    } catch (error) {
+      console.error('Error reordering services:', error);
+    }
   };
 
   const handleSaveTrip = async () => {
@@ -1574,7 +1617,8 @@ export default function App() {
                               title: 'رحلة جديدة',
                               desc: 'وصف الرحلة هنا',
                               image: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&q=80&w=800',
-                              iconName: 'MapPin'
+                              iconName: 'MapPin',
+                              order: specializedServices.length
                             })}
                             className="bg-gold text-white px-4 py-2 rounded-xl flex items-center gap-2 font-bold"
                           >
@@ -1583,7 +1627,7 @@ export default function App() {
                           </button>
                         </div>
                         <div className="grid md:grid-cols-2 gap-6">
-                          {specializedServices.map(service => {
+                          {specializedServices.map((service, index) => {
                             const Icon = {
                               Clock, MapPin, Star, Users, Camera, ShoppingBag
                             }[service.iconName] || MapPin;
@@ -1591,6 +1635,22 @@ export default function App() {
                             return (
                               <div key={service.id} className="bg-gray-50 p-6 rounded-3xl border border-gray-200 space-y-4">
                               <div className="flex gap-4">
+                                <div className="flex flex-col gap-1 justify-center">
+                                  <button 
+                                    disabled={index === 0}
+                                    onClick={() => moveSpecializedService(index, 'up')}
+                                    className="p-1 hover:bg-white rounded border border-transparent hover:border-gray-200 disabled:opacity-30"
+                                  >
+                                    <ArrowUp className="w-4 h-4" />
+                                  </button>
+                                  <button 
+                                    disabled={index === specializedServices.length - 1}
+                                    onClick={() => moveSpecializedService(index, 'down')}
+                                    className="p-1 hover:bg-white rounded border border-transparent hover:border-gray-200 disabled:opacity-30"
+                                  >
+                                    <ArrowDown className="w-4 h-4" />
+                                  </button>
+                                </div>
                                 <div className="relative w-24 h-24 rounded-2xl overflow-hidden shrink-0 bg-gray-200 group/img">
                                   <div 
                                     className="w-full h-full bg-cover bg-center"
