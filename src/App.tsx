@@ -36,7 +36,8 @@ import {
   TrendingUp,
   PieChart,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Instagram
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
@@ -96,6 +97,8 @@ interface SiteSettings {
   heroSubtitle: string;
   phone: string;
   whatsapp: string;
+  logo?: string;
+  instagram?: string;
 }
 
 interface Trip {
@@ -466,7 +469,9 @@ export default function App() {
       heroTitle: 'Alhatab VIP Taxi',
       heroSubtitle: 'فخامة التنقل',
       phone: '+973 32325997',
-      whatsapp: '97332325997'
+      whatsapp: '97332325997',
+      logo: '',
+      instagram: ''
     });
 
     alert('تم تهيئة قاعدة البيانات بنجاح!');
@@ -584,10 +589,21 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <div className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-dark rounded-xl flex items-center justify-center">
-                <Car className="text-gold w-6 h-6" />
-              </div>
-              <span className="text-xl font-bold tracking-tighter text-dark uppercase">Alhatab VIP Taxi</span>
+              {siteSettings.logo ? (
+                <img 
+                  src={siteSettings.logo} 
+                  alt="Logo" 
+                  className="h-12 w-auto object-contain"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <>
+                  <div className="w-10 h-10 bg-dark rounded-xl flex items-center justify-center">
+                    <Car className="text-gold w-6 h-6" />
+                  </div>
+                  <span className="text-xl font-bold tracking-tighter text-dark uppercase">Alhatab VIP Taxi</span>
+                </>
+              )}
             </div>
 
             {/* Desktop Menu */}
@@ -620,6 +636,16 @@ export default function App() {
                   <LogOut className="w-5 h-5" />
                 </button>
               )}
+              {siteSettings.instagram && (
+                <a 
+                  href={siteSettings.instagram} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-gray-600 hover:text-pink-600 transition-colors"
+                >
+                  <Instagram className="w-6 h-6" />
+                </a>
+              )}
               <a 
                 href={`https://wa.me/${siteSettings.whatsapp}`} 
                 target="_blank" 
@@ -648,15 +674,24 @@ export default function App() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed inset-0 z-40 bg-white pt-24 px-6 md:hidden"
+            className="fixed inset-0 z-40 bg-white pt-24 px-6 md:hidden overflow-y-auto"
           >
             <div className="flex flex-col gap-6 text-xl font-medium">
+              <div className="flex justify-center mb-4">
+                {siteSettings.logo ? (
+                  <img src={siteSettings.logo} alt="Logo" className="h-20 w-auto object-contain" />
+                ) : (
+                  <div className="w-16 h-16 bg-dark rounded-2xl flex items-center justify-center">
+                    <Car className="text-gold w-10 h-10" />
+                  </div>
+                )}
+              </div>
               <a href="#" onClick={() => setIsMenuOpen(false)}>الرئيسية</a>
               <a href="#services" onClick={() => setIsMenuOpen(false)}>خدماتنا</a>
               <a href="#specialized-services" onClick={() => setIsMenuOpen(false)}>خدمات خاصة</a>
               <a href="#about" onClick={() => setIsMenuOpen(false)}>لماذا نحن؟</a>
               <a 
-                href="https://wa.me/97332325997" 
+                href={`https://wa.me/${siteSettings.whatsapp}`} 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="bg-dark text-white w-full py-4 rounded-2xl text-center"
@@ -664,6 +699,18 @@ export default function App() {
               >
                 احجز الآن
               </a>
+              {siteSettings.instagram && (
+                <a 
+                  href={siteSettings.instagram} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 text-pink-600 font-bold py-4 border-2 border-pink-100 rounded-2xl"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <Instagram className="w-6 h-6" />
+                  تابعنا على انستقرام
+                </a>
+              )}
             </div>
           </motion.div>
         )}
@@ -1024,21 +1071,39 @@ export default function App() {
           <div className="grid md:grid-cols-4 gap-12 mb-16">
             <div className="col-span-2">
               <div className="flex items-center gap-2 mb-6">
-                <div className="w-10 h-10 bg-dark rounded-xl flex items-center justify-center">
-                  <Car className="text-gold w-6 h-6" />
-                </div>
-                <span className="text-xl font-bold tracking-tighter text-dark uppercase">Alhatab VIP Taxi</span>
+                {siteSettings.logo ? (
+                  <img src={siteSettings.logo} alt="Logo" className="h-12 w-auto object-contain" />
+                ) : (
+                  <>
+                    <div className="w-10 h-10 bg-dark rounded-xl flex items-center justify-center">
+                      <Car className="text-gold w-6 h-6" />
+                    </div>
+                    <span className="text-xl font-bold tracking-tighter text-dark uppercase">Alhatab VIP Taxi</span>
+                  </>
+                )}
               </div>
               <p className="text-gray-500 max-w-sm mb-8">
                 نحن متخصصون في تقديم خدمات النقل العائلي والفاخر، مع التركيز على الراحة والأمان في السفرات الطويلة بين مدن المملكة ودول الخليج.
               </p>
               <div className="flex gap-4">
-                {/* Social icons placeholder */}
-                {[1,2,3,4].map(i => (
-                  <div key={i} className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center hover:bg-gold hover:text-white transition-all cursor-pointer">
-                    <Star className="w-4 h-4" />
-                  </div>
-                ))}
+                {siteSettings.instagram && (
+                  <a 
+                    href={siteSettings.instagram} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center hover:bg-pink-600 hover:text-white transition-all cursor-pointer"
+                  >
+                    <Instagram className="w-5 h-5" />
+                  </a>
+                )}
+                <a 
+                  href={`https://wa.me/${siteSettings.whatsapp}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center hover:bg-green-600 hover:text-white transition-all cursor-pointer"
+                >
+                  <Phone className="w-5 h-5" />
+                </a>
               </div>
             </div>
             
@@ -1362,9 +1427,13 @@ export default function App() {
             >
               <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gold rounded-2xl flex items-center justify-center text-white">
-                    <Settings className="w-6 h-6" />
-                  </div>
+                  {siteSettings.logo ? (
+                    <img src={siteSettings.logo} alt="Logo" className="h-12 w-auto object-contain" />
+                  ) : (
+                    <div className="w-12 h-12 bg-gold rounded-2xl flex items-center justify-center text-white">
+                      <Settings className="w-6 h-6" />
+                    </div>
+                  )}
                   <div>
                     <h3 className="text-2xl font-bold text-dark">لوحة التحكم</h3>
                     <div className="flex gap-4 mt-1">
@@ -1467,6 +1536,47 @@ export default function App() {
                             />
                           </div>
                           <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-600">اللوغو (رابط أو رفع)</label>
+                            <div className="flex gap-4 items-center">
+                              <div className="relative w-16 h-16 bg-gray-100 rounded-xl overflow-hidden border border-gray-200 group/logo">
+                                {siteSettings.logo ? (
+                                  <img src={siteSettings.logo} alt="Logo" className="w-full h-full object-contain" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                    <ImageIcon className="w-6 h-6" />
+                                  </div>
+                                )}
+                                <label className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/logo:opacity-100 transition-opacity cursor-pointer">
+                                  {isUploading === 'site' + 'logo' ? (
+                                    <Loader2 className="text-white w-5 h-5 animate-spin" />
+                                  ) : (
+                                    <Upload className="text-white w-5 h-5" />
+                                  )}
+                                  <input 
+                                    type="file" 
+                                    className="hidden" 
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) handleImageUpload(file, 'settings', 'site', 'logo');
+                                    }}
+                                  />
+                                </label>
+                              </div>
+                              <input 
+                                type="text" 
+                                className="flex-1 bg-gray-50 border-gray-200 rounded-xl p-3 text-xs"
+                                placeholder="رابط اللوغو"
+                                value={siteSettings.logo || ''}
+                                onChange={e => {
+                                  const newSettings = { ...siteSettings, logo: e.target.value };
+                                  setSiteSettings(newSettings);
+                                  updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
                             <label className="text-sm font-bold text-gray-600">العنوان الفرعي</label>
                             <input 
                               type="text" 
@@ -1500,6 +1610,20 @@ export default function App() {
                               value={siteSettings.whatsapp}
                               onChange={e => {
                                 const newSettings = { ...siteSettings, whatsapp: e.target.value };
+                                setSiteSettings(newSettings);
+                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-600">رابط الانستقرام</label>
+                            <input 
+                              type="text" 
+                              className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
+                              placeholder="https://instagram.com/your_account"
+                              value={siteSettings.instagram || ''}
+                              onChange={e => {
+                                const newSettings = { ...siteSettings, instagram: e.target.value };
                                 setSiteSettings(newSettings);
                                 updateDoc(doc(db, 'settings', 'site'), newSettings);
                               }}
