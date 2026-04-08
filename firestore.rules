@@ -11,6 +11,11 @@ service cloud.firestore {
         (request.auth.token.email == "ahjm91@gmail.com" && request.auth.token.email_verified == true);
     }
 
+    // Users collection
+    match /users/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
     // Site settings
     match /settings/{settingId} {
       allow read: if true;
@@ -31,8 +36,9 @@ service cloud.firestore {
 
     // Trips (Accounting)
     match /trips/{tripId} {
-      allow read: if isAdmin();
-      allow write: if isAdmin();
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow create: if true; 
+      allow update, delete: if isAdmin();
     }
   }
 }

@@ -37,7 +37,8 @@
         "heroTitle": { "type": "string" },
         "heroSubtitle": { "type": "string" },
         "phone": { "type": "string" },
-        "whatsapp": { "type": "string" }
+        "whatsapp": { "type": "string" },
+        "notificationWhatsapp": { "type": "string" }
       }
     },
     "Trip": {
@@ -46,6 +47,7 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "userId": { "type": "string", "description": "ID of the customer if logged in" },
         "customerName": { "type": "string" },
         "phone": { "type": "string" },
         "passengers": { "type": "number" },
@@ -64,10 +66,29 @@
         "notes": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["customerName", "phone", "amount", "driverCost", "date"]
+      "required": ["customerName", "phone", "date"]
+    },
+    "User": {
+      "title": "User",
+      "description": "A customer profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "customer"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
     }
   },
   "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Customer profiles collection"
+    },
     "/services/{serviceId}": {
       "schema": "Service",
       "description": "Main services collection"

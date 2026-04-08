@@ -37,8 +37,19 @@ import {
   PieChart,
   ArrowUp,
   ArrowDown,
-  Instagram
+  Instagram,
+  CreditCard,
+  CheckCircle,
+  Wallet,
+  MessageCircle
 } from 'lucide-react';
+import { loadStripe } from '@stripe/stripe-js';
+import {
+  Elements,
+  CardElement,
+  useStripe,
+  useElements,
+} from '@stripe/react-stripe-js';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 import { auth, db, storage } from './firebase';
@@ -58,7 +69,10 @@ import {
   updateDoc, 
   deleteDoc, 
   addDoc,
-  getDoc
+  getDoc,
+  query,
+  where,
+  getDocs
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -66,6 +80,8 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 type ServiceType = 'luxury';
 
 interface BookingData {
+  customerName: string;
+  phone: string;
   pickup: string;
   dropoff: string;
   date: string;
@@ -95,14 +111,35 @@ interface SpecializedService {
 interface SiteSettings {
   heroTitle: string;
   heroSubtitle: string;
+  heroDescription: string;
+  heroImage: string;
   phone: string;
   whatsapp: string;
+  notificationWhatsapp?: string;
   logo?: string;
   instagram?: string;
+  // Design Settings
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  borderRadius: string;
+  footerAbout: string;
+  footerAddress: string;
+}
+
+interface UserProfile {
+  uid: string;
+  name: string;
+  email: string;
+  phone?: string;
+  photoURL?: string;
+  role: 'admin' | 'customer';
+  createdAt: string;
 }
 
 interface Trip {
   id: string;
+  userId?: string;
   customerName: string;
   phone: string;
   passengers: number;
@@ -122,15 +159,103 @@ interface Trip {
   createdAt: string;
 }
 
-export default function App() {
+const CheckoutForm = ({ trip, onSucceed }: { trip: Trip; onSucceed: () => void }) => {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [error, setError] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(false);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!stripe || !elements) return;
+
+    setProcessing(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/create-payment-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          amount: trip.amount,
+          metadata: { tripId: trip.id, customerName: trip.customerName }
+        }),
+      });
+
+      const { clientSecret, error: backendError } = await response.json();
+      if (backendError) throw new Error(backendError);
+
+      const result = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: elements.getElement(CardElement) as any,
+          billing_details: { name: trip.customerName },
+        },
+      });
+
+      if (result.error) {
+        setError(result.error.message || 'حدث خطأ في الدفع');
+      } else if (result.paymentIntent.status === 'succeeded') {
+        onSucceed();
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
+        <CardElement options={{
+          style: {
+            base: {
+              fontSize: '16px',
+              color: '#1A1A1A',
+              '::placeholder': { color: '#A0A0A0' },
+            },
+          },
+        }} />
+      </div>
+      {error && <div className="text-red-500 text-sm font-bold text-center">{error}</div>}
+      <button
+        disabled={!stripe || processing}
+        className="w-full bg-gold text-white py-4 rounded-2xl font-bold hover:bg-opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+      >
+        {processing ? (
+          <>
+            <Loader2 className="w-5 h-5 animate-spin" />
+            جاري المعالجة...
+          </>
+        ) : (
+          <>
+            <CreditCard className="w-5 h-5" />
+            دفع {trip.amount} BHD
+          </>
+        )}
+      </button>
+    </form>
+  );
+};
+
+function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
+  const [isCustomerDashboardOpen, setIsCustomerDashboardOpen] = useState(false);
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [customerTrips, setCustomerTrips] = useState<Trip[]>([]);
+  const [paymentTrip, setPaymentTrip] = useState<Trip | null>(null);
+  const [searchTripId, setSearchTripId] = useState('');
+  const [isSearchingTrip, setIsSearchingTrip] = useState(false);
+
+  const stripePromise = loadStripe((import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY || '');
   const [isUploading, setIsUploading] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [activeTab, setActiveTab] = useState<'content' | 'accounting'>('content');
+  const [activeTab, setActiveTab] = useState<'content' | 'accounting' | 'branding'>('content');
   const [isTripFormOpen, setIsTripFormOpen] = useState(false);
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [tripFormData, setTripFormData] = useState<Partial<Trip>>({
@@ -158,24 +283,53 @@ export default function App() {
     heroTitle: 'Alhatab VIP Taxi',
     heroSubtitle: 'فخامة التنقل',
     phone: '+973 32325997',
-    whatsapp: '97332325997'
+    whatsapp: '97332325997',
+    notificationWhatsapp: '97332325997'
   });
 
   const [bookingData, setBookingData] = useState<BookingData>({
+    customerName: '',
+    phone: '',
     pickup: '',
     dropoff: '',
-    date: '',
-    time: '',
+    date: new Date().toISOString().split('T')[0],
+    time: '10:00',
     passengers: 1,
     service: 'luxury'
   });
 
   // Auth & Data Fetching
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (u) => {
       setUser(u);
-      setIsAdmin(u?.email === 'ahjm91@gmail.com' && u?.emailVerified === true);
-      console.log('User status:', u?.email, 'Verified:', u?.emailVerified, 'IsAdmin:', u?.email === 'ahjm91@gmail.com' && u?.emailVerified === true);
+      const adminEmail = 'ahjm91@gmail.com';
+      const isUserAdmin = u?.email === adminEmail && u?.emailVerified === true;
+      setIsAdmin(isUserAdmin);
+      
+      if (u) {
+        // Sync profile
+        const userRef = doc(db, 'users', u.uid);
+        const userSnap = await getDoc(userRef);
+        
+        if (!userSnap.exists()) {
+          const newProfile: UserProfile = {
+            uid: u.uid,
+            name: u.displayName || 'عميل جديد',
+            email: u.email || '',
+            photoURL: u.photoURL || '',
+            role: isUserAdmin ? 'admin' : 'customer',
+            createdAt: new Date().toISOString()
+          };
+          await setDoc(userRef, newProfile);
+          setUserProfile(newProfile);
+        } else {
+          setUserProfile(userSnap.data() as UserProfile);
+        }
+      } else {
+        setUserProfile(null);
+      }
+      
+      console.log('User status:', u?.email, 'Verified:', u?.emailVerified, 'IsAdmin:', isUserAdmin);
     });
 
     const unsubscribeServices = onSnapshot(collection(db, 'services'), (snapshot) => {
@@ -206,6 +360,12 @@ export default function App() {
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Trip));
         setTrips(data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
       });
+    } else if (user) {
+      const q = query(collection(db, 'trips'), where('userId', '==', user.uid));
+      unsubscribeTrips = onSnapshot(q, (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Trip));
+        setCustomerTrips(data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      });
     }
 
     return () => {
@@ -215,7 +375,7 @@ export default function App() {
       unsubscribeSettings();
       unsubscribeTrips();
     };
-  }, [isAdmin]);
+  }, [isAdmin, user]);
 
   // Auto-fix broken specialized service images and missing order
   useEffect(() => {
@@ -338,10 +498,61 @@ export default function App() {
     }
   };
 
-  const handleBookingSubmit = (e: React.FormEvent) => {
+  const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const serviceName = services.find(s => s.id === bookingData.service)?.name || 'خدمة فاخرة';
-    window.open(`https://wa.me/${siteSettings.whatsapp}?text=${encodeURIComponent(`طلب حجز من الموقع:\nمن: ${bookingData.pickup}\nإلى: ${bookingData.dropoff}\nالتاريخ: ${bookingData.date}\nالوقت: ${bookingData.time}\nالركاب: ${bookingData.passengers}\nالخدمة: ${serviceName}`)}`, '_blank');
+    
+    try {
+      // Save to Firestore first
+      const tripData: Omit<Trip, 'id'> = {
+        userId: user?.uid,
+        customerName: bookingData.customerName,
+        phone: bookingData.phone,
+        passengers: bookingData.passengers,
+        bags: 0,
+        direction: `${bookingData.pickup} ← ${bookingData.dropoff}`,
+        pickup: bookingData.pickup,
+        dropoff: bookingData.dropoff,
+        date: bookingData.date,
+        time: bookingData.time,
+        amount: 0, // Admin will set this later
+        driverType: 'In',
+        driverName: '',
+        driverCost: 0,
+        profit: 0,
+        paymentStatus: 'Pending',
+        notes: 'حجز عبر الموقع',
+        createdAt: new Date().toISOString()
+      };
+
+      const docRef = await addDoc(collection(db, 'trips'), tripData);
+      const newTrip = { id: docRef.id, ...tripData } as Trip;
+      
+      // Reset form
+      setBookingData({
+        customerName: '',
+        phone: '',
+        pickup: '',
+        dropoff: '',
+        date: new Date().toISOString().split('T')[0],
+        time: '10:00',
+        passengers: 1,
+        service: 'luxury'
+      });
+      
+      // Redirect to payment if amount > 0, otherwise show success and redirect to customer dashboard
+      if (newTrip.amount > 0) {
+        setPaymentTrip(newTrip);
+        setIsPaymentOpen(true);
+      } else {
+        alert('تم استلام طلب الحجز بنجاح! سيقوم فريقنا بالتواصل معكم لتأكيد السعر وإتمام الحجز.');
+        if (user) {
+          setIsCustomerDashboardOpen(true);
+        }
+      }
+    } catch (error) {
+      console.error('Booking failed:', error);
+      alert('فشل إرسال الطلب، يرجى المحاولة مرة أخرى.');
+    }
   };
 
   // Seed Database Function
@@ -468,10 +679,18 @@ export default function App() {
     await setDoc(doc(db, 'settings', 'site'), {
       heroTitle: 'Alhatab VIP Taxi',
       heroSubtitle: 'فخامة التنقل',
+      heroDescription: 'نقدم لك أرقى خدمات التوصيل واللوميزين في مملكة البحرين وجميع دول الخليج. دقة في المواعيد، رفاهية مطلقة، وسائقون محترفون.',
+      heroImage: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&q=80&w=1920',
       phone: '+973 32325997',
       whatsapp: '97332325997',
       logo: '',
-      instagram: ''
+      instagram: '',
+      primaryColor: '#D4AF37', // Gold
+      secondaryColor: '#1A1A1A', // Dark
+      accentColor: '#F5F5F5', // Light Gray
+      borderRadius: '1.5rem',
+      footerAbout: 'نحن متخصصون في تقديم خدمات النقل العائلي والفاخر، مع التركيز على الراحة والأمان في السفرات الطويلة بين مدن المملكة ودول الخليج.',
+      footerAddress: 'مملكة البحرين وجميع دول الخليج'
     });
 
     alert('تم تهيئة قاعدة البيانات بنجاح!');
@@ -492,6 +711,36 @@ export default function App() {
     } catch (error) {
       console.error('Error reordering services:', error);
     }
+  };
+
+  const handleSendWhatsAppSummary = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    
+    const tomorrowTrips = trips.filter(t => t.date === tomorrowStr);
+    
+    if (tomorrowTrips.length === 0) {
+      alert('لا توجد رحلات مسجلة ليوم غد ' + tomorrowStr);
+      return;
+    }
+
+    let message = `*تقرير رحلات غد (${tomorrowStr})*\n\n`;
+    
+    tomorrowTrips.forEach((trip, index) => {
+      message += `*${index + 1}. رحلة رقم:* ${trip.id.slice(-6).toUpperCase()}\n`;
+      message += `👤 *العميل:* ${trip.customerName}\n`;
+      message += `📞 *الهاتف:* ${trip.phone}\n`;
+      message += `📍 *المسار:* ${trip.direction}\n`;
+      message += `🕒 *الوقت:* ${trip.time}\n`;
+      message += `💰 *المبلغ:* ${trip.amount} BHD\n`;
+      message += `💳 *الحالة:* ${trip.paymentStatus === 'Paid' ? '✅ مدفوع' : '❌ غير مدفوع'}\n`;
+      message += `------------------\n`;
+    });
+
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappNumber = siteSettings.notificationWhatsapp || siteSettings.whatsapp;
+    window.open(`https://wa.me/${whatsappNumber}?text=${encodedMessage}`, '_blank');
   };
 
   const handleSaveTrip = async () => {
@@ -584,6 +833,17 @@ export default function App() {
 
   return (
     <div className="min-h-screen font-sans selection:bg-gold/30">
+      <style>{`
+        :root {
+          --primary: ${siteSettings.primaryColor || '#D4AF37'};
+          --secondary: ${siteSettings.secondaryColor || '#0A0A0A'};
+          --accent: ${siteSettings.accentColor || '#F5F5F5'};
+          --radius: ${siteSettings.borderRadius || '1.5rem'};
+        }
+        .rounded-custom { border-radius: var(--radius); }
+        .rounded-custom-xl { border-radius: calc(var(--radius) * 1.5); }
+        .rounded-custom-2xl { border-radius: calc(var(--radius) * 2); }
+      `}</style>
       {/* Navigation */}
       <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -612,6 +872,13 @@ export default function App() {
               <a href="#services" className="text-gray-600 hover:text-dark transition-colors">خدماتنا</a>
               <a href="#specialized-services" className="text-gray-600 hover:text-dark transition-colors">خدمات خاصة</a>
               <a href="#about" className="text-gray-600 hover:text-dark transition-colors">لماذا نحن؟</a>
+              <button 
+                onClick={() => setIsPaymentOpen(true)}
+                className="flex items-center gap-2 text-dark font-bold hover:text-gold transition-colors"
+              >
+                <Wallet className="w-5 h-5" />
+                دفع قيمة رحلة
+              </button>
               {isAdmin && (
                 <button 
                   onClick={() => setIsDashboardOpen(true)}
@@ -619,6 +886,15 @@ export default function App() {
                 >
                   <Settings className="w-5 h-5" />
                   لوحة التحكم
+                </button>
+              )}
+              {user && !isAdmin && (
+                <button 
+                  onClick={() => setIsCustomerDashboardOpen(true)}
+                  className="flex items-center gap-2 text-gold font-bold hover:text-gold/80 transition-colors"
+                >
+                  <Users className="w-5 h-5" />
+                  رحلاتي
                 </button>
               )}
               {!user ? (
@@ -647,9 +923,7 @@ export default function App() {
                 </a>
               )}
               <a 
-                href={`https://wa.me/${siteSettings.whatsapp}`} 
-                target="_blank" 
-                rel="noopener noreferrer"
+                href="#booking-form" 
                 className="bg-dark text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition-all"
               >
                 احجز الآن
@@ -691,9 +965,7 @@ export default function App() {
               <a href="#specialized-services" onClick={() => setIsMenuOpen(false)}>خدمات خاصة</a>
               <a href="#about" onClick={() => setIsMenuOpen(false)}>لماذا نحن؟</a>
               <a 
-                href={`https://wa.me/${siteSettings.whatsapp}`} 
-                target="_blank" 
-                rel="noopener noreferrer"
+                href="#booking-form" 
                 className="bg-dark text-white w-full py-4 rounded-2xl text-center"
                 onClick={() => setIsMenuOpen(false)}
               >
@@ -718,6 +990,11 @@ export default function App() {
 
       {/* Hero Section */}
       <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
+        <div 
+          className="absolute inset-0 -z-20 bg-cover bg-center"
+          style={{ backgroundImage: `url(${siteSettings.heroImage})` }}
+        />
+        <div className="absolute inset-0 bg-white/90 backdrop-blur-[2px] -z-10" />
         <div className="absolute top-0 right-0 w-1/2 h-full bg-gold/5 -skew-x-12 transform translate-x-1/4 -z-10" />
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -732,7 +1009,7 @@ export default function App() {
                 <span className="text-gold">{siteSettings.heroSubtitle}</span>
               </h1>
               <p className="text-xl text-gray-600 mb-8 max-w-lg">
-                نقدم لك أرقى خدمات التوصيل واللوميزين في مملكة البحرين وجميع دول الخليج. دقة في المواعيد، رفاهية مطلقة، وسائقون محترفون.
+                {siteSettings.heroDescription}
               </p>
               
               <div className="flex flex-wrap gap-4">
@@ -749,6 +1026,7 @@ export default function App() {
 
             {/* Booking Card */}
             <motion.div
+              id="booking-form"
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
@@ -759,6 +1037,30 @@ export default function App() {
                 className="space-y-6"
               >
                 <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="relative">
+                      <Users className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <input 
+                        type="text" 
+                        placeholder="الاسم"
+                        required
+                        className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all"
+                        value={bookingData.customerName}
+                        onChange={e => setBookingData({...bookingData, customerName: e.target.value})}
+                      />
+                    </div>
+                    <div className="relative">
+                      <Phone className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <input 
+                        type="tel" 
+                        placeholder="رقم الهاتف"
+                        required
+                        className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all"
+                        value={bookingData.phone}
+                        onChange={e => setBookingData({...bookingData, phone: e.target.value})}
+                      />
+                    </div>
+                  </div>
                   <div className="relative">
                     <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                     <input 
@@ -822,9 +1124,12 @@ export default function App() {
                   type="submit"
                   className="w-full bg-dark text-white py-5 rounded-2xl font-bold text-lg hover:bg-gray-800 transform hover:-translate-y-1 transition-all flex items-center justify-center gap-2"
                 >
-                  احجز الآن عبر واتساب
-                  <ArrowLeft className="w-5 h-5" />
+                  احجز الآن
+                  <ChevronRight className="w-5 h-5 rotate-180" />
                 </button>
+                <p className="text-[10px] text-center text-gray-400">
+                  عند الضغط على "احجز الآن"، سيتم حفظ بياناتك في نظامنا وسنقوم بالتواصل معك لتأكيد الحجز.
+                </p>
               </form>
             </motion.div>
           </div>
@@ -1083,7 +1388,7 @@ export default function App() {
                 )}
               </div>
               <p className="text-gray-500 max-w-sm mb-8">
-                نحن متخصصون في تقديم خدمات النقل العائلي والفاخر، مع التركيز على الراحة والأمان في السفرات الطويلة بين مدن المملكة ودول الخليج.
+                {siteSettings.footerAbout}
               </p>
               <div className="flex gap-4">
                 {siteSettings.instagram && (
@@ -1126,7 +1431,7 @@ export default function App() {
                 </li>
                 <li className="flex items-center gap-3">
                   <MapPin className="w-5 h-5 text-gold" />
-                  مملكة البحرين وجميع دول الخليج
+                  {siteSettings.footerAddress}
                 </li>
               </ul>
             </div>
@@ -1455,6 +1760,15 @@ export default function App() {
                       >
                         النظام المحاسبي
                       </button>
+                      <button 
+                        onClick={() => setActiveTab('branding')}
+                        className={cn(
+                          "text-sm font-bold transition-colors",
+                          activeTab === 'branding' ? "text-gold" : "text-gray-400 hover:text-gray-600"
+                        )}
+                      >
+                        الهوية والتصميم
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1628,6 +1942,21 @@ export default function App() {
                                 updateDoc(doc(db, 'settings', 'site'), newSettings);
                               }}
                             />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-600">رقم استلام التنبيهات (واتساب)</label>
+                            <input 
+                              type="text" 
+                              className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
+                              placeholder="97332325997"
+                              value={siteSettings.notificationWhatsapp || ''}
+                              onChange={e => {
+                                const newSettings = { ...siteSettings, notificationWhatsapp: e.target.value };
+                                setSiteSettings(newSettings);
+                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                              }}
+                            />
+                            <p className="text-[10px] text-gray-400">هذا الرقم الذي سيتم إرسال جدول الرحلات اليومي إليه.</p>
                           </div>
                         </div>
                       </section>
@@ -1961,6 +2290,13 @@ export default function App() {
                             إضافة رحلة جديدة
                           </button>
                           <button 
+                            onClick={handleSendWhatsAppSummary}
+                            className="bg-green-600 text-white px-6 py-3 rounded-2xl flex items-center gap-2 font-bold shadow-lg shadow-green-600/20 hover:scale-105 transition-all"
+                          >
+                            <MessageCircle className="w-5 h-5" />
+                            إرسال جدول غد للواتساب
+                          </button>
+                          <button 
                             onClick={exportTripsToCSV}
                             className="bg-white text-dark border border-gray-200 px-6 py-3 rounded-2xl flex items-center gap-2 font-bold hover:bg-gray-50 transition-all"
                           >
@@ -1989,6 +2325,7 @@ export default function App() {
                               <tr className="bg-gray-50 border-b border-gray-100">
                                 <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Trip ID</th>
                                 <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Customer Name</th>
+                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Linked</th>
                                 <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Phone</th>
                                 <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap text-center">No. of Passengers</th>
                                 <th className="p-4 font-black text-gray-400 uppercase tracking-wider text-center">Bags</th>
@@ -2012,6 +2349,15 @@ export default function App() {
                                 <tr key={trip.id} className="hover:bg-gray-50/50 transition-colors">
                                   <td className="p-4 font-bold text-gray-400">{(trips.length - idx).toString().padStart(3, '0')}</td>
                                   <td className="p-4 font-bold text-dark whitespace-nowrap">{trip.customerName}</td>
+                                  <td className="p-4 text-center">
+                                    {trip.userId ? (
+                                      <div className="w-6 h-6 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto" title={trip.userId}>
+                                        <ShieldCheck className="w-4 h-4" />
+                                      </div>
+                                    ) : (
+                                      <span className="text-gray-300">—</span>
+                                    )}
+                                  </td>
                                   <td className="p-4 font-bold text-dark whitespace-nowrap">{trip.phone}</td>
                                   <td className="p-4 font-bold text-dark text-center">{trip.passengers}</td>
                                   <td className="p-4 font-bold text-dark text-center">{trip.bags}</td>
@@ -2079,6 +2425,173 @@ export default function App() {
                               )}
                             </tbody>
                           </table>
+                        </div>
+                      </div>
+                    </section>
+                  )}
+
+                  {activeTab === 'branding' && (
+                    <section className="space-y-12">
+                      <div>
+                        <h4 className="text-xl font-bold mb-6 flex items-center gap-2">
+                          <Star className="text-gold w-6 h-6" />
+                          الألوان والهوية البصرية
+                        </h4>
+                        <div className="grid md:grid-cols-3 gap-8">
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-600">اللون الرئيسي (الذهبي)</label>
+                            <div className="flex gap-2">
+                              <input 
+                                type="color" 
+                                className="w-12 h-12 rounded-xl cursor-pointer border-0"
+                                value={siteSettings.primaryColor}
+                                onChange={e => {
+                                  const newSettings = { ...siteSettings, primaryColor: e.target.value };
+                                  setSiteSettings(newSettings);
+                                  updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                }}
+                              />
+                              <input 
+                                type="text" 
+                                className="flex-1 bg-gray-50 border-gray-200 rounded-xl p-3 font-mono text-sm"
+                                value={siteSettings.primaryColor}
+                                onChange={e => {
+                                  const newSettings = { ...siteSettings, primaryColor: e.target.value };
+                                  setSiteSettings(newSettings);
+                                  updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-600">اللون الثانوي (الداكن)</label>
+                            <div className="flex gap-2">
+                              <input 
+                                type="color" 
+                                className="w-12 h-12 rounded-xl cursor-pointer border-0"
+                                value={siteSettings.secondaryColor}
+                                onChange={e => {
+                                  const newSettings = { ...siteSettings, secondaryColor: e.target.value };
+                                  setSiteSettings(newSettings);
+                                  updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                }}
+                              />
+                              <input 
+                                type="text" 
+                                className="flex-1 bg-gray-50 border-gray-200 rounded-xl p-3 font-mono text-sm"
+                                value={siteSettings.secondaryColor}
+                                onChange={e => {
+                                  const newSettings = { ...siteSettings, secondaryColor: e.target.value };
+                                  setSiteSettings(newSettings);
+                                  updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-600">انحناء الزوايا (Border Radius)</label>
+                            <select 
+                              className="w-full bg-gray-50 border-gray-200 rounded-xl p-3 font-bold"
+                              value={siteSettings.borderRadius}
+                              onChange={e => {
+                                const newSettings = { ...siteSettings, borderRadius: e.target.value };
+                                setSiteSettings(newSettings);
+                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                              }}
+                            >
+                              <option value="0rem">حواف حادة (0)</option>
+                              <option value="0.5rem">بسيط (8px)</option>
+                              <option value="1rem">متوسط (16px)</option>
+                              <option value="1.5rem">كبير (24px)</option>
+                              <option value="2.5rem">دائري جداً (40px)</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="text-xl font-bold mb-6 flex items-center gap-2">
+                          <ImageIcon className="text-gold w-6 h-6" />
+                          خلفية الهيرو (Hero Background)
+                        </h4>
+                        <div className="grid md:grid-cols-2 gap-8">
+                          <div className="space-y-4">
+                            <div className="relative aspect-video bg-gray-100 rounded-custom-xl overflow-hidden border-2 border-dashed border-gray-200 group/hero">
+                              <img src={siteSettings.heroImage} alt="Hero" className="w-full h-full object-cover" />
+                              <label className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover/hero:opacity-100 transition-opacity cursor-pointer text-white">
+                                <Upload className="w-8 h-8 mb-2" />
+                                <span className="font-bold">تغيير صورة الخلفية</span>
+                                <input 
+                                  type="file" 
+                                  className="hidden" 
+                                  accept="image/*"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleImageUpload(file, 'settings', 'site', 'heroImage');
+                                  }}
+                                />
+                              </label>
+                            </div>
+                            <input 
+                              type="text" 
+                              className="w-full bg-gray-50 border-gray-200 rounded-xl p-3 text-xs"
+                              placeholder="رابط صورة الخلفية"
+                              value={siteSettings.heroImage}
+                              onChange={e => {
+                                const newSettings = { ...siteSettings, heroImage: e.target.value };
+                                setSiteSettings(newSettings);
+                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <label className="text-sm font-bold text-gray-600">وصف الهيرو (Hero Description)</label>
+                              <textarea 
+                                className="w-full bg-gray-50 border-gray-200 rounded-xl p-4 h-32"
+                                value={siteSettings.heroDescription}
+                                onChange={e => {
+                                  const newSettings = { ...siteSettings, heroDescription: e.target.value };
+                                  setSiteSettings(newSettings);
+                                  updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="text-xl font-bold mb-6 flex items-center gap-2">
+                          <Menu className="text-gold w-6 h-6" />
+                          تذييل الصفحة (Footer)
+                        </h4>
+                        <div className="grid md:grid-cols-2 gap-8">
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-600">عن الشركة (Footer About)</label>
+                            <textarea 
+                              className="w-full bg-gray-50 border-gray-200 rounded-xl p-4 h-32"
+                              value={siteSettings.footerAbout}
+                              onChange={e => {
+                                const newSettings = { ...siteSettings, footerAbout: e.target.value };
+                                setSiteSettings(newSettings);
+                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-600">العنوان (Footer Address)</label>
+                            <input 
+                              type="text" 
+                              className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
+                              value={siteSettings.footerAddress}
+                              onChange={e => {
+                                const newSettings = { ...siteSettings, footerAddress: e.target.value };
+                                setSiteSettings(newSettings);
+                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                              }}
+                            />
+                          </div>
                         </div>
                       </div>
                     </section>
@@ -2153,25 +2666,36 @@ export default function App() {
                       onChange={e => setTripFormData({ ...tripFormData, phone: e.target.value })}
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-gray-400 uppercase">الركاب</label>
-                      <input 
-                        type="number" 
-                        className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
-                        value={tripFormData.passengers}
-                        onChange={e => setTripFormData({ ...tripFormData, passengers: parseInt(e.target.value) || 0 })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-gray-400 uppercase">الحقائب</label>
-                      <input 
-                        type="number" 
-                        className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
-                        value={tripFormData.bags}
-                        onChange={e => setTripFormData({ ...tripFormData, bags: parseInt(e.target.value) || 0 })}
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase">رقم العميل (UID)</label>
+                    <input 
+                      type="text" 
+                      placeholder="لربط الرحلة بحساب العميل"
+                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                      value={tripFormData.userId || ''}
+                      onChange={e => setTripFormData({ ...tripFormData, userId: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-4 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase">الركاب</label>
+                    <input 
+                      type="number" 
+                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                      value={tripFormData.passengers}
+                      onChange={e => setTripFormData({ ...tripFormData, passengers: parseInt(e.target.value) || 0 })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase">الحقائب</label>
+                    <input 
+                      type="number" 
+                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                      value={tripFormData.bags}
+                      onChange={e => setTripFormData({ ...tripFormData, bags: parseInt(e.target.value) || 0 })}
+                    />
                   </div>
                 </div>
 
@@ -2327,6 +2851,282 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Payment Modal */}
+      <AnimatePresence>
+        {isPaymentOpen && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setIsPaymentOpen(false);
+                setPaymentTrip(null);
+                setSearchTripId('');
+              }}
+              className="absolute inset-0 bg-dark/80 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden"
+            >
+              <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gold/10 rounded-xl flex items-center justify-center">
+                    <Wallet className="text-gold w-6 h-6" />
+                  </div>
+                  <h3 className="text-xl font-bold text-dark">دفع قيمة رحلة</h3>
+                </div>
+                <button 
+                  onClick={() => {
+                    setIsPaymentOpen(false);
+                    setPaymentTrip(null);
+                    setSearchTripId('');
+                  }}
+                  className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="p-8">
+                {!paymentTrip ? (
+                  <div className="space-y-6">
+                    <div className="text-center">
+                      <p className="text-gray-500">أدخل رقم الرحلة أو رقم الهاتف المسجل للبحث عن رحلتك</p>
+                    </div>
+                    <div className="space-y-2">
+                      <input 
+                        type="text" 
+                        className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold text-center text-lg"
+                        placeholder="رقم الرحلة أو الهاتف"
+                        value={searchTripId}
+                        onChange={e => setSearchTripId(e.target.value)}
+                      />
+                    </div>
+                    <button 
+                      onClick={async () => {
+                        if (!searchTripId) return;
+                        setIsSearchingTrip(true);
+                        try {
+                          const tripsRef = collection(db, 'trips');
+                          const q = query(tripsRef, where('phone', '==', searchTripId));
+                          const querySnapshot = await getDocs(q);
+                          
+                          let foundTrip = null;
+                          if (!querySnapshot.empty) {
+                            foundTrip = { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as Trip;
+                          } else {
+                            const docRef = doc(db, 'trips', searchTripId);
+                            const docSnap = await getDoc(docRef);
+                            if (docSnap.exists()) {
+                              foundTrip = { id: docSnap.id, ...docSnap.data() } as Trip;
+                            }
+                          }
+
+                          if (foundTrip) {
+                            if (foundTrip.paymentStatus === 'Paid') {
+                              alert('هذه الرحلة مدفوعة بالفعل. شكراً لك!');
+                            } else if (!foundTrip.amount || foundTrip.amount <= 0) {
+                              alert('لم يتم تحديد مبلغ لهذه الرحلة بعد. يرجى التواصل مع الإدارة.');
+                            } else {
+                              setPaymentTrip(foundTrip);
+                            }
+                          } else {
+                            alert('لم يتم العثور على رحلة بهذا الرقم.');
+                          }
+                        } catch (err) {
+                          console.error(err);
+                        } finally {
+                          setIsSearchingTrip(false);
+                        }
+                      }}
+                      disabled={isSearchingTrip}
+                      className="w-full bg-dark text-white py-4 rounded-2xl font-bold hover:bg-gray-800 transition-all flex items-center justify-center gap-2"
+                    >
+                      {isSearchingTrip ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
+                      بحث عن الرحلة
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    <div className="bg-gold/5 p-6 rounded-3xl border border-gold/10">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <p className="text-xs font-bold text-gold uppercase tracking-wider mb-1">تفاصيل الرحلة</p>
+                          <h4 className="text-xl font-bold text-dark">{paymentTrip.customerName}</h4>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs font-bold text-gray-400 uppercase mb-1">المبلغ</p>
+                          <p className="text-2xl font-black text-gold">{paymentTrip.amount} BHD</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="flex items-center gap-2 text-gray-600">
+                          <MapPin className="w-4 h-4" />
+                          <span>{paymentTrip.direction}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-gray-600">
+                          <Calendar className="w-4 h-4" />
+                          <span>{paymentTrip.date}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <Elements stripe={stripePromise}>
+                      <CheckoutForm 
+                        trip={paymentTrip} 
+                        onSucceed={async () => {
+                          await updateDoc(doc(db, 'trips', paymentTrip.id), {
+                            paymentStatus: 'Paid'
+                          });
+                          alert('تمت عملية الدفع بنجاح! شكراً لاختياركم الحطب VIP.');
+                          setIsPaymentOpen(false);
+                          setPaymentTrip(null);
+                          setSearchTripId('');
+                        }} 
+                      />
+                    </Elements>
+
+                    <button 
+                      onClick={() => setPaymentTrip(null)}
+                      className="w-full text-gray-400 text-sm font-bold hover:text-dark transition-colors"
+                    >
+                      بحث عن رحلة أخرى
+                    </button>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Customer Dashboard Modal */}
+      <AnimatePresence>
+        {isCustomerDashboardOpen && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsCustomerDashboardOpen(false)}
+              className="absolute inset-0 bg-dark/80 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gold/10 rounded-xl flex items-center justify-center">
+                    <Users className="text-gold w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-dark">رحلاتي</h3>
+                    <p className="text-xs text-gray-500">{user?.email}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsCustomerDashboardOpen(false)}
+                  className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="p-8 overflow-y-auto flex-1">
+                {customerTrips.length === 0 ? (
+                  <div className="text-center py-20">
+                    <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <Car className="w-10 h-10 text-gray-300" />
+                    </div>
+                    <h4 className="text-xl font-bold text-dark mb-2">لا توجد رحلات مسجلة</h4>
+                    <p className="text-gray-500">لم تقم بأي رحلات مع Alhatab VIP Taxi بعد.</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-6">
+                    {customerTrips.map((trip) => (
+                      <div key={trip.id} className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm hover:shadow-md transition-all">
+                        <div className="flex flex-wrap justify-between items-start gap-4 mb-6">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={cn(
+                                "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
+                                trip.paymentStatus === 'Paid' ? "bg-green-100 text-green-600" : "bg-orange-100 text-orange-600"
+                              )}>
+                                {trip.paymentStatus === 'Paid' ? 'مدفوع' : 'معلق'}
+                              </span>
+                              <span className="text-xs font-bold text-gray-400">#{trip.id.slice(-6).toUpperCase()}</span>
+                            </div>
+                            <h4 className="text-lg font-bold text-dark">{trip.direction}</h4>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-2xl font-black text-gold">{trip.amount} BHD</p>
+                            <p className="text-xs font-bold text-gray-400 uppercase">{trip.date}</p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6 border-t border-gray-50">
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-black text-gray-400 uppercase">نقطة الانطلاق</p>
+                            <p className="text-sm font-bold text-dark flex items-center gap-2">
+                              <MapPin className="w-3 h-3 text-gold" />
+                              {trip.pickup}
+                            </p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-black text-gray-400 uppercase">الوجهة</p>
+                            <p className="text-sm font-bold text-dark flex items-center gap-2">
+                              <MapPin className="w-3 h-3 text-gold" />
+                              {trip.dropoff}
+                            </p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-black text-gray-400 uppercase">الوقت</p>
+                            <p className="text-sm font-bold text-dark flex items-center gap-2">
+                              <Clock className="w-3 h-3 text-gold" />
+                              {trip.time}
+                            </p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-black text-gray-400 uppercase">الركاب</p>
+                            <p className="text-sm font-bold text-dark flex items-center gap-2">
+                              <Users className="w-3 h-3 text-gold" />
+                              {trip.passengers}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {trip.paymentStatus !== 'Paid' && (
+                          <button
+                            onClick={() => {
+                              setPaymentTrip(trip);
+                              setIsPaymentOpen(true);
+                              setIsCustomerDashboardOpen(false);
+                            }}
+                            className="mt-6 w-full bg-dark text-white py-3 rounded-2xl font-bold hover:bg-gray-800 transition-all flex items-center justify-center gap-2"
+                          >
+                            <CreditCard className="w-4 h-4" />
+                            دفع الآن
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
+
+export default App;

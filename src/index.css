@@ -3,8 +3,8 @@
 
 @theme {
   --font-sans: "Inter", "Noto Sans Arabic", ui-sans-serif, system-ui, sans-serif;
-  --color-gold: #D4AF37;
-  --color-dark: #0A0A0A;
+  --color-gold: var(--primary, #D4AF37);
+  --color-dark: var(--secondary, #0A0A0A);
 }
 
 @layer base {
