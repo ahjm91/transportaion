@@ -38,7 +38,9 @@
         "heroSubtitle": { "type": "string" },
         "phone": { "type": "string" },
         "whatsapp": { "type": "string" },
-        "notificationWhatsapp": { "type": "string" }
+        "notificationWhatsapp": { "type": "string" },
+        "footerAbout": { "type": "string" },
+        "footerAddress": { "type": "string" }
       }
     },
     "Trip": {
@@ -63,6 +65,7 @@
         "driverCost": { "type": "number" },
         "profit": { "type": "number" },
         "paymentStatus": { "type": "string", "enum": ["Paid", "Unpaid", "Pending"] },
+        "status": { "type": "string", "enum": ["Requested", "Confirmed", "Completed", "Cancelled"] },
         "notes": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
@@ -82,6 +85,17 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "email", "role"]
+    },
+    "FixedRoute": {
+      "title": "Fixed Route",
+      "description": "A predefined route with a fixed price",
+      "type": "object",
+      "properties": {
+        "pickup": { "type": "string" },
+        "dropoff": { "type": "string" },
+        "price": { "type": "number" }
+      },
+      "required": ["pickup", "dropoff", "price"]
     }
   },
   "firestore": {
@@ -96,6 +110,10 @@
     "/specialized_services/{specializedServiceId}": {
       "schema": "SpecializedService",
       "description": "Specialized services collection"
+    },
+    "/fixed_routes/{routeId}": {
+      "schema": "FixedRoute",
+      "description": "Predefined routes and prices"
     },
     "/settings/site": {
       "schema": "SiteSettings",

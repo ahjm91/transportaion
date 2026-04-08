@@ -34,6 +34,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Fixed Routes
+    match /fixed_routes/{routeId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // Trips (Accounting)
     match /trips/{tripId} {
       allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);

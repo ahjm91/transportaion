@@ -41,6 +41,7 @@ import {
   CreditCard,
   CheckCircle,
   Wallet,
+  Copy,
   MessageCircle
 } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
@@ -155,8 +156,16 @@ interface Trip {
   driverCost: number;
   profit: number;
   paymentStatus: 'Paid' | 'Unpaid' | 'Pending';
+  status: 'Requested' | 'Confirmed' | 'Completed' | 'Cancelled';
   notes: string;
   createdAt: string;
+}
+
+interface FixedRoute {
+  id: string;
+  pickup: string;
+  dropoff: string;
+  price: number;
 }
 
 const CheckoutForm = ({ trip, onSucceed }: { trip: Trip; onSucceed: () => void }) => {
@@ -244,6 +253,7 @@ function App() {
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
   const [isCustomerDashboardOpen, setIsCustomerDashboardOpen] = useState(false);
+  const [bookingMode, setBookingMode] = useState<'fixed' | 'custom'>('fixed');
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [customerTrips, setCustomerTrips] = useState<Trip[]>([]);
@@ -255,8 +265,10 @@ function App() {
   const [isUploading, setIsUploading] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [activeTab, setActiveTab] = useState<'content' | 'accounting' | 'branding'>('content');
+  const [activeTab, setActiveTab] = useState<'content' | 'accounting' | 'branding' | 'pricing'>('content');
+  const [isAdminScheduleView, setIsAdminScheduleView] = useState(false);
   const [isTripFormOpen, setIsTripFormOpen] = useState(false);
+  const [tripFilter, setTripFilter] = useState<'all' | 'requested' | 'unpaid' | 'pending_price'>('all');
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [tripFormData, setTripFormData] = useState<Partial<Trip>>({
     customerName: '',
@@ -278,6 +290,7 @@ function App() {
   
   const [services, setServices] = useState<Service[]>([]);
   const [specializedServices, setSpecializedServices] = useState<SpecializedService[]>([]);
+  const [fixedRoutes, setFixedRoutes] = useState<FixedRoute[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({
     heroTitle: 'Alhatab VIP Taxi',
@@ -348,11 +361,39 @@ function App() {
       console.error('Firestore specialized services listener error:', error);
     });
 
+    const unsubscribeFixedRoutes = onSnapshot(collection(db, 'fixed_routes'), (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FixedRoute));
+      setFixedRoutes(data);
+    }, (error) => {
+      console.error('Firestore fixed routes listener error:', error);
+    });
+
     const unsubscribeSettings = onSnapshot(doc(db, 'settings', 'site'), (snapshot) => {
       if (snapshot.exists()) {
         setSiteSettings(snapshot.data() as SiteSettings);
       }
     });
+
+    // Handle auto-payment from URL
+    const params = new URLSearchParams(window.location.search);
+    const payId = params.get('pay');
+    if (payId) {
+      const fetchTrip = async () => {
+        try {
+          const docSnap = await getDoc(doc(db, 'trips', payId));
+          if (docSnap.exists()) {
+            const trip = { id: docSnap.id, ...docSnap.data() } as Trip;
+            if (trip.paymentStatus !== 'Paid' && trip.amount > 0) {
+              setPaymentTrip(trip);
+              setIsPaymentOpen(true);
+            }
+          }
+        } catch (err) {
+          console.error('Error fetching auto-pay trip:', err);
+        }
+      };
+      fetchTrip();
+    }
 
     let unsubscribeTrips = () => {};
     if (isAdmin) {
@@ -502,6 +543,13 @@ function App() {
     e.preventDefault();
     
     try {
+      // Check for fixed price
+      const matchedRoute = fixedRoutes.find(r => 
+        r.pickup.trim().toLowerCase() === bookingData.pickup.trim().toLowerCase() && 
+        r.dropoff.trim().toLowerCase() === bookingData.dropoff.trim().toLowerCase()
+      );
+      const finalAmount = matchedRoute ? matchedRoute.price : 0;
+
       // Save to Firestore first
       const tripData: Omit<Trip, 'id'> = {
         userId: user?.uid,
@@ -514,19 +562,46 @@ function App() {
         dropoff: bookingData.dropoff,
         date: bookingData.date,
         time: bookingData.time,
-        amount: 0, // Admin will set this later
+        amount: finalAmount,
         driverType: 'In',
         driverName: '',
         driverCost: 0,
         profit: 0,
         paymentStatus: 'Pending',
-        notes: 'حجز عبر الموقع',
+        status: finalAmount > 0 ? 'Confirmed' : 'Requested',
+        notes: matchedRoute ? 'حجز تلقائي (سعر ثابت)' : 'حجز عبر الموقع',
         createdAt: new Date().toISOString()
       };
 
       const docRef = await addDoc(collection(db, 'trips'), tripData);
       const newTrip = { id: docRef.id, ...tripData } as Trip;
       
+      // Notify Admin via Email
+      try {
+        await fetch('/api/notify-booking', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(tripData)
+        });
+      } catch (emailErr) {
+        console.error('Failed to send email notification:', emailErr);
+      }
+
+      // Notify Admin via WhatsApp only for custom bookings (amount == 0)
+      if (finalAmount === 0) {
+        const adminMessage = `🔔 *حجز جديد من الموقع*\n\n` +
+                             `👤 العميل: ${bookingData.customerName}\n` +
+                             `📞 الهاتف: ${bookingData.phone}\n` +
+                             `📍 المسار: ${bookingData.pickup} ← ${bookingData.dropoff}\n` +
+                             `📅 التاريخ: ${bookingData.date}\n` +
+                             `🕒 الوقت: ${bookingData.time}\n` +
+                             `👥 الركاب: ${bookingData.passengers}\n` +
+                             `🔗 يرجى الدخول للوحة التحكم لتحديد السعر.`;
+        
+        const adminWhatsapp = siteSettings.notificationWhatsapp || siteSettings.whatsapp;
+        window.open(`https://wa.me/${adminWhatsapp}?text=${encodeURIComponent(adminMessage)}`, '_blank');
+      }
+
       // Reset form
       setBookingData({
         customerName: '',
@@ -540,7 +615,7 @@ function App() {
       });
       
       // Redirect to payment if amount > 0, otherwise show success and redirect to customer dashboard
-      if (newTrip.amount > 0) {
+      if (finalAmount > 0) {
         setPaymentTrip(newTrip);
         setIsPaymentOpen(true);
       } else {
@@ -741,6 +816,34 @@ function App() {
     const encodedMessage = encodeURIComponent(message);
     const whatsappNumber = siteSettings.notificationWhatsapp || siteSettings.whatsapp;
     window.open(`https://wa.me/${whatsappNumber}?text=${encodedMessage}`, '_blank');
+  };
+
+  const handleSendEmailSchedule = async () => {
+    const today = new Date().toISOString().split('T')[0];
+    const upcomingTrips = trips.filter(t => t.date >= today);
+
+    if (upcomingTrips.length === 0) {
+      alert('لا توجد رحلات قادمة لإرسالها.');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/send-full-schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trips: upcomingTrips })
+      });
+
+      if (response.ok) {
+        alert('تم إرسال جدول الرحلات القادمة إلى بريدك الإلكتروني بنجاح.');
+      } else {
+        const err = await response.json();
+        alert(`فشل إرسال الإيميل: ${err.error || 'خطأ غير معروف'}`);
+      }
+    } catch (error) {
+      console.error('Email schedule failed:', error);
+      alert('حدث خطأ أثناء محاولة إرسال الإيميل.');
+    }
   };
 
   const handleSaveTrip = async () => {
@@ -1030,13 +1133,109 @@ function App() {
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="bg-white rounded-3xl shadow-2xl shadow-dark/5 border border-gray-100 p-8 lg:p-10"
+              className="bg-white rounded-[2.5rem] shadow-2xl shadow-dark/5 border border-gray-100 overflow-hidden"
             >
+              {/* Tabs */}
+              <div className="flex border-b border-gray-100">
+                <button 
+                  onClick={() => setBookingMode('fixed')}
+                  className={cn(
+                    "flex-1 py-5 text-sm font-black transition-all flex items-center justify-center gap-2",
+                    bookingMode === 'fixed' ? "bg-gold text-white" : "bg-gray-50 text-gray-400 hover:bg-gray-100"
+                  )}
+                >
+                  <Star className="w-4 h-4" />
+                  حجز سريع (وجهات ثابتة)
+                </button>
+                <button 
+                  onClick={() => setBookingMode('custom')}
+                  className={cn(
+                    "flex-1 py-5 text-sm font-black transition-all flex items-center justify-center gap-2",
+                    bookingMode === 'custom' ? "bg-gold text-white" : "bg-gray-50 text-gray-400 hover:bg-gray-100"
+                  )}
+                >
+                  <MapPin className="w-4 h-4" />
+                  طلب حجز مخصص
+                </button>
+              </div>
+
               <form 
                 onSubmit={handleBookingSubmit}
-                className="space-y-6"
+                className="p-8 lg:p-10 space-y-6"
               >
                 <div className="space-y-4">
+                  {bookingMode === 'fixed' ? (
+                    <div className="space-y-4">
+                      <div className="relative">
+                        <select 
+                          required
+                          className="w-full bg-gold/5 border-gold/20 text-dark rounded-2xl py-5 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-black text-lg appearance-none"
+                          onChange={e => {
+                            const route = fixedRoutes.find(r => r.id === e.target.value);
+                            if (route) {
+                              setBookingData({
+                                ...bookingData,
+                                pickup: route.pickup,
+                                dropoff: route.dropoff
+                              });
+                            }
+                          }}
+                        >
+                          <option value="">اختر وجهتك المفضلة...</option>
+                          {fixedRoutes.map(route => (
+                            <option key={route.id} value={route.id}>
+                              {route.pickup} ← {route.dropoff} ({route.price} BHD)
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronRight className="absolute left-6 top-1/2 -translate-y-1/2 text-gold w-5 h-5 rotate-90 pointer-events-none" />
+                      </div>
+                      <div className="p-4 bg-green-50 rounded-2xl border border-green-100 flex items-center gap-3">
+                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                          <CreditCard className="text-green-600 w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black text-green-700 uppercase">سعر ثابت - دفع فوري</p>
+                          <p className="text-sm font-bold text-dark">سيتم تحويلك لصفحة الدفع مباشرة بعد التأكيد</p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="relative">
+                        <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <input 
+                          type="text" 
+                          placeholder="نقطة الانطلاق (مثال: المنامة)"
+                          required
+                          className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all"
+                          value={bookingData.pickup}
+                          onChange={e => setBookingData({...bookingData, pickup: e.target.value})}
+                        />
+                      </div>
+                      <div className="relative">
+                        <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-gold w-5 h-5" />
+                        <input 
+                          type="text" 
+                          placeholder="وجهة الوصول (مثال: الرفاع)"
+                          required
+                          className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all"
+                          value={bookingData.dropoff}
+                          onChange={e => setBookingData({...bookingData, dropoff: e.target.value})}
+                        />
+                      </div>
+                      <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex items-center gap-3">
+                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                          <Clock className="text-blue-600 w-5 h-5" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black text-blue-700 uppercase">سعر عند الطلب</p>
+                          <p className="text-sm font-bold text-dark">سيقوم فريقنا بتحديد السعر وإرسال رابط الدفع لك</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="relative">
                       <Users className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -1061,28 +1260,6 @@ function App() {
                       />
                     </div>
                   </div>
-                  <div className="relative">
-                    <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input 
-                      type="text" 
-                      placeholder="نقطة الانطلاق"
-                      required
-                      className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all"
-                      value={bookingData.pickup}
-                      onChange={e => setBookingData({...bookingData, pickup: e.target.value})}
-                    />
-                  </div>
-                  <div className="relative">
-                    <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-gold w-5 h-5" />
-                    <input 
-                      type="text" 
-                      placeholder="وجهة الوصول"
-                      required
-                      className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all"
-                      value={bookingData.dropoff}
-                      onChange={e => setBookingData({...bookingData, dropoff: e.target.value})}
-                    />
-                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -1106,29 +1283,24 @@ function App() {
                   </div>
                 </div>
 
-                <div className="relative">
-                  <Users className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <select 
-                    className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 appearance-none transition-all"
-                    value={bookingData.service}
-                    onChange={e => setBookingData({...bookingData, service: e.target.value})}
-                  >
-                    {services.map(s => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                    {services.length === 0 && <option value="luxury">سيارة عائلية فاخرة</option>}
-                  </select>
-                </div>
-
                 <button 
                   type="submit"
-                  className="w-full bg-dark text-white py-5 rounded-2xl font-bold text-lg hover:bg-gray-800 transform hover:-translate-y-1 transition-all flex items-center justify-center gap-2"
+                  className="w-full bg-dark text-white py-5 rounded-2xl font-black text-lg hover:bg-gray-800 transform hover:-translate-y-1 transition-all flex items-center justify-center gap-2 shadow-xl shadow-dark/10"
                 >
-                  احجز الآن
-                  <ChevronRight className="w-5 h-5 rotate-180" />
+                  {bookingMode === 'fixed' ? (
+                    <>
+                      <CreditCard className="w-5 h-5" />
+                      تأكيد الحجز والدفع
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-5 h-5" />
+                      إرسال طلب الحجز
+                    </>
+                  )}
                 </button>
-                <p className="text-[10px] text-center text-gray-400">
-                  عند الضغط على "احجز الآن"، سيتم حفظ بياناتك في نظامنا وسنقوم بالتواصل معك لتأكيد الحجز.
+                <p className="text-[10px] text-center text-gray-400 font-bold">
+                  {bookingMode === 'fixed' ? '* سيتم حفظ بياناتك وتحويلك لبوابة الدفع الآمنة' : '* سيتم مراجعة طلبك وإرسال السعر عبر الواتساب'}
                 </p>
               </form>
             </motion.div>
@@ -1761,13 +1933,13 @@ function App() {
                         النظام المحاسبي
                       </button>
                       <button 
-                        onClick={() => setActiveTab('branding')}
+                        onClick={() => setActiveTab('pricing')}
                         className={cn(
                           "text-sm font-bold transition-colors",
-                          activeTab === 'branding' ? "text-gold" : "text-gray-400 hover:text-gray-600"
+                          activeTab === 'pricing' ? "text-gold" : "text-gray-400 hover:text-gray-600"
                         )}
                       >
-                        الهوية والتصميم
+                        التسعيرات الثابتة
                       </button>
                     </div>
                   </div>
@@ -2280,6 +2452,7 @@ function App() {
                                 driverName: '',
                                 driverCost: 0,
                                 paymentStatus: 'Pending',
+                                status: 'Requested',
                                 notes: ''
                               });
                               setIsTripFormOpen(true);
@@ -2297,6 +2470,13 @@ function App() {
                             إرسال جدول غد للواتساب
                           </button>
                           <button 
+                            onClick={handleSendEmailSchedule}
+                            className="bg-blue-600 text-white px-6 py-3 rounded-2xl flex items-center gap-2 font-bold shadow-lg shadow-blue-600/20 hover:scale-105 transition-all"
+                          >
+                            <FileText className="w-5 h-5" />
+                            إرسال جدول الرحلات للإيميل
+                          </button>
+                          <button 
                             onClick={exportTripsToCSV}
                             className="bg-white text-dark border border-gray-200 px-6 py-3 rounded-2xl flex items-center gap-2 font-bold hover:bg-gray-50 transition-all"
                           >
@@ -2305,20 +2485,138 @@ function App() {
                           </button>
                         </div>
                         
-                        <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl">
-                          {['الكل', 'مدفوع', 'غير مدفوع', 'معلق'].map(status => (
+                        <div className="flex gap-4 items-center">
+                          <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl">
                             <button 
-                              key={status}
-                              className="px-4 py-2 rounded-xl text-xs font-bold transition-all"
+                              onClick={() => setIsAdminScheduleView(false)}
+                              className={cn(
+                                "px-4 py-2 rounded-xl text-xs font-bold transition-all",
+                                !isAdminScheduleView ? "bg-white text-dark shadow-sm" : "text-gray-500 hover:text-dark"
+                              )}
                             >
-                              {status}
+                              قائمة الرحلات
                             </button>
-                          ))}
+                            <button 
+                              onClick={() => setIsAdminScheduleView(true)}
+                              className={cn(
+                                "px-4 py-2 rounded-xl text-xs font-bold transition-all",
+                                isAdminScheduleView ? "bg-white text-dark shadow-sm" : "text-gray-500 hover:text-dark"
+                              )}
+                            >
+                              عرض الجدول اليومي
+                            </button>
+                          </div>
+
+                          {!isAdminScheduleView && (
+                            <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl">
+                              {[
+                                { id: 'all', label: 'الكل' },
+                                { id: 'requested', label: 'طلبات جديدة' },
+                                { id: 'pending_price', label: 'بانتظار التسعير' },
+                                { id: 'unpaid', label: 'غير مدفوعة' },
+                                { id: 'paid', label: 'مدفوعة' }
+                              ].map(filter => (
+                              <button 
+                                key={filter.id}
+                                onClick={() => setTripFilter(filter.id as any)}
+                                className={cn(
+                                  "px-4 py-2 rounded-xl text-xs font-bold transition-all",
+                                  tripFilter === filter.id ? "bg-white text-dark shadow-sm" : "text-gray-500 hover:text-dark"
+                                )}
+                              >
+                                {filter.label}
+                              </button>
+                            ))}
+                          </div>
+                          )}
                         </div>
                       </div>
 
-                      {/* Accounting Table */}
-                      <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+                      {isAdminScheduleView ? (
+                        <div className="space-y-8">
+                          {Object.entries(
+                            trips
+                              .filter(t => t.date >= new Date().toISOString().split('T')[0])
+                              .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))
+                              .reduce((acc, trip) => {
+                                if (!acc[trip.date]) acc[trip.date] = [];
+                                acc[trip.date].push(trip);
+                                return acc;
+                              }, {} as Record<string, Trip[]>)
+                          ).map(([date, dayTrips]: [string, any[]]) => (
+                            <div key={date} className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+                              <div className="bg-gray-50 p-6 border-b border-gray-100 flex justify-between items-center">
+                                <h4 className="text-lg font-black text-dark flex items-center gap-2">
+                                  <Calendar className="w-5 h-5 text-gold" />
+                                  رحلات يوم: {date}
+                                </h4>
+                                <span className="bg-gold/10 text-gold px-4 py-1 rounded-full text-xs font-bold">
+                                  {dayTrips.length} رحلات
+                                </span>
+                              </div>
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-right text-xs">
+                                  <thead>
+                                    <tr className="bg-white border-b border-gray-50">
+                                      <th className="p-4 font-black text-gray-400 uppercase tracking-wider">الوقت</th>
+                                      <th className="p-4 font-black text-gray-400 uppercase tracking-wider">العميل</th>
+                                      <th className="p-4 font-black text-gray-400 uppercase tracking-wider">المسار</th>
+                                      <th className="p-4 font-black text-gray-400 uppercase tracking-wider">السعر</th>
+                                      <th className="p-4 font-black text-gray-400 uppercase tracking-wider">السائق</th>
+                                      <th className="p-4 font-black text-gray-400 uppercase tracking-wider">الحالة</th>
+                                      <th className="p-4 font-black text-gray-400 uppercase tracking-wider">الدفع</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-50">
+                                    {dayTrips.map(trip => (
+                                      <tr key={trip.id} className="hover:bg-gray-50/30 transition-colors">
+                                        <td className="p-4 font-black text-dark">{trip.time}</td>
+                                        <td className="p-4">
+                                          <div className="font-bold text-dark">{trip.customerName}</div>
+                                          <div className="text-[10px] text-gray-400">{trip.phone}</div>
+                                        </td>
+                                        <td className="p-4 font-bold text-dark">{trip.direction}</td>
+                                        <td className="p-4 font-black text-dark">{trip.amount} BHD</td>
+                                        <td className="p-4">
+                                          {trip.driverName ? (
+                                            <span className="text-blue-600 font-bold">{trip.driverName}</span>
+                                          ) : (
+                                            <span className="text-gray-300">لم يحدد</span>
+                                          )}
+                                        </td>
+                                        <td className="p-4">
+                                          <span className={cn(
+                                            "px-2 py-1 rounded-full text-[9px] font-black uppercase",
+                                            trip.status === 'Confirmed' ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"
+                                          )}>
+                                            {trip.status}
+                                          </span>
+                                        </td>
+                                        <td className="p-4">
+                                          <span className={cn(
+                                            "px-2 py-1 rounded-full text-[9px] font-black uppercase",
+                                            trip.paymentStatus === 'Paid' ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                                          )}>
+                                            {trip.paymentStatus}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          ))}
+                          {trips.filter(t => t.date >= new Date().toISOString().split('T')[0]).length === 0 && (
+                            <div className="bg-white p-20 rounded-[3rem] text-center border border-gray-100">
+                              <Calendar className="w-12 h-12 text-gray-200 mx-auto mb-4" />
+                              <p className="text-gray-400 font-bold">لا توجد رحلات قادمة مجدولة</p>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        /* Accounting Table */
+                        <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
                         <div className="overflow-x-auto">
                           <table className="w-full text-right text-xs">
                             <thead>
@@ -2339,13 +2637,22 @@ function App() {
                                 <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Driver Name</th>
                                 <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Driver Cost (BHD)</th>
                                 <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Company Profit (BHD)</th>
+                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Trip Status</th>
                                 <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Payment Status</th>
                                 <th className="p-4 font-black text-gray-400 uppercase tracking-wider">Notes</th>
                                 <th className="p-4 font-black text-gray-400 uppercase tracking-wider">Actions</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
-                              {trips.map((trip, idx) => (
+                              {trips
+                                .filter(t => {
+                                  if (tripFilter === 'requested') return t.status === 'Requested';
+                                  if (tripFilter === 'pending_price') return t.amount === 0;
+                                  if (tripFilter === 'unpaid') return t.paymentStatus !== 'Paid' && t.amount > 0;
+                                  if (tripFilter === 'paid') return t.paymentStatus === 'Paid';
+                                  return true;
+                                })
+                                .map((trip, idx) => (
                                 <tr key={trip.id} className="hover:bg-gray-50/50 transition-colors">
                                   <td className="p-4 font-bold text-gray-400">{(trips.length - idx).toString().padStart(3, '0')}</td>
                                   <td className="p-4 font-bold text-dark whitespace-nowrap">{trip.customerName}</td>
@@ -2381,6 +2688,19 @@ function App() {
                                   <td className="p-4">
                                     <span className={cn(
                                       "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
+                                      trip.status === 'Requested' ? "bg-blue-100 text-blue-700" :
+                                      trip.status === 'Confirmed' ? "bg-green-100 text-green-700" :
+                                      trip.status === 'Completed' ? "bg-gray-100 text-gray-700" :
+                                      "bg-red-100 text-red-700"
+                                    )}>
+                                      {trip.status === 'Requested' ? 'Requested' :
+                                       trip.status === 'Confirmed' ? 'Confirmed' :
+                                       trip.status === 'Completed' ? 'Completed' : 'Cancelled'}
+                                    </span>
+                                  </td>
+                                  <td className="p-4">
+                                    <span className={cn(
+                                      "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
                                       trip.paymentStatus === 'Paid' ? "bg-green-100 text-green-700" :
                                       trip.paymentStatus === 'Unpaid' ? "bg-red-100 text-red-700" :
                                       "bg-amber-100 text-amber-700"
@@ -2392,6 +2712,32 @@ function App() {
                                   <td className="p-4 text-gray-400 max-w-[150px] truncate">{trip.notes || '—'}</td>
                                   <td className="p-4">
                                     <div className="flex gap-2">
+                                      {trip.amount > 0 && trip.paymentStatus !== 'Paid' && (
+                                        <>
+                                          <button 
+                                            onClick={() => {
+                                              const payUrl = `${window.location.origin}${window.location.pathname}?pay=${trip.id}`;
+                                              const message = `عزيزي ${trip.customerName}،\nتم تحديد سعر رحلتك من ${trip.pickup} إلى ${trip.dropoff}.\nالمبلغ: ${trip.amount} BHD\nيمكنك الدفع إلكترونياً عبر الرابط التالي:\n${payUrl}`;
+                                              window.open(`https://wa.me/${trip.phone.replace(/\+/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
+                                            }}
+                                            className="p-2 hover:bg-green-50 text-green-600 rounded-xl transition-colors"
+                                            title="إرسال رابط الدفع للعميل"
+                                          >
+                                            <Wallet className="w-4 h-4" />
+                                          </button>
+                                          <button 
+                                            onClick={() => {
+                                              const payUrl = `${window.location.origin}${window.location.pathname}?pay=${trip.id}`;
+                                              navigator.clipboard.writeText(payUrl);
+                                              alert('تم نسخ رابط الدفع');
+                                            }}
+                                            className="p-2 hover:bg-gray-50 text-gray-600 rounded-xl transition-colors"
+                                            title="نسخ رابط الدفع"
+                                          >
+                                            <Copy className="w-4 h-4" />
+                                          </button>
+                                        </>
+                                      )}
                                       <button 
                                         onClick={() => {
                                           setEditingTrip(trip);
@@ -2399,6 +2745,7 @@ function App() {
                                           setIsTripFormOpen(true);
                                         }}
                                         className="p-2 hover:bg-blue-50 text-blue-600 rounded-xl transition-colors"
+                                        title="تعديل"
                                       >
                                         <Settings className="w-4 h-4" />
                                       </button>
@@ -2409,6 +2756,7 @@ function App() {
                                           }
                                         }}
                                         className="p-2 hover:bg-red-50 text-red-600 rounded-xl transition-colors"
+                                        title="حذف"
                                       >
                                         <Trash2 className="w-4 h-4" />
                                       </button>
@@ -2426,6 +2774,77 @@ function App() {
                             </tbody>
                           </table>
                         </div>
+                      </div>
+                    )}
+                  </section>
+                )}
+
+                  {activeTab === 'pricing' && (
+                    <section className="space-y-12">
+                      <div className="flex justify-between items-center mb-6">
+                        <h4 className="text-xl font-bold flex items-center gap-2">
+                          <DollarSign className="text-gold w-6 h-6" />
+                          إدارة الوجهات والتسعيرات الثابتة
+                        </h4>
+                        <button 
+                          onClick={() => addDoc(collection(db, 'fixed_routes'), {
+                            pickup: 'المطار',
+                            dropoff: 'المنامة',
+                            price: 10
+                          })}
+                          className="bg-gold text-white px-4 py-2 rounded-xl flex items-center gap-2 font-bold"
+                        >
+                          <Plus className="w-5 h-5" />
+                          إضافة وجهة ثابتة
+                        </button>
+                      </div>
+                      <div className="grid gap-6">
+                        {fixedRoutes.map(route => (
+                          <div key={route.id} className="bg-gray-50 p-6 rounded-3xl border border-gray-200">
+                            <div className="grid md:grid-cols-3 gap-6 items-end">
+                              <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-500">نقطة الاستلام</label>
+                                <input 
+                                  type="text" 
+                                  className="w-full bg-white border-gray-200 rounded-xl p-3 font-bold"
+                                  value={route.pickup}
+                                  onChange={e => updateDoc(doc(db, 'fixed_routes', route.id), { pickup: e.target.value })}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-500">نقطة التوصيل</label>
+                                <input 
+                                  type="text" 
+                                  className="w-full bg-white border-gray-200 rounded-xl p-3 font-bold"
+                                  value={route.dropoff}
+                                  onChange={e => updateDoc(doc(db, 'fixed_routes', route.id), { dropoff: e.target.value })}
+                                />
+                              </div>
+                              <div className="flex gap-4 items-center">
+                                <div className="flex-1 space-y-2">
+                                  <label className="text-xs font-bold text-gray-500">السعر (BHD)</label>
+                                  <input 
+                                    type="number" 
+                                    className="w-full bg-white border-gray-200 rounded-xl p-3 font-bold text-gold"
+                                    value={route.price}
+                                    onChange={e => updateDoc(doc(db, 'fixed_routes', route.id), { price: parseFloat(e.target.value) || 0 })}
+                                  />
+                                </div>
+                                <button 
+                                  onClick={() => deleteDoc(doc(db, 'fixed_routes', route.id))}
+                                  className="text-red-500 p-3 hover:bg-red-50 rounded-xl transition-colors"
+                                >
+                                  <Trash2 className="w-5 h-5" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        {fixedRoutes.length === 0 && (
+                          <div className="text-center py-12 bg-gray-50 rounded-3xl border border-dashed border-gray-200 text-gray-400 font-bold">
+                            لا توجد تسعيرات ثابتة مضافة حالياً.
+                          </div>
+                        )}
                       </div>
                     </section>
                   )}
@@ -2808,7 +3227,20 @@ function App() {
                   </div>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-6">
+                <div className="grid md:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase">حالة الرحلة</label>
+                    <select 
+                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                      value={tripFormData.status}
+                      onChange={e => setTripFormData({ ...tripFormData, status: e.target.value as any })}
+                    >
+                      <option value="Requested">طلب جديد</option>
+                      <option value="Confirmed">مؤكدة</option>
+                      <option value="Completed">مكتملة</option>
+                      <option value="Cancelled">ملغاة</option>
+                    </select>
+                  </div>
                   <div className="space-y-2">
                     <label className="text-xs font-black text-gray-400 uppercase">حالة الدفع</label>
                     <select 
@@ -3069,6 +3501,18 @@ function App() {
                           <div className="text-right">
                             <p className="text-2xl font-black text-gold">{trip.amount} BHD</p>
                             <p className="text-xs font-bold text-gray-400 uppercase">{trip.date}</p>
+                            {trip.amount > 0 && trip.paymentStatus !== 'Paid' && (
+                              <button 
+                                onClick={() => {
+                                  setPaymentTrip(trip);
+                                  setIsPaymentOpen(true);
+                                }}
+                                className="mt-2 bg-gold text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-opacity-90 transition-all flex items-center gap-2 ml-auto"
+                              >
+                                <Wallet className="w-4 h-4" />
+                                ادفع الآن
+                              </button>
+                            )}
                           </div>
                         </div>
 
