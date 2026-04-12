@@ -48,7 +48,6 @@ import {
   MessageCircle
 } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
-import { useJsApiLoader, Autocomplete } from '@react-google-maps/api';
 import { GoogleGenAI } from "@google/genai";
 import {
   Elements,
@@ -82,6 +81,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { translations } from './translations';
+import firebaseConfig from '../firebase-applet-config.json';
 
 // Types
 type ServiceType = 'luxury';
@@ -95,7 +95,11 @@ interface BookingData {
   date: string;
   time: string;
   passengers: number;
+  bags: number;
+  carType: 'Standard' | 'VIP' | 'Van';
   service: string;
+  distance?: number;
+  amount?: number;
 }
 
 interface Service {
@@ -146,6 +150,11 @@ interface SiteSettings {
   footerAddress: string;
   footerAddress_en?: string;
   adminEmails?: string[];
+  // Pricing & Payment
+  pricePerKm: number;
+  baseFee: number;
+  myFatoorahToken?: string;
+  myFatoorahIsSandbox?: boolean;
 }
 
 interface UserProfile {
@@ -165,9 +174,11 @@ interface Trip {
   phone: string;
   passengers: number;
   bags: number;
+  carType: 'Standard' | 'VIP' | 'Van';
   direction: string;
   pickup: string;
   dropoff: string;
+  distance?: number; // in km
   date: string;
   time: string;
   amount: number;
@@ -326,15 +337,7 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
   throw new Error(JSON.stringify(errInfo));
 }
 
-const libraries: ("places" | "drawing" | "geometry" | "visualization")[] = ["places"];
-
 function App() {
-  const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: (import.meta as any).env.VITE_GOOGLE_MAPS_API_KEY || "",
-    libraries
-  });
-
   const [lang, setLang] = useState<'ar' | 'en'>('ar');
   const t = (key: keyof typeof translations.ar) => translations[lang][key] || key;
 
@@ -407,6 +410,7 @@ function App() {
   };
   const [activeTab, setActiveTab] = useState<'content' | 'accounting' | 'branding' | 'pricing'>('content');
   const [isAdminScheduleView, setIsAdminScheduleView] = useState(false);
+  const [tripToDelete, setTripToDelete] = useState<Trip | null>(null);
   const [isTripFormOpen, setIsTripFormOpen] = useState(false);
   const [tripFilter, setTripFilter] = useState<'all' | 'requested' | 'unpaid' | 'pending_price'>('all');
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
@@ -415,6 +419,7 @@ function App() {
     phone: '',
     passengers: 1,
     bags: 0,
+    carType: 'Standard',
     direction: '',
     pickup: '',
     dropoff: '',
@@ -449,65 +454,34 @@ function App() {
     secondaryColor: '#1A1A1A',
     accentColor: '#F5F5F5',
     borderRadius: '1.5rem',
-    adminEmails: ['ahjm91@gmail.com']
+    adminEmails: ['ahjm91@gmail.com'],
+    pricePerKm: 0.5,
+    baseFee: 2,
+    myFatoorahIsSandbox: true
   });
 
-  const [pickupAutocomplete, setPickupAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
-  const [dropoffAutocomplete, setDropoffAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
-  const [adminPickupAutocomplete, setAdminPickupAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
-  const [adminDropoffAutocomplete, setAdminDropoffAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
+  // Handle payment redirect
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const successTripId = urlParams.get('pay_success');
+    const errorTripId = urlParams.get('pay_error');
 
-  const onPickupLoad = (autocomplete: google.maps.places.Autocomplete) => {
-    setPickupAutocomplete(autocomplete);
-  };
-
-  const onDropoffLoad = (autocomplete: google.maps.places.Autocomplete) => {
-    setDropoffAutocomplete(autocomplete);
-  };
-
-  const onPickupPlaceChanged = () => {
-    if (pickupAutocomplete !== null) {
-      const place = pickupAutocomplete.getPlace();
-      if (place.formatted_address) {
-        setBookingData(prev => ({ ...prev, pickup: place.formatted_address! }));
-      }
+    if (successTripId) {
+      // Update trip status to Paid
+      safeUpdateDoc(doc(db, 'trips', successTripId), { 
+        paymentStatus: 'Paid',
+        status: 'Confirmed'
+      }).then(() => {
+        alert(lang === 'ar' ? 'تم الدفع بنجاح! شكراً لك.' : 'Payment successful! Thank you.');
+        window.history.replaceState({}, '', window.location.pathname);
+      });
     }
-  };
 
-  const onDropoffPlaceChanged = () => {
-    if (dropoffAutocomplete !== null) {
-      const place = dropoffAutocomplete.getPlace();
-      if (place.formatted_address) {
-        setBookingData(prev => ({ ...prev, dropoff: place.formatted_address! }));
-      }
+    if (errorTripId) {
+      alert(lang === 'ar' ? 'حدث خطأ أثناء الدفع. يرجى المحاولة مرة أخرى.' : 'Payment failed. Please try again.');
+      window.history.replaceState({}, '', window.location.pathname);
     }
-  };
-
-  const onAdminPickupLoad = (autocomplete: google.maps.places.Autocomplete) => {
-    setAdminPickupAutocomplete(autocomplete);
-  };
-
-  const onAdminDropoffLoad = (autocomplete: google.maps.places.Autocomplete) => {
-    setAdminDropoffAutocomplete(autocomplete);
-  };
-
-  const onAdminPickupPlaceChanged = () => {
-    if (adminPickupAutocomplete !== null) {
-      const place = adminPickupAutocomplete.getPlace();
-      if (place.formatted_address) {
-        setTripFormData(prev => ({ ...prev, pickup: place.formatted_address! }));
-      }
-    }
-  };
-
-  const onAdminDropoffPlaceChanged = () => {
-    if (adminDropoffAutocomplete !== null) {
-      const place = adminDropoffAutocomplete.getPlace();
-      if (place.formatted_address) {
-        setTripFormData(prev => ({ ...prev, dropoff: place.formatted_address! }));
-      }
-    }
-  };
+  }, [lang]);
 
   const [bookingData, setBookingData] = useState<BookingData>({
     customerName: '',
@@ -518,6 +492,8 @@ function App() {
     date: new Date().toISOString().split('T')[0],
     time: '10:00',
     passengers: 1,
+    bags: 0,
+    carType: 'Standard',
     service: 'luxury'
   });
 
@@ -828,7 +804,7 @@ function App() {
     try {
       // Validate phone confirmation
       if (bookingData.phone !== bookingData.confirmPhone) {
-        alert('رقم الهاتف غير متطابق، يرجى التأكد من كتابة نفس الرقم في الخانتين.');
+        alert(lang === 'ar' ? 'رقم الهاتف غير متطابق، يرجى التأكد من كتابة نفس الرقم في الخانتين.' : 'Phone numbers do not match.');
         return;
       }
 
@@ -841,64 +817,114 @@ function App() {
         r.dropoff.trim().toLowerCase() === bookingData.dropoff.trim().toLowerCase()
       ) : null;
       
-      const finalAmount = matchedRoute ? matchedRoute.price : 0;
+      const finalAmount = matchedRoute ? matchedRoute.price : (bookingData.amount || 0);
 
       // Save to Firestore first
       const tripData: Omit<Trip, 'id'> = {
-        userId: user?.uid,
+        userId: user?.uid || null,
         customerName: bookingData.customerName,
         phone: bookingData.phone,
         passengers: bookingData.passengers,
-        bags: 0,
+        bags: bookingData.bags,
+        carType: bookingData.carType,
         direction: `${bookingData.pickup} ← ${bookingData.dropoff}`,
         pickup: bookingData.pickup,
         dropoff: bookingData.dropoff,
+        distance: bookingData.distance || 0,
         date: bookingData.date,
         time: bookingData.time,
-        amount: finalAmount,
+        amount: Number(finalAmount) || 0,
         driverType: 'In',
         driverName: '',
         driverCost: 0,
-        profit: 0,
+        profit: Number(finalAmount) || 0,
         paymentStatus: 'Pending',
-        status: finalAmount > 0 ? 'Confirmed' : 'Requested',
+        status: Number(finalAmount) > 0 ? 'Confirmed' : 'Requested',
         notes: isCustom ? 'طلب حجز مخصص' : (matchedRoute ? 'حجز تلقائي (سعر ثابت)' : 'حجز عبر الموقع'),
         createdAt: new Date().toISOString()
       };
 
       // Start saving to Firestore
-      const docRef = await addDoc(collection(db, 'trips'), tripData);
+      const docRef = await safeAddDoc(collection(db, 'trips'), tripData);
+      if (!docRef) {
+        throw new Error('Failed to save trip to database');
+      }
       const newTrip = { id: docRef.id, ...tripData } as Trip;
       
-      // Notify Admin via Email (Background - don't await to avoid popup blocking)
+      // Notify Admin via Email
       fetch('/api/notify-booking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(tripData)
-      }).catch(emailErr => console.error('Failed to send email notification:', emailErr));
+        body: JSON.stringify(newTrip)
+      })
+      .then(async res => {
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          console.error('Email notification server error:', res.status, errData);
+        }
+      })
+      .catch(emailErr => {
+        console.error('Failed to send email notification (Network Error):', emailErr);
+        if (emailErr instanceof Error) {
+          console.error('Error details:', {
+            message: emailErr.message,
+            stack: emailErr.stack,
+            url: '/api/notify-booking'
+          });
+        }
+      });
 
-      // Redirect to payment if amount > 0, otherwise show success and redirect to WhatsApp
-      if (finalAmount > 0) {
-        setPaymentTrip(newTrip);
-        setIsPaymentOpen(true);
-      } else {
-        const adminMessage = `🔔 *حجز جديد من الموقع*\n\n` +
-                             `👤 العميل: ${bookingData.customerName}\n` +
-                             `📞 الهاتف: ${bookingData.phone}\n` +
-                             `📍 المسار: ${bookingData.pickup} ← ${bookingData.dropoff}\n` +
-                             `📅 التاريخ: ${bookingData.date}\n` +
-                             `🕒 الوقت: ${bookingData.time}\n` +
-                             `👥 الركاب: ${bookingData.passengers}\n` +
-                             `🔗 يرجى الدخول للوحة التحكم لتحديد السعر.`;
+      // WhatsApp Message Construction
+      const adminMessage = `🔔 *حجز جديد من الموقع*\n\n` +
+                           `👤 العميل: ${bookingData.customerName}\n` +
+                           `📞 الهاتف: ${bookingData.phone}\n` +
+                           `📍 المسار: ${bookingData.pickup} ← ${bookingData.dropoff}\n` +
+                           `📅 التاريخ: ${bookingData.date}\n` +
+                           `🕒 الوقت: ${bookingData.time}\n` +
+                           `👥 الركاب: ${bookingData.passengers}\n` +
+                           `🚘 نوع السيارة: ${bookingData.carType}\n` +
+                           `💰 السعر: ${newTrip.amount > 0 ? newTrip.amount + ' BHD' : 'بانتظار التسعير'}\n` +
+                           `🔗 يرجى الدخول للوحة التحكم للمتابعة.`;
+      
+      const adminWhatsapp = siteSettings.notificationWhatsapp || siteSettings.whatsapp;
+      const whatsappUrl = `https://wa.me/${adminWhatsapp}?text=${encodeURIComponent(adminMessage)}`;
+
+      // Redirect to payment if amount > 0
+      if (newTrip.amount > 0) {
+        const confirmPay = window.confirm(lang === 'ar' 
+          ? 'تم تسجيل طلبك. هل تريد الدفع الآن إلكترونياً لتأكيد الحجز؟' 
+          : 'Your request is recorded. Do you want to pay online now to confirm?');
         
-        const adminWhatsapp = siteSettings.notificationWhatsapp || siteSettings.whatsapp;
-        const whatsappUrl = `https://wa.me/${adminWhatsapp}?text=${encodeURIComponent(adminMessage)}`;
-        
-        // Use location.href for more reliable redirection after async calls
-        window.location.href = whatsappUrl;
+        if (confirmPay) {
+          if (siteSettings.myFatoorahToken) {
+            const response = await fetch('/api/myfatoorah/execute-payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                amount: newTrip.amount,
+                customerName: newTrip.customerName,
+                phone: newTrip.phone,
+                tripId: docRef.id,
+                isSandbox: siteSettings.myFatoorahIsSandbox,
+                token: siteSettings.myFatoorahToken
+              })
+            });
+            const data = await response.json();
+            if (data.paymentUrl) {
+              window.open(data.paymentUrl, '_blank');
+              return;
+            }
+          } else {
+            setPaymentTrip(newTrip);
+            setIsPaymentOpen(true);
+            return;
+          }
+        }
       }
 
-      // Reset form
+      // If no payment or amount is 0, redirect to WhatsApp
+      alert(lang === 'ar' ? 'تم استلام طلبك بنجاح! سيتم تحويلك الآن لتأكيد الحجز عبر واتساب.' : 'Your request has been received successfully! Redirecting to WhatsApp...');
+      
       setBookingData({
         customerName: '',
         phone: '',
@@ -908,11 +934,15 @@ function App() {
         date: new Date().toISOString().split('T')[0],
         time: '10:00',
         passengers: 1,
+        bags: 0,
+        carType: 'Standard',
         service: 'luxury'
       });
+        
+      window.open(whatsappUrl, '_blank');
     } catch (error) {
       console.error('Booking failed:', error);
-      alert('فشل إرسال الطلب، يرجى المحاولة مرة أخرى.');
+      alert(lang === 'ar' ? 'فشل إرسال الطلب، يرجى المحاولة مرة أخرى.' : 'Booking failed, please try again.');
     }
   };
 
@@ -1192,9 +1222,9 @@ function App() {
     const path = 'trips';
     try {
       if (editingTrip) {
-        await updateDoc(doc(db, path, editingTrip.id), data);
+        await safeUpdateDoc(doc(db, path, editingTrip.id), data);
       } else {
-        await addDoc(collection(db, path), data);
+        await safeAddDoc(collection(db, path), data);
       }
       setIsTripFormOpen(false);
       setEditingTrip(null);
@@ -1203,9 +1233,11 @@ function App() {
         phone: '',
         passengers: 1,
         bags: 0,
+        carType: 'Standard',
         direction: '',
         pickup: '',
         dropoff: '',
+        distance: 0,
         date: new Date().toISOString().split('T')[0],
         time: '10:00',
         amount: 0,
@@ -1213,6 +1245,7 @@ function App() {
         driverName: '',
         driverCost: 0,
         paymentStatus: 'Pending',
+        status: 'Requested',
         notes: ''
       });
     } catch (error: any) {
@@ -1228,6 +1261,17 @@ function App() {
       };
       console.error('Firestore Error:', JSON.stringify(errInfo));
       alert('حدث خطأ أثناء حفظ البيانات. يرجى التحقق من الصلاحيات.');
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    if (!isAdmin) return;
+    try {
+      await safeUpdateDoc(doc(db, 'settings', 'site'), siteSettings);
+      alert(lang === 'ar' ? 'تم حفظ الإعدادات بنجاح' : 'Settings saved successfully');
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      alert(lang === 'ar' ? 'فشل حفظ الإعدادات' : 'Failed to save settings');
     }
   };
 
@@ -1582,67 +1626,78 @@ function App() {
                     <div className="space-y-4">
                       <div className="relative">
                         <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                        {isLoaded ? (
-                          <Autocomplete
-                            onLoad={onPickupLoad}
-                            onPlaceChanged={onPickupPlaceChanged}
-                          >
-                            <input 
-                              type="text" 
-                              placeholder={t('pickup')}
-                              required
-                              className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all"
-                              value={bookingData.pickup}
-                              onChange={e => setBookingData({...bookingData, pickup: e.target.value})}
-                            />
-                          </Autocomplete>
-                        ) : (
-                          <input 
-                            type="text" 
-                            placeholder={t('pickup')}
-                            required
-                            className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all"
-                            value={bookingData.pickup}
-                            onChange={e => setBookingData({...bookingData, pickup: e.target.value})}
-                          />
-                        )}
+                        <input 
+                          type="text" 
+                          placeholder={t('pickup')}
+                          required
+                          className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all"
+                          value={bookingData.pickup}
+                          onChange={e => setBookingData({...bookingData, pickup: e.target.value})}
+                        />
                       </div>
                       <div className="relative">
                         <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-gold w-5 h-5" />
-                        {isLoaded ? (
-                          <Autocomplete
-                            onLoad={onDropoffLoad}
-                            onPlaceChanged={onDropoffPlaceChanged}
+                        <input 
+                          type="text" 
+                          placeholder={t('dropoff')}
+                          required
+                          className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all"
+                          value={bookingData.dropoff}
+                          onChange={e => setBookingData({...bookingData, dropoff: e.target.value})}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="relative">
+                          <Car className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                          <select 
+                            className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all appearance-none font-bold"
+                            value={bookingData.carType}
+                            onChange={e => setBookingData({...bookingData, carType: e.target.value as any})}
                           >
-                            <input 
-                              type="text" 
-                              placeholder={t('dropoff')}
-                              required
-                              className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all"
-                              value={bookingData.dropoff}
-                              onChange={e => setBookingData({...bookingData, dropoff: e.target.value})}
-                            />
-                          </Autocomplete>
-                        ) : (
+                            <option value="Standard">{lang === 'ar' ? 'عادي' : 'Standard'}</option>
+                            <option value="VIP">VIP</option>
+                            <option value="Van">{lang === 'ar' ? 'فان' : 'Van'}</option>
+                          </select>
+                        </div>
+                        <div className="relative">
+                          <ShoppingBag className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                           <input 
-                            type="text" 
-                            placeholder={t('dropoff')}
-                            required
-                            className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all"
-                            value={bookingData.dropoff}
-                            onChange={e => setBookingData({...bookingData, dropoff: e.target.value})}
+                            type="number" 
+                            min="0"
+                            placeholder={lang === 'ar' ? 'الشنط' : 'Bags'}
+                            className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
+                            value={bookingData.bags}
+                            onChange={e => setBookingData({...bookingData, bags: parseInt(e.target.value) || 0})}
                           />
-                        )}
-                      </div>
-                      <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex items-center gap-3">
-                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                          <Clock className="text-blue-600 w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-black text-blue-700 uppercase">{t('priceOnRequest')}</p>
-                          <p className="text-sm font-bold text-dark">{t('priceOnRequestDesc')}</p>
                         </div>
                       </div>
+
+                      {bookingData.amount ? (
+                        <div className="p-4 bg-gold/10 rounded-2xl border border-gold/20 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                              <DollarSign className="text-gold w-5 h-5" />
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-black text-gold uppercase">{lang === 'ar' ? 'السعر المقدر' : 'Estimated Price'}</p>
+                              <p className="text-sm font-bold text-dark">{bookingData.distance} كم</p>
+                            </div>
+                          </div>
+                          <div className="text-xl font-black text-gold">
+                            {bookingData.amount} BHD
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex items-center gap-3">
+                          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                            <Clock className="text-blue-600 w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-blue-700 uppercase">{t('priceOnRequest')}</p>
+                            <p className="text-sm font-bold text-dark">{t('priceOnRequestDesc')}</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -2405,7 +2460,7 @@ function App() {
                           activeTab === 'pricing' ? "text-gold" : "text-gray-400 hover:text-gray-600"
                         )}
                       >
-                        {lang === 'ar' ? 'التسعيرات الثابتة' : 'Fixed Pricing'}
+                        {lang === 'ar' ? 'التسعيرات والربط' : 'Pricing & Integration'}
                       </button>
                     </div>
                   </div>
@@ -2576,7 +2631,35 @@ function App() {
                               onChange={e => {
                                 const newSettings = { ...siteSettings, instagram: e.target.value };
                                 setSiteSettings(newSettings);
-                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                safeUpdateDoc(doc(db, 'settings', 'site'), newSettings);
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-600">رابط تيك توك</label>
+                            <input 
+                              type="text" 
+                              className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
+                              placeholder="https://tiktok.com/@your_account"
+                              value={siteSettings.tiktok || ''}
+                              onChange={e => {
+                                const newSettings = { ...siteSettings, tiktok: e.target.value };
+                                setSiteSettings(newSettings);
+                                safeUpdateDoc(doc(db, 'settings', 'site'), newSettings);
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-600">رابط منصة X</label>
+                            <input 
+                              type="text" 
+                              className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
+                              placeholder="https://x.com/your_account"
+                              value={siteSettings.twitter || ''}
+                              onChange={e => {
+                                const newSettings = { ...siteSettings, twitter: e.target.value };
+                                setSiteSettings(newSettings);
+                                safeUpdateDoc(doc(db, 'settings', 'site'), newSettings);
                               }}
                             />
                           </div>
@@ -2947,20 +3030,29 @@ function App() {
                         </div>
                         <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
                           <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600 mb-3">
-                            <Users className="w-5 h-5" />
+                            <Clock className="w-5 h-5" />
                           </div>
-                          <p className="text-xs text-gray-500 font-bold mb-1">تكلفة السائقين</p>
-                          <p className="text-2xl font-black text-dark">
-                            {trips.reduce((acc, t) => acc + (t.driverCost || 0), 0).toFixed(2)} <span className="text-xs">BHD</span>
+                          <p className="text-xs text-gray-500 font-bold mb-1">أرباح اليوم</p>
+                          <p className="text-2xl font-black text-gold">
+                            {trips
+                              .filter(t => t.date === new Date().toISOString().split('T')[0])
+                              .reduce((acc, t) => acc + (t.profit || 0), 0).toFixed(2)} <span className="text-xs">BHD</span>
                           </p>
                         </div>
                         <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
                           <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center text-purple-600 mb-3">
                             <Calendar className="w-5 h-5" />
                           </div>
-                          <p className="text-xs text-gray-500 font-bold mb-1">حجوزات اليوم</p>
+                          <p className="text-xs text-gray-500 font-bold mb-1">أرباح الأسبوع</p>
                           <p className="text-2xl font-black text-dark">
-                            {trips.filter(t => t.date === new Date().toISOString().split('T')[0]).length}
+                            {trips
+                              .filter(t => {
+                                const tripDate = new Date(t.date);
+                                const weekAgo = new Date();
+                                weekAgo.setDate(weekAgo.getDate() - 7);
+                                return tripDate >= weekAgo;
+                              })
+                              .reduce((acc, t) => acc + (t.profit || 0), 0).toFixed(2)} <span className="text-xs">BHD</span>
                           </p>
                         </div>
                       </div>
@@ -3161,6 +3253,8 @@ function App() {
                                 <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Phone</th>
                                 <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap text-center">No. of Passengers</th>
                                 <th className="p-4 font-black text-gray-400 uppercase tracking-wider text-center">Bags</th>
+                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider text-center">Car Type</th>
+                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider text-center">Distance (km)</th>
                                 <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Trip Direction</th>
                                 <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Pickup Location</th>
                                 <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Drop-off Location</th>
@@ -3202,6 +3296,16 @@ function App() {
                                   <td className="p-4 font-bold text-dark whitespace-nowrap">{trip.phone}</td>
                                   <td className="p-4 font-bold text-dark text-center">{trip.passengers}</td>
                                   <td className="p-4 font-bold text-dark text-center">{trip.bags}</td>
+                                  <td className="p-4 font-bold text-dark text-center">
+                                    <span className={cn(
+                                      "px-2 py-1 rounded text-[10px] font-bold",
+                                      trip.carType === 'VIP' ? "bg-gold/10 text-gold" : 
+                                      trip.carType === 'Van' ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-700"
+                                    )}>
+                                      {trip.carType}
+                                    </span>
+                                  </td>
+                                  <td className="p-4 font-bold text-dark text-center">{trip.distance?.toFixed(1) || '—'}</td>
                                   <td className="p-4 font-bold text-dark whitespace-nowrap">{trip.direction}</td>
                                   <td className="p-4 font-bold text-dark whitespace-nowrap">{trip.pickup}</td>
                                   <td className="p-4 font-bold text-dark whitespace-nowrap">{trip.dropoff}</td>
@@ -3274,6 +3378,7 @@ function App() {
                                       )}
                                       <button 
                                         onClick={() => {
+                                          console.log('Editing trip:', trip.id);
                                           setEditingTrip(trip);
                                           setTripFormData(trip);
                                           setIsTripFormOpen(true);
@@ -3284,11 +3389,7 @@ function App() {
                                         <Settings className="w-4 h-4" />
                                       </button>
                                       <button 
-                                        onClick={() => {
-                                          if (window.confirm('هل أنت متأكد من حذف هذه الرحلة؟')) {
-                                            deleteDoc(doc(db, 'trips', trip.id));
-                                          }
-                                        }}
+                                        onClick={() => setTripToDelete(trip)}
                                         className="p-2 hover:bg-red-50 text-red-600 rounded-xl transition-colors"
                                         title="حذف"
                                       >
@@ -3314,71 +3415,117 @@ function App() {
                 )}
 
                   {activeTab === 'pricing' && (
-                    <section className="space-y-12">
-                      <div className="flex justify-between items-center mb-6">
-                        <h4 className="text-xl font-bold flex items-center gap-2">
-                          <DollarSign className="text-gold w-6 h-6" />
-                          إدارة الوجهات والتسعيرات الثابتة
-                        </h4>
-                        <button 
-                          onClick={() => addDoc(collection(db, 'fixed_routes'), {
-                            pickup: 'المطار',
-                            dropoff: 'المنامة',
-                            price: 10
-                          })}
-                          className="bg-gold text-white px-4 py-2 rounded-xl flex items-center gap-2 font-bold"
-                        >
-                          <Plus className="w-5 h-5" />
-                          إضافة وجهة ثابتة
-                        </button>
-                      </div>
-                      <div className="grid gap-6">
-                        {fixedRoutes.map(route => (
-                          <div key={route.id} className="bg-gray-50 p-6 rounded-3xl border border-gray-200">
-                            <div className="grid md:grid-cols-3 gap-6 items-end">
-                              <div className="space-y-2">
-                                <label className="text-xs font-bold text-gray-500">نقطة الاستلام</label>
-                                <input 
-                                  type="text" 
-                                  className="w-full bg-white border-gray-200 rounded-xl p-3 font-bold"
-                                  value={route.pickup}
-                                  onChange={e => updateDoc(doc(db, 'fixed_routes', route.id), { pickup: e.target.value })}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <label className="text-xs font-bold text-gray-500">نقطة التوصيل</label>
-                                <input 
-                                  type="text" 
-                                  className="w-full bg-white border-gray-200 rounded-xl p-3 font-bold"
-                                  value={route.dropoff}
-                                  onChange={e => updateDoc(doc(db, 'fixed_routes', route.id), { dropoff: e.target.value })}
-                                />
-                              </div>
-                              <div className="flex gap-4 items-center">
-                                <div className="flex-1 space-y-2">
-                                  <label className="text-xs font-bold text-gray-500">السعر (BHD)</label>
-                                  <input 
-                                    type="number" 
-                                    className="w-full bg-white border-gray-200 rounded-xl p-3 font-bold text-gold"
-                                    value={route.price}
-                                    onChange={e => updateDoc(doc(db, 'fixed_routes', route.id), { price: parseFloat(e.target.value) || 0 })}
-                                  />
-                                </div>
-                                <button 
-                                  onClick={() => deleteDoc(doc(db, 'fixed_routes', route.id))}
-                                  className="text-red-500 p-3 hover:bg-red-50 rounded-xl transition-colors"
-                                >
-                                  <Trash2 className="w-5 h-5" />
-                                </button>
-                              </div>
+                    <section className="space-y-8">
+                      {/* Pricing Settings */}
+                      <div className="grid md:grid-cols-2 gap-8">
+                        <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
+                          <h4 className="text-xl font-black text-dark flex items-center gap-2">
+                            <DollarSign className="w-6 h-6 text-gold" />
+                            إعدادات التسعير التلقائي
+                          </h4>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <label className="text-xs font-bold text-gray-400 uppercase">سعر الكيلومتر (BHD)</label>
+                              <input 
+                                type="number" 
+                                step="0.01"
+                                className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
+                                value={siteSettings.pricePerKm}
+                                onChange={e => setSiteSettings({...siteSettings, pricePerKm: parseFloat(e.target.value) || 0})}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-xs font-bold text-gray-400 uppercase">رسوم الخدمة الثابتة (BHD)</label>
+                              <input 
+                                type="number" 
+                                step="0.01"
+                                className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
+                                value={siteSettings.baseFee}
+                                onChange={e => setSiteSettings({...siteSettings, baseFee: parseFloat(e.target.value) || 0})}
+                              />
                             </div>
                           </div>
-                        ))}
-                        {fixedRoutes.length === 0 && (
-                          <div className="text-center py-12 bg-gray-50 rounded-3xl border border-dashed border-gray-200 text-gray-400 font-bold">
-                            لا توجد تسعيرات ثابتة مضافة حالياً.
+                          <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100">
+                            <p className="text-xs text-blue-700 font-bold">المعادلة: (المسافة × سعر الكيلو) + الرسوم الثابتة</p>
                           </div>
-                        )}
+                          <button 
+                            onClick={handleSaveSettings}
+                            className="w-full bg-dark text-white py-4 rounded-2xl font-bold hover:bg-gray-800 transition-all"
+                          >
+                            حفظ إعدادات التسعير
+                          </button>
+                        </div>
+
+                        <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
+                          <h4 className="text-xl font-black text-dark flex items-center gap-2">
+                            <CreditCard className="w-6 h-6 text-gold" />
+                            ربط MyFatoorah
+                          </h4>
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <label className="text-xs font-bold text-gray-400 uppercase">API Token</label>
+                              <input 
+                                type="password" 
+                                className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
+                                value={siteSettings.myFatoorahToken || ''}
+                                onChange={e => setSiteSettings({...siteSettings, myFatoorahToken: e.target.value})}
+                                placeholder="أدخل توكن MyFatoorah"
+                              />
+                            </div>
+                            <div className="flex items-center gap-3 bg-gray-50 p-4 rounded-2xl">
+                              <input 
+                                type="checkbox" 
+                                id="mf-sandbox"
+                                checked={siteSettings.myFatoorahIsSandbox}
+                                onChange={e => setSiteSettings({...siteSettings, myFatoorahIsSandbox: e.target.checked})}
+                                className="w-5 h-5 rounded border-gray-300 text-gold focus:ring-gold"
+                              />
+                              <label htmlFor="mf-sandbox" className="text-sm font-bold text-dark">تفعيل وضع التجربة (Sandbox Mode)</label>
+                            </div>
+                          </div>
+                          <button 
+                            onClick={handleSaveSettings}
+                            className="w-full bg-dark text-white py-4 rounded-2xl font-bold hover:bg-gray-800 transition-all"
+                          >
+                            حفظ إعدادات الدفع
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Existing Fixed Pricing Section */}
+                      <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
+                        <div className="flex justify-between items-center">
+                          <h4 className="text-xl font-black text-dark">المسارات والأسعار الثابتة</h4>
+                          <button 
+                            onClick={() => {
+                              const pickup = prompt('نقطة الانطلاق:');
+                              const dropoff = prompt('نقطة الوصول:');
+                              const price = parseFloat(prompt('السعر (BHD):') || '0');
+                              if (pickup && dropoff && !isNaN(price)) {
+                                safeAddDoc(collection(db, 'fixed_routes'), { pickup, dropoff, price });
+                              }
+                            }}
+                            className="bg-gold text-white px-4 py-2 rounded-xl text-xs font-bold"
+                          >
+                            إضافة مسار ثابت
+                          </button>
+                        </div>
+                        <div className="grid md:grid-cols-3 gap-4">
+                          {fixedRoutes.map(route => (
+                            <div key={route.id} className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex justify-between items-center">
+                              <div>
+                                <p className="text-xs font-bold text-dark">{route.pickup} ← {route.dropoff}</p>
+                                <p className="text-lg font-black text-gold">{route.price} BHD</p>
+                              </div>
+                              <button 
+                                onClick={() => safeDeleteDoc(doc(db, 'fixed_routes', route.id))}
+                                className="text-red-500 hover:bg-red-50 p-2 rounded-xl transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </section>
                   )}
@@ -3580,57 +3727,6 @@ function App() {
 
                       <div>
                         <h4 className="text-xl font-bold mb-6 flex items-center gap-2">
-                          <MessageCircle className="text-gold w-6 h-6" />
-                          وسائل التواصل الاجتماعي (Social Media)
-                        </h4>
-                        <div className="grid md:grid-cols-3 gap-8">
-                          <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-600">Instagram Link</label>
-                            <input 
-                              type="text" 
-                              className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
-                              placeholder="https://instagram.com/..."
-                              value={siteSettings.instagram || ''}
-                              onChange={e => {
-                                const newSettings = { ...siteSettings, instagram: e.target.value };
-                                setSiteSettings(newSettings);
-                                safeUpdateDoc(doc(db, 'settings', 'site'), newSettings);
-                              }}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-600">TikTok Link</label>
-                            <input 
-                              type="text" 
-                              className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
-                              placeholder="https://tiktok.com/@..."
-                              value={siteSettings.tiktok || ''}
-                              onChange={e => {
-                                const newSettings = { ...siteSettings, tiktok: e.target.value };
-                                setSiteSettings(newSettings);
-                                safeUpdateDoc(doc(db, 'settings', 'site'), newSettings);
-                              }}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-sm font-bold text-gray-600">X (Twitter) Link</label>
-                            <input 
-                              type="text" 
-                              className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
-                              placeholder="https://x.com/..."
-                              value={siteSettings.twitter || ''}
-                              onChange={e => {
-                                const newSettings = { ...siteSettings, twitter: e.target.value };
-                                setSiteSettings(newSettings);
-                                safeUpdateDoc(doc(db, 'settings', 'site'), newSettings);
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4 className="text-xl font-bold mb-6 flex items-center gap-2">
                           <Menu className="text-gold w-6 h-6" />
                           تذييل الصفحة (Footer)
                         </h4>
@@ -3758,10 +3854,59 @@ function App() {
         )}
       </AnimatePresence>
 
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {tripToDelete && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setTripToDelete(null)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative bg-white w-full max-w-md rounded-[2rem] shadow-2xl p-8 text-center"
+              dir="rtl"
+            >
+              <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Trash2 className="w-10 h-10" />
+              </div>
+              <h3 className="text-xl font-black text-dark mb-2">تأكيد الحذف</h3>
+              <p className="text-gray-500 font-bold mb-8">
+                هل أنت متأكد من حذف رحلة العميل <span className="text-dark">{tripToDelete.customerName}</span>؟
+                <br />
+                هذا الإجراء لا يمكن التراجع عنه.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <button 
+                  onClick={() => setTripToDelete(null)}
+                  className="py-4 rounded-2xl font-bold text-gray-400 hover:bg-gray-50 transition-all"
+                >
+                  إلغاء
+                </button>
+                <button 
+                  onClick={async () => {
+                    await safeDeleteDoc(doc(db, 'trips', tripToDelete.id));
+                    setTripToDelete(null);
+                  }}
+                  className="bg-red-500 text-white py-4 rounded-2xl font-bold hover:bg-red-600 transition-all shadow-lg shadow-red-500/20"
+                >
+                  تأكيد الحذف
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Trip Form Modal */}
       <AnimatePresence>
         {isTripFormOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -3843,6 +3988,28 @@ function App() {
                       onChange={e => setTripFormData({ ...tripFormData, bags: parseInt(e.target.value) || 0 })}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase">نوع السيارة</label>
+                    <select 
+                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                      value={tripFormData.carType}
+                      onChange={e => setTripFormData({ ...tripFormData, carType: e.target.value as any })}
+                    >
+                      <option value="Standard">Standard</option>
+                      <option value="VIP">VIP</option>
+                      <option value="Van">Van</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase">المسافة (كم)</label>
+                    <input 
+                      type="number" 
+                      step="0.1"
+                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                      value={tripFormData.distance || 0}
+                      onChange={e => setTripFormData({ ...tripFormData, distance: parseFloat(e.target.value) || 0 })}
+                    />
+                  </div>
                 </div>
 
                 {/* Trip Details */}
@@ -3859,49 +4026,21 @@ function App() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-black text-gray-400 uppercase">نقطة الاستلام</label>
-                    {isLoaded ? (
-                      <Autocomplete
-                        onLoad={onAdminPickupLoad}
-                        onPlaceChanged={onAdminPickupPlaceChanged}
-                      >
-                        <input 
-                          type="text" 
-                          className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
-                          value={tripFormData.pickup}
-                          onChange={e => setTripFormData({ ...tripFormData, pickup: e.target.value })}
-                        />
-                      </Autocomplete>
-                    ) : (
-                      <input 
-                        type="text" 
-                        className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
-                        value={tripFormData.pickup}
-                        onChange={e => setTripFormData({ ...tripFormData, pickup: e.target.value })}
-                      />
-                    )}
+                    <input 
+                      type="text" 
+                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                      value={tripFormData.pickup}
+                      onChange={e => setTripFormData({ ...tripFormData, pickup: e.target.value })}
+                    />
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-black text-gray-400 uppercase">نقطة التوصيل</label>
-                    {isLoaded ? (
-                      <Autocomplete
-                        onLoad={onAdminDropoffLoad}
-                        onPlaceChanged={onAdminDropoffPlaceChanged}
-                      >
-                        <input 
-                          type="text" 
-                          className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
-                          value={tripFormData.dropoff}
-                          onChange={e => setTripFormData({ ...tripFormData, dropoff: e.target.value })}
-                        />
-                      </Autocomplete>
-                    ) : (
-                      <input 
-                        type="text" 
-                        className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
-                        value={tripFormData.dropoff}
-                        onChange={e => setTripFormData({ ...tripFormData, dropoff: e.target.value })}
-                      />
-                    )}
+                    <input 
+                      type="text" 
+                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                      value={tripFormData.dropoff}
+                      onChange={e => setTripFormData({ ...tripFormData, dropoff: e.target.value })}
+                    />
                   </div>
                 </div>
 

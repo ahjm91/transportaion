@@ -15,6 +15,12 @@ const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY) 
   : null;
 
+if (resend) {
+  console.log("Resend initialized successfully.");
+} else {
+  console.warn("Resend NOT initialized. RESEND_API_KEY is missing.");
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -54,9 +60,10 @@ async function startServer() {
 
   // Email Notification
   app.post("/api/notify-booking", async (req, res) => {
+    console.log("Received booking notification request:", req.body.customerName);
     try {
       if (!resend) {
-        console.warn("Resend is not configured. Skipping email notification.");
+        console.warn("Resend is not configured (RESEND_API_KEY missing). Skipping email notification.");
         return res.json({ success: false, message: "Resend not configured" });
       }
 
@@ -178,6 +185,61 @@ async function startServer() {
       if (error) return res.status(400).json({ error });
       res.json({ success: true, data });
     } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // MyFatoorah Payment
+  app.post("/api/myfatoorah/execute-payment", async (req, res) => {
+    try {
+      const { amount, customerName, phone, tripId, isSandbox, token } = req.body;
+      
+      if (!token) {
+        return res.status(400).json({ error: "MyFatoorah token is missing" });
+      }
+
+      const baseUrl = isSandbox 
+        ? "https://apitest.myfatoorah.com" 
+        : "https://api.myfatoorah.com";
+
+      const payload = {
+        CustomerName: customerName,
+        DisplayCurrencyIso: "BHD",
+        MobileCountryCode: "973",
+        CustomerMobile: phone.replace(/[^0-9]/g, ''),
+        CustomerEmail: "customer@example.com",
+        InvoiceValue: amount,
+        CallBackUrl: `${req.protocol}://${req.get('host')}/?pay_success=${tripId}`,
+        ErrorUrl: `${req.protocol}://${req.get('host')}/?pay_error=${tripId}`,
+        Language: "ar",
+        CustomerReference: tripId,
+        UserDefinedField: tripId,
+        InvoiceItems: [
+          {
+            ItemName: `Trip Booking #${tripId}`,
+            Quantity: 1,
+            UnitPrice: amount
+          }
+        ]
+      };
+
+      const response = await fetch(`${baseUrl}/v2/ExecutePayment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+      if (!data.IsSuccess) {
+        throw new Error(data.Message || "MyFatoorah error");
+      }
+
+      res.json({ paymentUrl: data.Data.PaymentURL });
+    } catch (error: any) {
+      console.error("MyFatoorah Error:", error);
       res.status(500).json({ error: error.message });
     }
   });
