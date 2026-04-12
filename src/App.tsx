@@ -13,6 +13,7 @@ import {
   ChevronRight, 
   Star, 
   ShieldCheck, 
+  ShieldAlert,
   Clock3, 
   Phone,
   Menu,
@@ -47,6 +48,7 @@ import {
   MessageCircle
 } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
+import { useJsApiLoader, Autocomplete } from '@react-google-maps/api';
 import { GoogleGenAI } from "@google/genai";
 import {
   Elements,
@@ -265,7 +267,74 @@ const CheckoutForm = ({ trip, onSucceed }: { trip: Trip; onSucceed: () => void }
   );
 };
 
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId: string | undefined;
+    email: string | null | undefined;
+    emailVerified: boolean | undefined;
+    isAnonymous: boolean | undefined;
+    tenantId: string | null | undefined;
+    providerInfo: {
+      providerId: string;
+      displayName: string | null;
+      email: string | null;
+      photoUrl: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData.map(provider => ({
+        providerId: provider.providerId,
+        displayName: provider.displayName,
+        email: provider.email,
+        photoUrl: provider.photoURL
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  // Show a user-friendly alert for permission issues
+  if (errInfo.error.includes('permission-denied') || errInfo.error.includes('insufficient permissions')) {
+    if (auth.currentUser && !auth.currentUser.emailVerified) {
+      alert('عذراً، يجب تفعيل البريد الإلكتروني الخاص بك لتتمكن من إجراء التعديلات. يرجى مراجعة بريدك الإلكتروني.');
+    } else {
+      alert('عذراً، ليس لديك الصلاحية الكافية للقيام بهذه العملية.');
+    }
+  }
+  throw new Error(JSON.stringify(errInfo));
+}
+
+const libraries: ("places" | "drawing" | "geometry" | "visualization")[] = ["places"];
+
 function App() {
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: (import.meta as any).env.VITE_GOOGLE_MAPS_API_KEY || "",
+    libraries
+  });
+
   const [lang, setLang] = useState<'ar' | 'en'>('ar');
   const t = (key: keyof typeof translations.ar) => translations[lang][key] || key;
 
@@ -311,6 +380,31 @@ function App() {
   const [isUploading, setIsUploading] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+
+  const safeUpdateDoc = async (docRef: any, data: any) => {
+    try {
+      await updateDoc(docRef, data);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, docRef.path);
+    }
+  };
+
+  const safeAddDoc = async (colRef: any, data: any) => {
+    try {
+      return await addDoc(colRef, data);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, colRef.path);
+    }
+  };
+
+  const safeDeleteDoc = async (docRef: any) => {
+    try {
+      await deleteDoc(docRef);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, docRef.path);
+    }
+  };
   const [activeTab, setActiveTab] = useState<'content' | 'accounting' | 'branding' | 'pricing'>('content');
   const [isAdminScheduleView, setIsAdminScheduleView] = useState(false);
   const [isTripFormOpen, setIsTripFormOpen] = useState(false);
@@ -357,6 +451,63 @@ function App() {
     borderRadius: '1.5rem',
     adminEmails: ['ahjm91@gmail.com']
   });
+
+  const [pickupAutocomplete, setPickupAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
+  const [dropoffAutocomplete, setDropoffAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
+  const [adminPickupAutocomplete, setAdminPickupAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
+  const [adminDropoffAutocomplete, setAdminDropoffAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
+
+  const onPickupLoad = (autocomplete: google.maps.places.Autocomplete) => {
+    setPickupAutocomplete(autocomplete);
+  };
+
+  const onDropoffLoad = (autocomplete: google.maps.places.Autocomplete) => {
+    setDropoffAutocomplete(autocomplete);
+  };
+
+  const onPickupPlaceChanged = () => {
+    if (pickupAutocomplete !== null) {
+      const place = pickupAutocomplete.getPlace();
+      if (place.formatted_address) {
+        setBookingData(prev => ({ ...prev, pickup: place.formatted_address! }));
+      }
+    }
+  };
+
+  const onDropoffPlaceChanged = () => {
+    if (dropoffAutocomplete !== null) {
+      const place = dropoffAutocomplete.getPlace();
+      if (place.formatted_address) {
+        setBookingData(prev => ({ ...prev, dropoff: place.formatted_address! }));
+      }
+    }
+  };
+
+  const onAdminPickupLoad = (autocomplete: google.maps.places.Autocomplete) => {
+    setAdminPickupAutocomplete(autocomplete);
+  };
+
+  const onAdminDropoffLoad = (autocomplete: google.maps.places.Autocomplete) => {
+    setAdminDropoffAutocomplete(autocomplete);
+  };
+
+  const onAdminPickupPlaceChanged = () => {
+    if (adminPickupAutocomplete !== null) {
+      const place = adminPickupAutocomplete.getPlace();
+      if (place.formatted_address) {
+        setTripFormData(prev => ({ ...prev, pickup: place.formatted_address! }));
+      }
+    }
+  };
+
+  const onAdminDropoffPlaceChanged = () => {
+    if (adminDropoffAutocomplete !== null) {
+      const place = adminDropoffAutocomplete.getPlace();
+      if (place.formatted_address) {
+        setTripFormData(prev => ({ ...prev, dropoff: place.formatted_address! }));
+      }
+    }
+  };
 
   const [bookingData, setBookingData] = useState<BookingData>({
     customerName: '',
@@ -431,8 +582,9 @@ function App() {
   useEffect(() => {
     const checkAdmin = () => {
       const primaryAdmin = 'ahjm91@gmail.com';
-      const isUserAdmin = user?.email === primaryAdmin || (siteSettings.adminEmails?.includes(user?.email || '')) && user?.emailVerified === true;
-      setIsAdmin(isUserAdmin);
+      const isEmailMatch = user?.email === primaryAdmin || (siteSettings.adminEmails?.includes(user?.email || ''));
+      setIsAdmin(!!isEmailMatch);
+      setIsEmailVerified(!!user?.emailVerified);
     };
     checkAdmin();
   }, [user, siteSettings.adminEmails]);
@@ -444,7 +596,8 @@ function App() {
       
       if (u) {
         const primaryAdmin = 'ahjm91@gmail.com';
-        const isUserAdmin = u.email === primaryAdmin || (siteSettings.adminEmails?.includes(u.email || '')) && u.emailVerified === true;
+        const isEmailMatch = u.email === primaryAdmin || (siteSettings.adminEmails?.includes(u.email || ''));
+        const isUserAdmin = isEmailMatch && u.emailVerified === true;
 
         // Sync profile
         const userRef = doc(db, 'users', u.uid);
@@ -1429,25 +1582,57 @@ function App() {
                     <div className="space-y-4">
                       <div className="relative">
                         <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                        <input 
-                          type="text" 
-                          placeholder={t('pickup')}
-                          required
-                          className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all"
-                          value={bookingData.pickup}
-                          onChange={e => setBookingData({...bookingData, pickup: e.target.value})}
-                        />
+                        {isLoaded ? (
+                          <Autocomplete
+                            onLoad={onPickupLoad}
+                            onPlaceChanged={onPickupPlaceChanged}
+                          >
+                            <input 
+                              type="text" 
+                              placeholder={t('pickup')}
+                              required
+                              className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all"
+                              value={bookingData.pickup}
+                              onChange={e => setBookingData({...bookingData, pickup: e.target.value})}
+                            />
+                          </Autocomplete>
+                        ) : (
+                          <input 
+                            type="text" 
+                            placeholder={t('pickup')}
+                            required
+                            className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all"
+                            value={bookingData.pickup}
+                            onChange={e => setBookingData({...bookingData, pickup: e.target.value})}
+                          />
+                        )}
                       </div>
                       <div className="relative">
                         <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-gold w-5 h-5" />
-                        <input 
-                          type="text" 
-                          placeholder={t('dropoff')}
-                          required
-                          className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all"
-                          value={bookingData.dropoff}
-                          onChange={e => setBookingData({...bookingData, dropoff: e.target.value})}
-                        />
+                        {isLoaded ? (
+                          <Autocomplete
+                            onLoad={onDropoffLoad}
+                            onPlaceChanged={onDropoffPlaceChanged}
+                          >
+                            <input 
+                              type="text" 
+                              placeholder={t('dropoff')}
+                              required
+                              className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all"
+                              value={bookingData.dropoff}
+                              onChange={e => setBookingData({...bookingData, dropoff: e.target.value})}
+                            />
+                          </Autocomplete>
+                        ) : (
+                          <input 
+                            type="text" 
+                            placeholder={t('dropoff')}
+                            required
+                            className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all"
+                            value={bookingData.dropoff}
+                            onChange={e => setBookingData({...bookingData, dropoff: e.target.value})}
+                          />
+                        )}
                       </div>
                       <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex items-center gap-3">
                         <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
@@ -2226,33 +2411,32 @@ function App() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  {isAdmin && (
+                  {isAdmin && isEmailVerified && (
                     <div className="flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-bold border border-green-100">
                       <ShieldCheck className="w-4 h-4" />
                       {lang === 'ar' ? 'مدير مفعل' : 'Active Admin'}
                     </div>
                   )}
-                  {!isAdmin && user && (
+                  {isAdmin && !isEmailVerified && (
                     <div className="flex flex-col items-end gap-1">
                       <div className="flex items-center gap-2 bg-red-50 text-red-700 px-3 py-1 rounded-full text-xs font-bold border border-red-100">
-                        <ShieldCheck className="w-4 h-4" />
-                        {lang === 'ar' ? 'حساب غير مفعل كمدير (تأكد من تفعيل البريد)' : 'Account not active as admin (Verify email)'}
+                        <ShieldAlert className="w-4 h-4" />
+                        {lang === 'ar' ? 'البريد غير مفعل (لا يمكنك الحفظ)' : 'Email not verified (Cannot save)'}
                       </div>
-                      {user.email === 'ahjm91@gmail.com' && !user.emailVerified && (
-                        <button 
-                          onClick={async () => {
-                            try {
-                              await sendEmailVerification(user);
-                              alert(lang === 'ar' ? 'تم إرسال رابط التفعيل إلى بريدك الإلكتروني.' : 'Verification link sent to your email.');
-                            } catch (error: any) {
-                              alert((lang === 'ar' ? 'فشل إرسال الرابط: ' : 'Failed to send link: ') + error.message);
-                            }
-                          }}
-                          className="text-[10px] text-blue-600 hover:underline font-bold"
-                        >
-                          {lang === 'ar' ? 'إعادة إرسال رابط التفعيل' : 'Resend verification link'}
-                        </button>
-                      )}
+                      <button 
+                        onClick={async () => {
+                          if (!user) return;
+                          try {
+                            await sendEmailVerification(user);
+                            alert(lang === 'ar' ? 'تم إرسال رابط التفعيل إلى بريدك الإلكتروني.' : 'Verification link sent to your email.');
+                          } catch (error: any) {
+                            alert((lang === 'ar' ? 'فشل إرسال الرابط: ' : 'Failed to send link: ') + error.message);
+                          }
+                        }}
+                        className="text-[10px] text-blue-600 hover:underline font-bold"
+                      >
+                        {lang === 'ar' ? 'إعادة إرسال رابط التفعيل' : 'Resend verification link'}
+                      </button>
                     </div>
                   )}
                   {services.length === 0 && specializedServices.length === 0 && (
@@ -2298,7 +2482,7 @@ function App() {
                               onChange={e => {
                                 const newSettings = { ...siteSettings, heroTitle: e.target.value };
                                 setSiteSettings(newSettings);
-                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                safeUpdateDoc(doc(db, 'settings', 'site'), newSettings);
                               }}
                             />
                           </div>
@@ -2338,7 +2522,7 @@ function App() {
                                 onChange={e => {
                                   const newSettings = { ...siteSettings, logo: e.target.value };
                                   setSiteSettings(newSettings);
-                                  updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                  safeUpdateDoc(doc(db, 'settings', 'site'), newSettings);
                                 }}
                               />
                             </div>
@@ -2352,7 +2536,7 @@ function App() {
                               onChange={e => {
                                 const newSettings = { ...siteSettings, heroSubtitle: e.target.value };
                                 setSiteSettings(newSettings);
-                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                safeUpdateDoc(doc(db, 'settings', 'site'), newSettings);
                               }}
                             />
                           </div>
@@ -2365,7 +2549,7 @@ function App() {
                               onChange={e => {
                                 const newSettings = { ...siteSettings, phone: e.target.value };
                                 setSiteSettings(newSettings);
-                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                safeUpdateDoc(doc(db, 'settings', 'site'), newSettings);
                               }}
                             />
                           </div>
@@ -2378,7 +2562,7 @@ function App() {
                               onChange={e => {
                                 const newSettings = { ...siteSettings, whatsapp: e.target.value };
                                 setSiteSettings(newSettings);
-                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                safeUpdateDoc(doc(db, 'settings', 'site'), newSettings);
                               }}
                             />
                           </div>
@@ -2428,7 +2612,7 @@ function App() {
                               const name_en = await translateText(name);
                               const description_en = await translateText(description);
                               
-                              addDoc(collection(db, 'services'), {
+                              safeAddDoc(collection(db, 'services'), {
                                 name,
                                 name_en,
                                 description,
@@ -2483,10 +2667,10 @@ function App() {
                                       placeholder="رابط الصورة"
                                       className="flex-1 text-xs bg-white border-gray-200 rounded-lg p-2"
                                       value={service.image}
-                                      onChange={e => updateDoc(doc(db, 'services', service.id), { image: e.target.value })}
+                                      onChange={e => safeUpdateDoc(doc(db, 'services', service.id), { image: e.target.value })}
                                     />
                                     <button 
-                                      onClick={() => updateDoc(doc(db, 'services', service.id), { image: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=800' })}
+                                      onClick={() => safeUpdateDoc(doc(db, 'services', service.id), { image: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=800' })}
                                       className="text-[10px] bg-gray-200 px-2 rounded hover:bg-gray-300"
                                     >
                                       إعادة تعيين
@@ -2501,7 +2685,7 @@ function App() {
                                           type="text" 
                                           className="text-lg font-bold bg-white border border-gray-200 rounded-xl p-2 w-full"
                                           value={service.name}
-                                          onChange={e => updateDoc(doc(db, 'services', service.id), { name: e.target.value })}
+                                          onChange={e => safeUpdateDoc(doc(db, 'services', service.id), { name: e.target.value })}
                                         />
                                       </div>
                                       <div className="flex-1 space-y-2">
@@ -2510,11 +2694,11 @@ function App() {
                                           type="text" 
                                           className="text-lg font-bold bg-white border border-gray-200 rounded-xl p-2 w-full"
                                           value={service.name_en || ''}
-                                          onChange={e => updateDoc(doc(db, 'services', service.id), { name_en: e.target.value })}
+                                          onChange={e => safeUpdateDoc(doc(db, 'services', service.id), { name_en: e.target.value })}
                                         />
                                       </div>
                                       <button 
-                                        onClick={() => deleteDoc(doc(db, 'services', service.id))}
+                                        onClick={() => safeDeleteDoc(doc(db, 'services', service.id))}
                                         className="text-red-500 p-2 hover:bg-red-50 rounded-lg transition-colors self-end"
                                       >
                                         <Trash2 className="w-5 h-5" />
@@ -2560,7 +2744,7 @@ function App() {
                               const title_en = await translateText(title);
                               const desc_en = await translateText(desc);
                               
-                              addDoc(collection(db, 'specialized_services'), {
+                              safeAddDoc(collection(db, 'specialized_services'), {
                                 title,
                                 title_en,
                                 desc,
@@ -2635,7 +2819,7 @@ function App() {
                                         type="text" 
                                         className="font-bold bg-white border border-gray-200 rounded-lg p-1 w-full text-sm"
                                         value={service.title}
-                                        onChange={e => updateDoc(doc(db, 'specialized_services', service.id), { title: e.target.value })}
+                                        onChange={e => safeUpdateDoc(doc(db, 'specialized_services', service.id), { title: e.target.value })}
                                       />
                                     </div>
                                     <div className="flex-1 space-y-1">
@@ -2644,11 +2828,11 @@ function App() {
                                         type="text" 
                                         className="font-bold bg-white border border-gray-200 rounded-lg p-1 w-full text-sm"
                                         value={service.title_en || ''}
-                                        onChange={e => updateDoc(doc(db, 'specialized_services', service.id), { title_en: e.target.value })}
+                                        onChange={e => safeUpdateDoc(doc(db, 'specialized_services', service.id), { title_en: e.target.value })}
                                       />
                                     </div>
                                     <button 
-                                      onClick={() => deleteDoc(doc(db, 'specialized_services', service.id))}
+                                      onClick={() => safeDeleteDoc(doc(db, 'specialized_services', service.id))}
                                       className="text-red-500 p-1 hover:bg-red-50 rounded-lg transition-colors self-end"
                                     >
                                       <Trash2 className="w-4 h-4" />
@@ -3410,7 +3594,7 @@ function App() {
                               onChange={e => {
                                 const newSettings = { ...siteSettings, instagram: e.target.value };
                                 setSiteSettings(newSettings);
-                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                safeUpdateDoc(doc(db, 'settings', 'site'), newSettings);
                               }}
                             />
                           </div>
@@ -3424,7 +3608,7 @@ function App() {
                               onChange={e => {
                                 const newSettings = { ...siteSettings, tiktok: e.target.value };
                                 setSiteSettings(newSettings);
-                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                safeUpdateDoc(doc(db, 'settings', 'site'), newSettings);
                               }}
                             />
                           </div>
@@ -3438,7 +3622,7 @@ function App() {
                               onChange={e => {
                                 const newSettings = { ...siteSettings, twitter: e.target.value };
                                 setSiteSettings(newSettings);
-                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                safeUpdateDoc(doc(db, 'settings', 'site'), newSettings);
                               }}
                             />
                           </div>
@@ -3459,7 +3643,7 @@ function App() {
                               onChange={e => {
                                 const newSettings = { ...siteSettings, footerAbout: e.target.value };
                                 setSiteSettings(newSettings);
-                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                safeUpdateDoc(doc(db, 'settings', 'site'), newSettings);
                               }}
                             />
                           </div>
@@ -3675,21 +3859,49 @@ function App() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-black text-gray-400 uppercase">نقطة الاستلام</label>
-                    <input 
-                      type="text" 
-                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
-                      value={tripFormData.pickup}
-                      onChange={e => setTripFormData({ ...tripFormData, pickup: e.target.value })}
-                    />
+                    {isLoaded ? (
+                      <Autocomplete
+                        onLoad={onAdminPickupLoad}
+                        onPlaceChanged={onAdminPickupPlaceChanged}
+                      >
+                        <input 
+                          type="text" 
+                          className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                          value={tripFormData.pickup}
+                          onChange={e => setTripFormData({ ...tripFormData, pickup: e.target.value })}
+                        />
+                      </Autocomplete>
+                    ) : (
+                      <input 
+                        type="text" 
+                        className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                        value={tripFormData.pickup}
+                        onChange={e => setTripFormData({ ...tripFormData, pickup: e.target.value })}
+                      />
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-black text-gray-400 uppercase">نقطة التوصيل</label>
-                    <input 
-                      type="text" 
-                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
-                      value={tripFormData.dropoff}
-                      onChange={e => setTripFormData({ ...tripFormData, dropoff: e.target.value })}
-                    />
+                    {isLoaded ? (
+                      <Autocomplete
+                        onLoad={onAdminDropoffLoad}
+                        onPlaceChanged={onAdminDropoffPlaceChanged}
+                      >
+                        <input 
+                          type="text" 
+                          className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                          value={tripFormData.dropoff}
+                          onChange={e => setTripFormData({ ...tripFormData, dropoff: e.target.value })}
+                        />
+                      </Autocomplete>
+                    ) : (
+                      <input 
+                        type="text" 
+                        className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                        value={tripFormData.dropoff}
+                        onChange={e => setTripFormData({ ...tripFormData, dropoff: e.target.value })}
+                      />
+                    )}
                   </div>
                 </div>
 
