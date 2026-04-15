@@ -4,8 +4,21 @@ import path from "path";
 import Stripe from "stripe";
 import dotenv from "dotenv";
 import { Resend } from 'resend';
+import helmet from "helmet";
+import compression from "compression";
+import morgan from "morgan";
+import cors from "cors";
+import { rateLimit } from "express-rate-limit";
 
 dotenv.config();
+
+// Environment Variable Validation
+const requiredEnvVars = ['STRIPE_SECRET_KEY', 'RESEND_API_KEY'];
+requiredEnvVars.forEach(varName => {
+  if (!process.env[varName]) {
+    console.warn(`⚠️ Warning: ${varName} is not set in environment variables.`);
+  }
+});
 
 const stripe = process.env.STRIPE_SECRET_KEY 
   ? new Stripe(process.env.STRIPE_SECRET_KEY) 
@@ -15,34 +28,57 @@ const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY) 
   : null;
 
-if (resend) {
-  console.log("Resend initialized successfully.");
-} else {
-  console.warn("Resend NOT initialized. RESEND_API_KEY is missing.");
-}
-
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  // Security Middlewares
+  app.use(helmet({
+    contentSecurityPolicy: false, // Disabled to allow Vite's inline scripts in dev
+    crossOriginEmbedderPolicy: false,
+  }));
+  app.use(cors());
+  
+  // Performance Middlewares
+  app.use(compression());
+  app.use(morgan('dev')); // Logging
+  
+  app.use(express.json({ limit: '10kb' })); // Body limit to prevent large payload attacks
+
+  // Rate Limiting for API
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 100, // Limit each IP to 100 requests per windowMs
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { error: "Too many requests, please try again later." }
+  });
+
+  // Apply rate limiter to sensitive endpoints
+  app.use("/api/", apiLimiter);
 
   // API Routes
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
+    res.json({ 
+      status: "ok", 
+      timestamp: new Date().toISOString(),
+      env: process.env.NODE_ENV || 'development'
+    });
   });
 
   // Stripe Payment Intent
-  app.post("/api/create-payment-intent", async (req, res) => {
+  app.post("/api/create-payment-intent", async (req, res, next) => {
     try {
       if (!stripe) {
-        return res.status(500).json({ error: "Stripe is not configured" });
+        throw new Error("Stripe is not configured");
       }
 
       const { amount, currency = "bhd", metadata } = req.body;
 
-      // Stripe expects amount in cents/fils
-      // BHD has 3 decimal places, so 1.000 BHD = 1000 fils
+      if (!amount || isNaN(amount)) {
+        return res.status(400).json({ error: "Invalid amount" });
+      }
+
       const intent = await stripe.paymentIntents.create({
         amount: Math.round(amount * 1000),
         currency,
@@ -53,24 +89,23 @@ async function startServer() {
       });
 
       res.json({ clientSecret: intent.client_secret });
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
+    } catch (error) {
+      next(error);
     }
   });
 
   // Email Notification
-  app.post("/api/notify-booking", async (req, res) => {
-    console.log("Received booking notification request:", req.body.customerName);
+  app.post("/api/notify-booking", async (req, res, next) => {
     try {
       if (!resend) {
-        console.warn("Resend is not configured (RESEND_API_KEY missing). Skipping email notification.");
+        console.warn("Resend is not configured. Skipping email notification.");
         return res.json({ success: false, message: "Resend not configured" });
       }
 
       const { customerName, phone, pickup, dropoff, date, time, passengers, amount, notes } = req.body;
 
       const { data, error } = await resend.emails.send({
-        from: 'Alhatab VIP Taxi <onboarding@resend.dev>',
+        from: 'GCC TAXI <onboarding@resend.dev>',
         to: ['ahjm91@gmail.com'],
         subject: `حجز جديد: ${customerName} - ${pickup} ← ${dropoff}`,
         html: `
@@ -85,26 +120,23 @@ async function startServer() {
             <p><strong>السعر:</strong> ${amount > 0 ? `${amount} BHD` : 'بانتظار التسعير'}</p>
             <p><strong>ملاحظات:</strong> ${notes || 'لا يوجد'}</p>
             <hr />
-            <p style="font-size: 12px; color: #666;">تم إرسال هذا التنبيه تلقائياً من نظام الحطاب VIP.</p>
+            <p style="font-size: 12px; color: #666;">تم إرسال هذا التنبيه تلقائياً من نظام GCC TAXI.</p>
           </div>
         `,
       });
 
-      if (error) {
-        return res.status(400).json({ error });
-      }
-
+      if (error) throw error;
       res.json({ success: true, data });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
+    } catch (error) {
+      next(error);
     }
   });
 
   // Full Schedule Email Notification
-  app.post("/api/send-full-schedule", async (req, res) => {
+  app.post("/api/send-full-schedule", async (req, res, next) => {
     try {
       if (!resend) {
-        return res.status(500).json({ error: "Resend is not configured" });
+        throw new Error("Resend is not configured");
       }
 
       const { trips } = req.body;
@@ -113,14 +145,12 @@ async function startServer() {
         return res.status(400).json({ error: "Invalid trips data" });
       }
 
-      // Sort trips by date and time
       const sortedTrips = [...trips].sort((a, b) => {
         const dateCompare = a.date.localeCompare(b.date);
         if (dateCompare !== 0) return dateCompare;
         return a.time.localeCompare(b.time);
       });
 
-      // Group by date
       const groupedTrips: { [key: string]: any[] } = {};
       sortedTrips.forEach(trip => {
         if (!groupedTrips[trip.date]) groupedTrips[trip.date] = [];
@@ -171,26 +201,26 @@ async function startServer() {
 
       htmlContent += `
           <hr style="margin-top: 40px; border: 0; border-top: 1px solid #eee;" />
-          <p style="font-size: 12px; color: #999; text-align: center;">نظام الحطاب VIP - إدارة الرحلات</p>
+          <p style="font-size: 12px; color: #999; text-align: center;">نظام GCC TAXI - إدارة الرحلات</p>
         </div>
       `;
 
       const { data, error } = await resend.emails.send({
-        from: 'Alhatab VIP Taxi <onboarding@resend.dev>',
+        from: 'GCC TAXI <onboarding@resend.dev>',
         to: ['ahjm91@gmail.com'],
         subject: `📅 جدول الرحلات القادمة - تحديث ${new Date().toLocaleDateString('ar-BH')}`,
         html: htmlContent,
       });
 
-      if (error) return res.status(400).json({ error });
+      if (error) throw error;
       res.json({ success: true, data });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
+    } catch (error) {
+      next(error);
     }
   });
 
   // MyFatoorah Payment
-  app.post("/api/myfatoorah/execute-payment", async (req, res) => {
+  app.post("/api/myfatoorah/execute-payment", async (req, res, next) => {
     try {
       const { amount, customerName, phone, tripId, isSandbox, token } = req.body;
       
@@ -238,10 +268,19 @@ async function startServer() {
       }
 
       res.json({ paymentUrl: data.Data.PaymentURL });
-    } catch (error: any) {
-      console.error("MyFatoorah Error:", error);
-      res.status(500).json({ error: error.message });
+    } catch (error) {
+      next(error);
     }
+  });
+
+  // Centralized Error Handler
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error(`🔴 Backend Error: ${err.message}`);
+    const status = err.status || 500;
+    res.status(status).json({
+      error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message,
+      status
+    });
   });
 
   // Vite middleware for development
@@ -260,7 +299,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
   });
 }
 

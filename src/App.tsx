@@ -41,6 +41,7 @@ import {
   Bus,
   Instagram,
   Twitter,
+  Send,
   Share2,
   CreditCard,
   CheckCircle,
@@ -147,6 +148,7 @@ interface SiteSettings {
   instagram?: string;
   tiktok?: string;
   twitter?: string;
+  telegram?: string;
   // Design Settings
   primaryColor: string;
   secondaryColor: string;
@@ -162,6 +164,17 @@ interface SiteSettings {
   baseFee: number;
   myFatoorahToken?: string;
   myFatoorahIsSandbox?: boolean;
+  // Visibility Controls
+  showHeaderSocials: boolean;
+  showFooterSocials: boolean;
+  showHeaderLogo: boolean;
+  showFooterLogo: boolean;
+  showHeroSection: boolean;
+  showServicesSection: boolean;
+  showSpecializedSection: boolean;
+  showAboutSection: boolean;
+  showBookingSection: boolean;
+  showCTASection: boolean;
 }
 
 interface UserProfile {
@@ -457,7 +470,7 @@ function App() {
   const [fixedRoutes, setFixedRoutes] = useState<FixedRoute[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({
-    heroTitle: 'Alhatab VIP Taxi',
+    heroTitle: 'GCC TAXI',
     heroSubtitle: 'فخامة التنقل',
     heroDescription: 'نقدم لك أرقى خدمات التوصيل واللوميزين في مملكة البحرين وجميع دول الخليج.',
     heroImage: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&q=80&w=1920',
@@ -469,6 +482,7 @@ function App() {
     instagram: '',
     tiktok: '',
     twitter: '',
+    telegram: '',
     primaryColor: '#D4AF37',
     secondaryColor: '#1A1A1A',
     accentColor: '#F5F5F5',
@@ -476,7 +490,17 @@ function App() {
     adminEmails: ['ahjm91@gmail.com'],
     pricePerKm: 0.5,
     baseFee: 2,
-    myFatoorahIsSandbox: true
+    myFatoorahIsSandbox: true,
+    showHeaderSocials: false,
+    showFooterSocials: true,
+    showHeaderLogo: true,
+    showFooterLogo: true,
+    showHeroSection: true,
+    showServicesSection: true,
+    showSpecializedSection: true,
+    showAboutSection: true,
+    showBookingSection: true,
+    showCTASection: true
   });
 
   // Handle payment redirect
@@ -1024,8 +1048,8 @@ function App() {
       {
         name: 'سيارة عائلية فاخرة',
         name_en: 'Luxury Family Car',
-        description: 'نحن في Alhatab VIP Taxi نفخر بتقديم أسطول من السيارات العائلية الحديثة والمريحة، المصممة خصيصاً لتناسب السفرات الطويلة والرحلات البرية. سياراتنا ملائمة تماماً للجلوس لفترات طويلة، حيث توفر مساحة واسعة تتسع لـ 7-8 ركاب براحة تامة، مع مساحة كبيرة للأمتعة ونظام ترفيهي متكامل لضمان استمتاعكم بكل لحظة.',
-        description_en: 'At Alhatab VIP Taxi, we are proud to offer a fleet of modern and comfortable family cars, specifically designed for long trips and road travel. Our cars are perfectly suited for long sitting periods, providing ample space for 7-8 passengers in complete comfort, with large luggage space and an integrated entertainment system to ensure you enjoy every moment.',
+        description: 'نحن في GCC TAXI نفخر بتقديم أسطول من السيارات العائلية الحديثة والمريحة، المصممة خصيصاً لتناسب السفرات الطويلة والرحلات البرية. سياراتنا ملائمة تماماً للجلوس لفترات طويلة، حيث توفر مساحة واسعة تتسع لـ 7-8 ركاب براحة تامة، مع مساحة كبيرة للأمتعة ونظام ترفيهي متكامل لضمان استمتاعكم بكل لحظة.',
+        description_en: 'At GCC TAXI, we are proud to offer a fleet of modern and comfortable family cars, specifically designed for long trips and road travel. Our cars are perfectly suited for long sitting periods, providing ample space for 7-8 passengers in complete comfort, with large luggage space and an integrated entertainment system to ensure you enjoy every moment.',
         image: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=800',
         features: [
           '7-8 ركاب براحة تامة',
@@ -1075,8 +1099,8 @@ function App() {
       {
         title: 'رحلات أبو ظبي',
         title_en: 'Abu Dhabi Trips',
-        desc: 'احجز رحلتك من وإلى أبو ظبي مع Alhatab VIP Taxi، حيث الراحة والرفاهية في كل كيلومتر.',
-        desc_en: 'Book your trip to and from Abu Dhabi with Alhatab VIP Taxi, where comfort and luxury are in every kilometer.',
+        desc: 'احجز رحلتك من وإلى أبو ظبي مع GCC TAXI، حيث الراحة والرفاهية في كل كيلومتر.',
+        desc_en: 'Book your trip to and from Abu Dhabi with GCC TAXI, where comfort and luxury are in every kilometer.',
         iconName: 'MapPin',
         image: 'https://images.unsplash.com/photo-1584132967334-10e028bd69f7?auto=format&fit=crop&q=80&w=800',
         order: 2
@@ -1172,8 +1196,8 @@ function App() {
 
     // Seed Settings
     await setDoc(doc(db, 'settings', 'site'), {
-      heroTitle: 'Alhatab VIP Taxi',
-      heroTitle_en: 'Alhatab VIP Taxi',
+      heroTitle: 'GCC TAXI',
+      heroTitle_en: 'GCC TAXI',
       heroSubtitle: 'فخامة التنقل',
       heroSubtitle_en: 'Luxury Mobility',
       heroDescription: 'نقدم لك أرقى خدمات التوصيل واللوميزين في مملكة البحرين وجميع دول الخليج. دقة في المواعيد، رفاهية مطلقة، وسائقون محترفون.',
@@ -1399,20 +1423,22 @@ function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <div className="flex items-center gap-2">
-              {siteSettings.logo ? (
-                <img 
-                  src={siteSettings.logo} 
-                  alt="Logo" 
-                  className="h-12 w-auto object-contain"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <>
-                  <div className="w-10 h-10 bg-dark rounded-xl flex items-center justify-center">
-                    <Car className="text-gold w-6 h-6" />
-                  </div>
-                  <span className="text-xl font-bold tracking-tighter text-dark uppercase">Alhatab VIP Taxi</span>
-                </>
+              {siteSettings.showHeaderLogo && (
+                siteSettings.logo ? (
+                  <img 
+                    src={siteSettings.logo} 
+                    alt="Logo" 
+                    className="h-12 w-auto object-contain"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <>
+                    <div className="w-10 h-10 bg-dark rounded-xl flex items-center justify-center">
+                      <Car className="text-gold w-6 h-6" />
+                    </div>
+                    <span className="text-xl font-bold tracking-tighter text-dark uppercase">GCC TAXI</span>
+                  </>
+                )
               )}
             </div>
 
@@ -1468,25 +1494,39 @@ function App() {
                   <LogOut className="w-5 h-5" />
                 </button>
               )}
-              {siteSettings.instagram && (
-                <a 
-                  href={siteSettings.instagram} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-gray-600 hover:text-pink-600 transition-colors"
-                >
-                  <Instagram className="w-6 h-6" />
-                </a>
-              )}
-              {siteSettings.tiktok && (
-                <a 
-                  href={siteSettings.tiktok} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-gray-600 hover:text-black transition-colors"
-                >
-                  <Share2 className="w-6 h-6" />
-                </a>
+              {siteSettings.showHeaderSocials && (
+                <>
+                  {siteSettings.instagram && (
+                    <a 
+                      href={siteSettings.instagram} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-gray-600 hover:text-pink-600 transition-colors"
+                    >
+                      <Instagram className="w-6 h-6" />
+                    </a>
+                  )}
+                  {siteSettings.telegram && (
+                    <a 
+                      href={siteSettings.telegram} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-gray-600 hover:text-blue-500 transition-colors"
+                    >
+                      <Send className="w-6 h-6" />
+                    </a>
+                  )}
+                  {siteSettings.tiktok && (
+                    <a 
+                      href={siteSettings.tiktok} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-gray-600 hover:text-black transition-colors"
+                    >
+                      <Share2 className="w-6 h-6" />
+                    </a>
+                  )}
+                </>
               )}
               {siteSettings.twitter && (
                 <a 
@@ -1540,24 +1580,42 @@ function App() {
               <a href="#services" onClick={() => setIsMenuOpen(false)}>{t('services')}</a>
               <a href="#specialized-services" onClick={() => setIsMenuOpen(false)}>{t('specializedServices')}</a>
               <a href="#about" onClick={() => setIsMenuOpen(false)}>{t('whyUs')}</a>
-              <a 
-                href="#booking-form" 
-                className="bg-dark text-white w-full py-4 rounded-2xl text-center"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                {t('bookNow')}
-              </a>
-              {siteSettings.instagram && (
+              {siteSettings.showBookingSection && (
                 <a 
-                  href={siteSettings.instagram} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 text-pink-600 font-bold py-4 border-2 border-pink-100 rounded-2xl"
+                  href="#booking-form" 
+                  className="bg-dark text-white w-full py-4 rounded-2xl text-center"
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  <Instagram className="w-6 h-6" />
-                  {lang === 'ar' ? 'تابعنا على انستقرام' : 'Follow us on Instagram'}
+                  {t('bookNow')}
                 </a>
+              )}
+              {siteSettings.showHeaderSocials && (
+                <>
+                  {siteSettings.instagram && (
+                    <a 
+                      href={siteSettings.instagram} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 text-pink-600 font-bold py-4 border-2 border-pink-100 rounded-2xl"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <Instagram className="w-6 h-6" />
+                      {lang === 'ar' ? 'تابعنا على انستقرام' : 'Follow us on Instagram'}
+                    </a>
+                  )}
+                  {siteSettings.telegram && (
+                    <a 
+                      href={siteSettings.telegram} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 text-blue-600 font-bold py-4 border-2 border-blue-100 rounded-2xl"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <Send className="w-6 h-6" />
+                      {lang === 'ar' ? 'تابعنا على تيليجرام' : 'Follow us on Telegram'}
+                    </a>
+                  )}
+                </>
               )}
               {siteSettings.tiktok && (
                 <a 
@@ -1589,622 +1647,632 @@ function App() {
       </AnimatePresence>
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
-        <div 
-          className="absolute inset-0 -z-20 bg-cover bg-center"
-          style={{ backgroundImage: `url(${siteSettings.heroImage})` }}
-        />
-        <div className="absolute inset-0 bg-white/90 backdrop-blur-[2px] -z-10" />
-        <div className="absolute top-0 right-0 w-1/2 h-full bg-gold/5 -skew-x-12 transform translate-x-1/4 -z-10" />
-        
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <motion.div
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6 }}
-            >
-              <h1 className="text-5xl lg:text-7xl font-bold leading-tight text-dark mb-6">
-                {lang === 'ar' ? siteSettings.heroTitle : (siteSettings.heroTitle_en || siteSettings.heroTitle)} <br />
-                <span className="text-gold">{lang === 'ar' ? siteSettings.heroSubtitle : (siteSettings.heroSubtitle_en || siteSettings.heroSubtitle)}</span>
-              </h1>
-              <p className="text-xl text-gray-600 mb-8 max-w-lg">
-                {lang === 'ar' ? siteSettings.heroDescription : (siteSettings.heroDescription_en || siteSettings.heroDescription)}
-              </p>
-              
-              <div className="flex flex-wrap gap-4">
-                <div className="flex items-center gap-2 bg-white shadow-sm border border-gray-100 px-4 py-2 rounded-full">
-                  <ShieldCheck className="text-green-500 w-5 h-5" />
-                  <span className="text-sm font-medium">{t('safeTrips')}</span>
-                </div>
-                <div className="flex items-center gap-2 bg-white shadow-sm border border-gray-100 px-4 py-2 rounded-full">
-                  <Clock3 className="text-blue-500 w-5 h-5" />
-                  <span className="text-sm font-medium">{t('available247')}</span>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Booking Card */}
-            <motion.div
-              id="booking-form"
-              initial={{ opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="bg-white rounded-[2.5rem] shadow-2xl shadow-dark/5 border border-gray-100 overflow-hidden"
-            >
-              {/* Tabs */}
-              <div className="flex border-b border-gray-100">
-                <button 
-                  onClick={() => setBookingMode('fixed')}
-                  className={cn(
-                    "flex-1 py-5 text-sm font-black transition-all flex items-center justify-center gap-2",
-                    bookingMode === 'fixed' ? "bg-gold text-white" : "bg-gray-50 text-gray-400 hover:bg-gray-100"
-                  )}
-                >
-                  <Star className="w-4 h-4" />
-                  {t('fixedBooking')}
-                </button>
-                <button 
-                  onClick={() => setBookingMode('custom')}
-                  className={cn(
-                    "flex-1 py-5 text-sm font-black transition-all flex items-center justify-center gap-2",
-                    bookingMode === 'custom' ? "bg-gold text-white" : "bg-gray-50 text-gray-400 hover:bg-gray-100"
-                  )}
-                >
-                  <MapPin className="w-4 h-4" />
-                  {t('customBooking')}
-                </button>
-              </div>
-
-              <form 
-                onSubmit={handleBookingSubmit}
-                className="p-8 lg:p-10 space-y-8"
+      {siteSettings.showHeroSection && (
+        <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
+          <div 
+            className="absolute inset-0 -z-20 bg-cover bg-center"
+            style={{ backgroundImage: `url(${siteSettings.heroImage})` }}
+          />
+          <div className="absolute inset-0 bg-white/90 backdrop-blur-[2px] -z-10" />
+          <div className="absolute top-0 right-0 w-1/2 h-full bg-gold/5 -skew-x-12 transform translate-x-1/4 -z-10" />
+          
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid lg:grid-cols-2 gap-12 items-center">
+              <motion.div
+                initial={{ opacity: 0, x: 50 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.6 }}
               >
-                {/* Locations Selection - Priority for Fixed Mode */}
-                {bookingMode === 'fixed' ? (
-                  <div className="space-y-2">
-                    <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('selectDropoff')} *</label>
-                    <div className="relative">
-                      <select 
-                        required
-                        className="w-full bg-gold/5 border-gold/20 text-dark rounded-2xl py-5 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-black text-lg appearance-none"
-                        onChange={e => {
-                          const route = fixedRoutes.find(r => r.id === e.target.value);
-                          if (route) {
-                            setBookingData({
-                              ...bookingData,
-                              pickup: route.pickup,
-                              dropoff: route.dropoff,
-                              bookingType: 'transfer' // Fixed routes are always transfers
-                            });
-                          }
-                        }}
-                      >
-                        <option value="">{t('selectDropoff')}</option>
-                        {fixedRoutes.map(route => (
-                          <option key={route.id} value={route.id}>
-                            {route.pickup} ← {route.dropoff} ({route.price} {t('bhd')})
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronRight className="absolute left-6 top-1/2 -translate-y-1/2 text-gold w-5 h-5 rotate-90 pointer-events-none" />
-                    </div>
+                <h1 className="text-5xl lg:text-7xl font-bold leading-tight text-dark mb-6">
+                  {lang === 'ar' ? siteSettings.heroTitle : (siteSettings.heroTitle_en || siteSettings.heroTitle)} <br />
+                  <span className="text-gold">{lang === 'ar' ? siteSettings.heroSubtitle : (siteSettings.heroSubtitle_en || siteSettings.heroSubtitle)}</span>
+                </h1>
+                <p className="text-xl text-gray-600 mb-8 max-w-lg">
+                  {lang === 'ar' ? siteSettings.heroDescription : (siteSettings.heroDescription_en || siteSettings.heroDescription)}
+                </p>
+                
+                <div className="flex flex-wrap gap-4">
+                  <div className="flex items-center gap-2 bg-white shadow-sm border border-gray-100 px-4 py-2 rounded-full">
+                    <ShieldCheck className="text-green-500 w-5 h-5" />
+                    <span className="text-sm font-medium">{t('safeTrips')}</span>
                   </div>
-                ) : (
-                  <>
-                    {/* Booking Type Selector - Only for Custom Mode */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <button
-                        type="button"
-                        onClick={() => setBookingData({...bookingData, bookingType: 'transfer'})}
-                        className={cn(
-                          "flex flex-col items-center justify-center p-6 rounded-3xl border-2 transition-all gap-3",
-                          bookingData.bookingType === 'transfer' 
-                            ? "bg-gold/5 border-gold text-gold shadow-lg shadow-gold/10" 
-                            : "bg-gray-50 border-transparent text-gray-400 hover:bg-gray-100"
-                        )}
-                      >
-                        <div className={cn(
-                          "w-12 h-12 rounded-2xl flex items-center justify-center transition-all",
-                          bookingData.bookingType === 'transfer' ? "bg-gold text-white" : "bg-white text-gray-400"
-                        )}>
-                          <MapPin className="w-6 h-6" />
-                        </div>
-                        <span className="font-black text-sm uppercase tracking-wider">{t('transfer')}</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setBookingData({...bookingData, bookingType: 'hourly'})}
-                        className={cn(
-                          "flex flex-col items-center justify-center p-6 rounded-3xl border-2 transition-all gap-3",
-                          bookingData.bookingType === 'hourly' 
-                            ? "bg-gold/5 border-gold text-gold shadow-lg shadow-gold/10" 
-                            : "bg-gray-50 border-transparent text-gray-400 hover:bg-gray-100"
-                        )}
-                      >
-                        <div className={cn(
-                          "w-12 h-12 rounded-2xl flex items-center justify-center transition-all",
-                          bookingData.bookingType === 'hourly' ? "bg-gold text-white" : "bg-white text-gray-400"
-                        )}>
-                          <Clock className="w-6 h-6" />
-                        </div>
-                        <span className="font-black text-sm uppercase tracking-wider">{t('hourly')}</span>
-                      </button>
-                    </div>
+                  <div className="flex items-center gap-2 bg-white shadow-sm border border-gray-100 px-4 py-2 rounded-full">
+                    <Clock3 className="text-blue-500 w-5 h-5" />
+                    <span className="text-sm font-medium">{t('available247')}</span>
+                  </div>
+                </div>
+              </motion.div>
 
-                    {/* Custom Locations */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('pickupLocation')} *</label>
-                        <div className="relative">
-                          <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                          <input 
-                            type="text" 
-                            required
-                            className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
-                            value={bookingData.pickup}
-                            onChange={e => setBookingData({...bookingData, pickup: e.target.value})}
-                          />
-                        </div>
+              {/* Booking Card */}
+              <motion.div
+                id="booking-form"
+                initial={{ opacity: 0, y: 40 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                className="bg-white rounded-[2.5rem] shadow-2xl shadow-dark/5 border border-gray-100 overflow-hidden"
+              >
+                {/* Tabs */}
+                <div className="flex border-b border-gray-100">
+                  <button 
+                    onClick={() => setBookingMode('fixed')}
+                    className={cn(
+                      "flex-1 py-5 text-sm font-black transition-all flex items-center justify-center gap-2",
+                      bookingMode === 'fixed' ? "bg-gold text-white" : "bg-gray-50 text-gray-400 hover:bg-gray-100"
+                    )}
+                  >
+                    <Star className="w-4 h-4" />
+                    {t('fixedBooking')}
+                  </button>
+                  <button 
+                    onClick={() => setBookingMode('custom')}
+                    className={cn(
+                      "flex-1 py-5 text-sm font-black transition-all flex items-center justify-center gap-2",
+                      bookingMode === 'custom' ? "bg-gold text-white" : "bg-gray-50 text-gray-400 hover:bg-gray-100"
+                    )}
+                  >
+                    <MapPin className="w-4 h-4" />
+                    {t('customBooking')}
+                  </button>
+                </div>
+
+                <form 
+                  onSubmit={handleBookingSubmit}
+                  className="p-8 lg:p-10 space-y-8"
+                >
+                  {/* Locations Selection - Priority for Fixed Mode */}
+                  {bookingMode === 'fixed' ? (
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('selectDropoff')} *</label>
+                      <div className="relative">
+                        <select 
+                          required
+                          className="w-full bg-gold/5 border-gold/20 text-dark rounded-2xl py-5 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-black text-lg appearance-none"
+                          onChange={e => {
+                            const route = fixedRoutes.find(r => r.id === e.target.value);
+                            if (route) {
+                              setBookingData({
+                                ...bookingData,
+                                pickup: route.pickup,
+                                dropoff: route.dropoff,
+                                bookingType: 'transfer' // Fixed routes are always transfers
+                              });
+                            }
+                          }}
+                        >
+                          <option value="">{t('selectDropoff')}</option>
+                          {fixedRoutes.map(route => (
+                            <option key={route.id} value={route.id}>
+                              {route.pickup} ← {route.dropoff} ({route.price} {t('bhd')})
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronRight className="absolute left-6 top-1/2 -translate-y-1/2 text-gold w-5 h-5 rotate-90 pointer-events-none" />
                       </div>
-                      {bookingData.bookingType === 'transfer' ? (
+                    </div>
+                  ) : (
+                    <>
+                      {/* Booking Type Selector - Only for Custom Mode */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <button
+                          type="button"
+                          onClick={() => setBookingData({...bookingData, bookingType: 'transfer'})}
+                          className={cn(
+                            "flex flex-col items-center justify-center p-6 rounded-3xl border-2 transition-all gap-3",
+                            bookingData.bookingType === 'transfer' 
+                              ? "bg-gold/5 border-gold text-gold shadow-lg shadow-gold/10" 
+                              : "bg-gray-50 border-transparent text-gray-400 hover:bg-gray-100"
+                          )}
+                        >
+                          <div className={cn(
+                            "w-12 h-12 rounded-2xl flex items-center justify-center transition-all",
+                            bookingData.bookingType === 'transfer' ? "bg-gold text-white" : "bg-white text-gray-400"
+                          )}>
+                            <MapPin className="w-6 h-6" />
+                          </div>
+                          <span className="font-black text-sm uppercase tracking-wider">{t('transfer')}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBookingData({...bookingData, bookingType: 'hourly'})}
+                          className={cn(
+                            "flex flex-col items-center justify-center p-6 rounded-3xl border-2 transition-all gap-3",
+                            bookingData.bookingType === 'hourly' 
+                              ? "bg-gold/5 border-gold text-gold shadow-lg shadow-gold/10" 
+                              : "bg-gray-50 border-transparent text-gray-400 hover:bg-gray-100"
+                          )}
+                        >
+                          <div className={cn(
+                            "w-12 h-12 rounded-2xl flex items-center justify-center transition-all",
+                            bookingData.bookingType === 'hourly' ? "bg-gold text-white" : "bg-white text-gray-400"
+                          )}>
+                            <Clock className="w-6 h-6" />
+                          </div>
+                          <span className="font-black text-sm uppercase tracking-wider">{t('hourly')}</span>
+                        </button>
+                      </div>
+
+                      {/* Custom Locations */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('dropoffLocation')} *</label>
+                          <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('pickupLocation')} *</label>
                           <div className="relative">
-                            <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-gold w-5 h-5" />
+                            <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                             <input 
                               type="text" 
                               required
                               className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
-                              value={bookingData.dropoff}
-                              onChange={e => setBookingData({...bookingData, dropoff: e.target.value})}
+                              value={bookingData.pickup}
+                              onChange={e => setBookingData({...bookingData, pickup: e.target.value})}
                             />
                           </div>
                         </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('hours')} *</label>
-                          <div className="relative">
-                            <Clock className="absolute right-4 top-1/2 -translate-y-1/2 text-gold w-5 h-5" />
-                            <input 
-                              type="number" 
-                              min="1"
-                              required
-                              className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
-                              value={bookingData.hours}
-                              onChange={e => setBookingData({...bookingData, hours: parseInt(e.target.value) || 1})}
-                            />
+                        {bookingData.bookingType === 'transfer' ? (
+                          <div className="space-y-2">
+                            <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('dropoffLocation')} *</label>
+                            <div className="relative">
+                              <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-gold w-5 h-5" />
+                              <input 
+                                type="text" 
+                                required
+                                className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
+                                value={bookingData.dropoff}
+                                onChange={e => setBookingData({...bookingData, dropoff: e.target.value})}
+                              />
+                            </div>
                           </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('hours')} *</label>
+                            <div className="relative">
+                              <Clock className="absolute right-4 top-1/2 -translate-y-1/2 text-gold w-5 h-5" />
+                              <input 
+                                type="number" 
+                                min="1"
+                                required
+                                className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
+                                value={bookingData.hours}
+                                onChange={e => setBookingData({...bookingData, hours: parseInt(e.target.value) || 1})}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  <div className="space-y-6">
+                    {/* Name Fields */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('firstName')} *</label>
+                        <input 
+                          type="text" 
+                          required
+                          className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
+                          value={bookingData.firstName}
+                          onChange={e => setBookingData({...bookingData, firstName: e.target.value})}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('lastName')} *</label>
+                        <input 
+                          type="text" 
+                          required
+                          className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
+                          value={bookingData.lastName}
+                          onChange={e => setBookingData({...bookingData, lastName: e.target.value})}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Email & Phone */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('emailAddress')} *</label>
+                        <input 
+                          type="email" 
+                          required
+                          className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
+                          value={bookingData.email}
+                          onChange={e => setBookingData({...bookingData, email: e.target.value})}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('phone')} *</label>
+                        <input 
+                          type="tel" 
+                          required
+                          className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
+                          value={bookingData.phone}
+                          onChange={e => setBookingData({...bookingData, phone: e.target.value})}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Date & Time */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('date')} *</label>
+                        <input 
+                          type="date" 
+                          required
+                          className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
+                          value={bookingData.date}
+                          onChange={e => setBookingData({...bookingData, date: e.target.value})}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('time')} *</label>
+                        <input 
+                          type="time" 
+                          required
+                          className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
+                          value={bookingData.time}
+                          onChange={e => setBookingData({...bookingData, time: e.target.value})}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Vehicle Type Selection */}
+                    <div className="space-y-3">
+                      <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('vehicleType')} *</label>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {[
+                          { id: 'Standard', label: t('sedan'), icon: Car },
+                          { id: 'VIP', label: t('miniVan'), icon: Users },
+                          { id: 'Van', label: t('miniBus'), icon: Bus }
+                        ].map((vehicle) => (
+                          <button
+                            key={vehicle.id}
+                            type="button"
+                            onClick={() => setBookingData({...bookingData, carType: vehicle.id as any})}
+                            className={cn(
+                              "flex items-center gap-3 p-4 rounded-2xl border-2 transition-all",
+                              bookingData.carType === vehicle.id 
+                                ? "bg-gold/5 border-gold text-gold" 
+                                : "bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100"
+                            )}
+                          >
+                            <vehicle.icon className="w-5 h-5" />
+                            <span className="text-xs font-bold">{vehicle.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Passengers & Bags */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('passengers')} *</label>
+                        <input 
+                          type="number" 
+                          min="1"
+                          required
+                          className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
+                          value={bookingData.passengers}
+                          onChange={e => setBookingData({...bookingData, passengers: parseInt(e.target.value) || 1})}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-gray-400 uppercase mr-1">{lang === 'ar' ? 'الشنط' : 'Bags'}</label>
+                        <input 
+                          type="number" 
+                          min="0"
+                          className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
+                          value={bookingData.bags}
+                          onChange={e => setBookingData({...bookingData, bags: parseInt(e.target.value) || 0})}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Special Requests */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('specialRequests')}</label>
+                      <textarea 
+                        rows={3}
+                        className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold resize-none"
+                        value={bookingData.specialRequests}
+                        onChange={e => setBookingData({...bookingData, specialRequests: e.target.value})}
+                      />
+                    </div>
+                  </div>
+
+                  {bookingData.amount ? (
+                    <div className="p-6 bg-gold/10 rounded-[2rem] border border-gold/20 flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm">
+                          <DollarSign className="text-gold w-6 h-6" />
                         </div>
-                      )}
+                        <div>
+                          <p className="text-[10px] font-black text-gold uppercase tracking-widest">{lang === 'ar' ? 'السعر المقدر' : 'Estimated Price'}</p>
+                          <p className="text-sm font-bold text-dark">{bookingData.distance} كم</p>
+                        </div>
+                      </div>
+                      <div className="text-2xl font-black text-gold">
+                        {bookingData.amount} BHD
+                      </div>
                     </div>
-                  </>
-                )}
-
-                <div className="space-y-6">
-                  {/* Name Fields */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('firstName')} *</label>
-                      <input 
-                        type="text" 
-                        required
-                        className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
-                        value={bookingData.firstName}
-                        onChange={e => setBookingData({...bookingData, firstName: e.target.value})}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('lastName')} *</label>
-                      <input 
-                        type="text" 
-                        required
-                        className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
-                        value={bookingData.lastName}
-                        onChange={e => setBookingData({...bookingData, lastName: e.target.value})}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Email & Phone */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('emailAddress')} *</label>
-                      <input 
-                        type="email" 
-                        required
-                        className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
-                        value={bookingData.email}
-                        onChange={e => setBookingData({...bookingData, email: e.target.value})}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('phone')} *</label>
-                      <input 
-                        type="tel" 
-                        required
-                        className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
-                        value={bookingData.phone}
-                        onChange={e => setBookingData({...bookingData, phone: e.target.value})}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Date & Time */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('date')} *</label>
-                      <input 
-                        type="date" 
-                        required
-                        className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
-                        value={bookingData.date}
-                        onChange={e => setBookingData({...bookingData, date: e.target.value})}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('time')} *</label>
-                      <input 
-                        type="time" 
-                        required
-                        className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
-                        value={bookingData.time}
-                        onChange={e => setBookingData({...bookingData, time: e.target.value})}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Vehicle Type Selection */}
-                  <div className="space-y-3">
-                    <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('vehicleType')} *</label>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {[
-                        { id: 'Standard', label: t('sedan'), icon: Car },
-                        { id: 'VIP', label: t('miniVan'), icon: Users },
-                        { id: 'Van', label: t('miniBus'), icon: Bus }
-                      ].map((vehicle) => (
-                        <button
-                          key={vehicle.id}
-                          type="button"
-                          onClick={() => setBookingData({...bookingData, carType: vehicle.id as any})}
-                          className={cn(
-                            "flex items-center gap-3 p-4 rounded-2xl border-2 transition-all",
-                            bookingData.carType === vehicle.id 
-                              ? "bg-gold/5 border-gold text-gold" 
-                              : "bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100"
-                          )}
-                        >
-                          <vehicle.icon className="w-5 h-5" />
-                          <span className="text-xs font-bold">{vehicle.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Passengers & Bags */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('passengers')} *</label>
-                      <input 
-                        type="number" 
-                        min="1"
-                        required
-                        className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
-                        value={bookingData.passengers}
-                        onChange={e => setBookingData({...bookingData, passengers: parseInt(e.target.value) || 1})}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-gray-400 uppercase mr-1">{lang === 'ar' ? 'الشنط' : 'Bags'}</label>
-                      <input 
-                        type="number" 
-                        min="0"
-                        className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
-                        value={bookingData.bags}
-                        onChange={e => setBookingData({...bookingData, bags: parseInt(e.target.value) || 0})}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Special Requests */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('specialRequests')}</label>
-                    <textarea 
-                      rows={3}
-                      className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold resize-none"
-                      value={bookingData.specialRequests}
-                      onChange={e => setBookingData({...bookingData, specialRequests: e.target.value})}
-                    />
-                  </div>
-                </div>
-
-                {bookingData.amount ? (
-                  <div className="p-6 bg-gold/10 rounded-[2rem] border border-gold/20 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
+                  ) : (
+                    <div className="p-6 bg-blue-50 rounded-[2rem] border border-blue-100 flex items-center gap-4">
                       <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm">
-                        <DollarSign className="text-gold w-6 h-6" />
+                        <Clock className="text-blue-600 w-6 h-6" />
                       </div>
                       <div>
-                        <p className="text-[10px] font-black text-gold uppercase tracking-widest">{lang === 'ar' ? 'السعر المقدر' : 'Estimated Price'}</p>
-                        <p className="text-sm font-bold text-dark">{bookingData.distance} كم</p>
+                        <p className="text-[10px] font-black text-blue-700 uppercase tracking-widest">{t('priceOnRequest')}</p>
+                        <p className="text-sm font-bold text-dark">{t('priceOnRequestDesc')}</p>
                       </div>
                     </div>
-                    <div className="text-2xl font-black text-gold">
-                      {bookingData.amount} BHD
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-6 bg-blue-50 rounded-[2rem] border border-blue-100 flex items-center gap-4">
-                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm">
-                      <Clock className="text-blue-600 w-6 h-6" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-blue-700 uppercase tracking-widest">{t('priceOnRequest')}</p>
-                      <p className="text-sm font-bold text-dark">{t('priceOnRequestDesc')}</p>
-                    </div>
-                  </div>
-                )}
+                  )}
 
-                <button 
-                  type="submit"
-                  className="w-full bg-dark text-white py-6 rounded-[2rem] font-black text-xl hover:bg-gray-800 transform hover:-translate-y-1 transition-all flex items-center justify-center gap-3 shadow-2xl shadow-dark/20"
-                >
-                  <Star className="w-6 h-6 text-gold" />
-                  {bookingMode === 'fixed' ? t('confirmBooking') : t('sendRequest')}
-                </button>
-              </form>
-            </motion.div>
+                  <button 
+                    type="submit"
+                    className="w-full bg-dark text-white py-6 rounded-[2rem] font-black text-xl hover:bg-gray-800 transform hover:-translate-y-1 transition-all flex items-center justify-center gap-3 shadow-2xl shadow-dark/20"
+                  >
+                    <Star className="w-6 h-6 text-gold" />
+                    {bookingMode === 'fixed' ? t('confirmBooking') : t('sendRequest')}
+                  </button>
+                </form>
+              </motion.div>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Services Section */}
-      <section id="services" className="py-24 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-dark mb-4">{lang === 'ar' ? 'خدماتنا المتميزة' : 'Our Premium Services'}</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
-              {lang === 'ar' 
-                ? 'نقدم لكم تجربة سفر بري فريدة من نوعها، تجمع بين الفخامة والراحة لضمان وصولكم ووصول عائلتكم بكل أمان وسعادة.'
-                : 'We offer a unique land travel experience, combining luxury and comfort to ensure you and your family arrive safely and happily.'}
-            </p>
-          </div>
+      {siteSettings.showServicesSection && (
+        <section id="services" className="py-24 bg-gray-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl font-bold text-dark mb-4">{lang === 'ar' ? 'خدماتنا المتميزة' : 'Our Premium Services'}</h2>
+              <p className="text-gray-600 max-w-2xl mx-auto">
+                {lang === 'ar' 
+                  ? 'نقدم لكم تجربة سفر بري فريدة من نوعها، تجمع بين الفخامة والراحة لضمان وصولكم ووصول عائلتكم بكل أمان وسعادة.'
+                  : 'We offer a unique land travel experience, combining luxury and comfort to ensure you and your family arrive safely and happily.'}
+              </p>
+            </div>
 
-          <div className="grid md:grid-cols-1 gap-8 max-w-3xl mx-auto">
-            {services.map((service, idx) => (
-              <motion.div
-                key={service.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.1 }}
-                viewport={{ once: true }}
-                className="bg-white rounded-3xl overflow-hidden border border-gray-100 group"
-              >
-                <div className="relative h-64 overflow-hidden bg-gray-200">
-                  <img 
-                    key={service.image}
-                    src={service.image} 
-                    alt={service.name} 
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    referrerPolicy="no-referrer"
-                    crossOrigin="anonymous"
-                    onError={(e) => {
-                      console.error('Image load error (main services):', service.image);
-                      (e.target as HTMLImageElement).src = 'https://picsum.photos/seed/broken/800/600';
-                    }}
-                  />
-                </div>
-                <div className="p-8">
-                  <h3 className="text-2xl font-bold mb-3">
-                    {lang === 'ar' ? service.name : (service.name_en || service.name)}
-                  </h3>
-                  <p className="text-gray-600 mb-6">
-                    {lang === 'ar' ? service.description : (service.description_en || service.description)}
-                  </p>
-                  <ul className="space-y-3 mb-8">
-                    {(lang === 'ar' ? service.features : (service.features_en || service.features)).map((feature, i) => (
-                      <li key={i} className="flex items-center gap-2 text-sm text-gray-500">
-                        <div className="w-1.5 h-1.5 bg-gold rounded-full" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                  <a 
-                    href={`https://wa.me/97332325997?text=${encodeURIComponent(lang === 'ar' ? `أرغب في الاستفسار عن تفاصيل خدمة: ${service.name}` : `I would like to inquire about service details: ${service.name}`)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-3 rounded-xl border-2 border-dark font-bold hover:bg-dark hover:text-white transition-all text-center block"
-                  >
-                    {lang === 'ar' ? 'تفاصيل الخدمة' : 'Service Details'}
-                  </a>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Specialized Services Section */}
-      <section id="specialized-services" className="py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-dark mb-4">{t('specializedServices')}</h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
-              {lang === 'ar'
-                ? 'نقدم حلول نقل متكاملة تلبي كافة احتياجاتكم في مملكة البحرين وجميع دول الخليج، مع الالتزام التام بأعلى معايير الجودة.'
-                : 'We provide integrated transportation solutions that meet all your needs in the Kingdom of Bahrain and all GCC countries, with full commitment to the highest quality standards.'}
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {specializedServices.map((service, idx) => {
-              const Icon = {
-                Clock, MapPin, Star, Users, Camera, ShoppingBag
-              }[service.iconName] || MapPin;
-
-              return (
+            <div className="grid md:grid-cols-1 gap-8 max-w-3xl mx-auto">
+              {services.map((service, idx) => (
                 <motion.div
                   key={service.id}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.1 }}
                   viewport={{ once: true }}
-                  className="group bg-gray-50 rounded-[2.5rem] overflow-hidden hover:bg-white hover:shadow-xl transition-all border border-transparent hover:border-gold/20"
+                  className="bg-white rounded-3xl overflow-hidden border border-gray-100 group"
                 >
-                  <div className="h-48 overflow-hidden bg-gray-200">
+                  <div className="relative h-64 overflow-hidden bg-gray-200">
                     <img 
                       key={service.image}
                       src={service.image} 
-                      alt={service.title} 
+                      alt={service.name} 
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                       referrerPolicy="no-referrer"
                       crossOrigin="anonymous"
                       onError={(e) => {
-                        console.error('Image load error (specialized):', service.image);
+                        console.error('Image load error (main services):', service.image);
                         (e.target as HTMLImageElement).src = 'https://picsum.photos/seed/broken/800/600';
                       }}
                     />
                   </div>
                   <div className="p-8">
-                    <div className="flex items-center gap-4 mb-4">
-                      <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-gold shadow-sm group-hover:bg-gold group-hover:text-white transition-colors overflow-hidden">
-                        {service.iconImage ? (
-                          <img 
-                            src={service.iconImage} 
-                            alt="" 
-                            className="w-full h-full object-cover"
-                            referrerPolicy="no-referrer"
-                            crossOrigin="anonymous"
-                          />
-                        ) : (
-                          <Icon className="w-8 h-8" />
-                        )}
-                      </div>
-                      <h3 className="text-xl font-bold">
-                        {lang === 'ar' ? service.title : (service.title_en || service.title)}
-                      </h3>
-                    </div>
-                    <p className="text-gray-500 text-sm leading-relaxed mb-6">
-                      {lang === 'ar' ? service.desc : (service.desc_en || service.desc)}
+                    <h3 className="text-2xl font-bold mb-3">
+                      {lang === 'ar' ? service.name : (service.name_en || service.name)}
+                    </h3>
+                    <p className="text-gray-600 mb-6">
+                      {lang === 'ar' ? service.description : (service.description_en || service.description)}
                     </p>
+                    <ul className="space-y-3 mb-8">
+                      {(lang === 'ar' ? service.features : (service.features_en || service.features)).map((feature, i) => (
+                        <li key={i} className="flex items-center gap-2 text-sm text-gray-500">
+                          <div className="w-1.5 h-1.5 bg-gold rounded-full" />
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
                     <a 
-                      href={`https://wa.me/${siteSettings.whatsapp}?text=${encodeURIComponent(lang === 'ar' ? `أرغب في الاستفسار عن خدمة: ${service.title}` : `I would like to inquire about service: ${service.title}`)}`}
+                      href={`https://wa.me/97332325997?text=${encodeURIComponent(lang === 'ar' ? `أرغب في الاستفسار عن تفاصيل خدمة: ${service.name}` : `I would like to inquire about service details: ${service.name}`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-gold font-bold flex items-center gap-2 hover:gap-3 transition-all"
+                      className="w-full py-3 rounded-xl border-2 border-dark font-bold hover:bg-dark hover:text-white transition-all text-center block"
                     >
-                      {lang === 'ar' ? 'استفسر الآن' : 'Inquire Now'}
-                      <ArrowLeft className={cn("w-4 h-4", lang === 'en' && "rotate-180")} />
+                      {lang === 'ar' ? 'تفاصيل الخدمة' : 'Service Details'}
                     </a>
                   </div>
                 </motion.div>
-              );
-            })}
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
+
+      {/* Specialized Services Section */}
+      {siteSettings.showSpecializedSection && (
+        <section id="specialized-services" className="py-24 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl font-bold text-dark mb-4">{t('specializedServices')}</h2>
+              <p className="text-gray-600 max-w-2xl mx-auto">
+                {lang === 'ar'
+                  ? 'نقدم حلول نقل متكاملة تلبي كافة احتياجاتكم في مملكة البحرين وجميع دول الخليج، مع الالتزام التام بأعلى معايير الجودة.'
+                  : 'We provide integrated transportation solutions that meet all your needs in the Kingdom of Bahrain and all GCC countries, with full commitment to the highest quality standards.'}
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {specializedServices.map((service, idx) => {
+                const Icon = {
+                  Clock, MapPin, Star, Users, Camera, ShoppingBag
+                }[service.iconName] || MapPin;
+
+                return (
+                  <motion.div
+                    key={service.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                    viewport={{ once: true }}
+                    className="group bg-gray-50 rounded-[2.5rem] overflow-hidden hover:bg-white hover:shadow-xl transition-all border border-transparent hover:border-gold/20"
+                  >
+                    <div className="h-48 overflow-hidden bg-gray-200">
+                      <img 
+                        key={service.image}
+                        src={service.image} 
+                        alt={service.title} 
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        referrerPolicy="no-referrer"
+                        crossOrigin="anonymous"
+                        onError={(e) => {
+                          console.error('Image load error (specialized):', service.image);
+                          (e.target as HTMLImageElement).src = 'https://picsum.photos/seed/broken/800/600';
+                        }}
+                      />
+                    </div>
+                    <div className="p-8">
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-gold shadow-sm group-hover:bg-gold group-hover:text-white transition-colors overflow-hidden">
+                          {service.iconImage ? (
+                            <img 
+                              src={service.iconImage} 
+                              alt="" 
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                              crossOrigin="anonymous"
+                            />
+                          ) : (
+                            <Icon className="w-8 h-8" />
+                          )}
+                        </div>
+                        <h3 className="text-xl font-bold">
+                          {lang === 'ar' ? service.title : (service.title_en || service.title)}
+                        </h3>
+                      </div>
+                      <p className="text-gray-500 text-sm leading-relaxed mb-6">
+                        {lang === 'ar' ? service.desc : (service.desc_en || service.desc)}
+                      </p>
+                      <a 
+                        href={`https://wa.me/${siteSettings.whatsapp}?text=${encodeURIComponent(lang === 'ar' ? `أرغب في الاستفسار عن خدمة: ${service.title}` : `I would like to inquire about service: ${service.title}`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-gold font-bold flex items-center gap-2 hover:gap-3 transition-all"
+                      >
+                        {lang === 'ar' ? 'استفسر الآن' : 'Inquire Now'}
+                        <ArrowLeft className={cn("w-4 h-4", lang === 'en' && "rotate-180")} />
+                      </a>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Why Us */}
-      <section className="py-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-            <div className="relative">
-              <img 
-                src="https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&q=80&w=800" 
-                alt="Luxury Car Interior" 
-                className="rounded-[2.5rem] shadow-2xl"
-              />
-              <div className="absolute -bottom-8 -left-8 bg-gold p-8 rounded-3xl text-white shadow-xl hidden md:block">
-                <div className="text-4xl font-bold mb-1">10+</div>
-                <div className="text-sm opacity-90">{lang === 'ar' ? 'سنوات من الخبرة' : 'Years of Experience'}</div>
+      {siteSettings.showAboutSection && (
+        <section className="py-24">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid lg:grid-cols-2 gap-16 items-center">
+              <div className="relative">
+                <img 
+                  src="https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&q=80&w=800" 
+                  alt="Luxury Car Interior" 
+                  className="rounded-[2.5rem] shadow-2xl"
+                />
+                <div className="absolute -bottom-8 -left-8 bg-gold p-8 rounded-3xl text-white shadow-xl hidden md:block">
+                  <div className="text-4xl font-bold mb-1">10+</div>
+                  <div className="text-sm opacity-90">{lang === 'ar' ? 'سنوات من الخبرة' : 'Years of Experience'}</div>
+                </div>
               </div>
-            </div>
-            
-            <div className="space-y-8">
-              <div>
-                <h2 className="text-4xl font-bold text-dark mb-4">{lang === 'ar' ? 'لماذا تختار Alhatab VIP Taxi؟' : 'Why Choose Alhatab VIP Taxi?'}</h2>
-                <p className="text-gray-600">
-                  {lang === 'ar'
-                    ? 'نحن نؤمن بأن الرحلة لا تقل أهمية عن الوجهة. لذلك نسعى جاهدين لتقديم أفضل تجربة ممكنة.'
-                    : 'We believe that the journey is as important as the destination. Therefore, we strive to provide the best possible experience.'}
-                </p>
-              </div>
+              
+              <div className="space-y-8">
+                <div>
+                  <h2 className="text-4xl font-bold text-dark mb-4">{lang === 'ar' ? 'لماذا تختار GCC TAXI؟' : 'Why Choose GCC TAXI?'}</h2>
+                  <p className="text-gray-600">
+                    {lang === 'ar'
+                      ? 'نحن نؤمن بأن الرحلة لا تقل أهمية عن الوجهة. لذلك نسعى جاهدين لتقديم أفضل تجربة ممكنة.'
+                      : 'We believe that the journey is as important as the destination. Therefore, we strive to provide the best possible experience.'}
+                  </p>
+                </div>
 
-              <div className="grid gap-6">
-                {[
-                  { 
-                    icon: <ShieldCheck className="w-6 h-6" />, 
-                    title: lang === 'ar' ? "أمان وخصوصية تامة" : "Total Safety & Privacy", 
-                    desc: lang === 'ar' ? "جميع رحلاتنا مراقبة ونضمن لك خصوصية كاملة خلال تنقلك." : "All our trips are monitored and we guarantee total privacy during your travel."
-                  },
-                  { 
-                    icon: <Clock3 className="w-6 h-6" />, 
-                    title: lang === 'ar' ? "دقة متناهية في المواعيد" : "Extreme Punctuality", 
-                    desc: lang === 'ar' ? "نصل إليك قبل الموعد المحدد لضمان وصولك في الوقت المناسب." : "We arrive before the scheduled time to ensure you arrive on time."
-                  },
-                  { 
-                    icon: <Star className="w-6 h-6" />, 
-                    title: lang === 'ar' ? "سائقون محترفون" : "Professional Drivers", 
-                    desc: lang === 'ar' ? "نخبة من السائقين المدربين على أعلى معايير الضيافة والقيادة الآمنة." : "A selection of drivers trained to the highest standards of hospitality and safe driving."
-                  }
-                ].map((item, i) => (
-                  <div key={i} className="flex gap-4 p-6 rounded-2xl bg-gray-50 hover:bg-gold/5 transition-colors">
-                    <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm text-gold shrink-0">
-                      {item.icon}
+                <div className="grid gap-6">
+                  {[
+                    { 
+                      icon: <ShieldCheck className="w-6 h-6" />, 
+                      title: lang === 'ar' ? "أمان وخصوصية تامة" : "Total Safety & Privacy", 
+                      desc: lang === 'ar' ? "جميع رحلاتنا مراقبة ونضمن لك خصوصية كاملة خلال تنقلك." : "All our trips are monitored and we guarantee total privacy during your travel."
+                    },
+                    { 
+                      icon: <Clock3 className="w-6 h-6" />, 
+                      title: lang === 'ar' ? "دقة متناهية في المواعيد" : "Extreme Punctuality", 
+                      desc: lang === 'ar' ? "نصل إليك قبل الموعد المحدد لضمان وصولك في الوقت المناسب." : "We arrive before the scheduled time to ensure you arrive on time."
+                    },
+                    { 
+                      icon: <Star className="w-6 h-6" />, 
+                      title: lang === 'ar' ? "سائقون محترفون" : "Professional Drivers", 
+                      desc: lang === 'ar' ? "نخبة من السائقين المدربين على أعلى معايير الضيافة والقيادة الآمنة." : "A selection of drivers trained to the highest standards of hospitality and safe driving."
+                    }
+                  ].map((item, i) => (
+                    <div key={i} className="flex gap-4 p-6 rounded-2xl bg-gray-50 hover:bg-gold/5 transition-colors">
+                      <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm text-gold shrink-0">
+                        {item.icon}
+                      </div>
+                      <div>
+                        <h4 className="font-bold mb-1">{item.title}</h4>
+                        <p className="text-sm text-gray-500">{item.desc}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-bold mb-1">{item.title}</h4>
-                      <p className="text-sm text-gray-500">{item.desc}</p>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* CTA Section */}
-      <section className="py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-dark rounded-[3rem] p-12 lg:p-20 relative overflow-hidden text-center">
-            <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
-              <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-gold via-transparent to-transparent" />
-            </div>
-            
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              className="relative z-10"
-            >
-              <h2 className="text-4xl lg:text-5xl font-bold text-white mb-6">{lang === 'ar' ? 'جاهز لرحلتك القادمة؟' : 'Ready for your next trip?'}</h2>
-              <p className="text-gray-400 text-xl mb-10 max-w-2xl mx-auto">
-                {lang === 'ar'
-                  ? 'احجز معنا الان واستمتع بخصم 20% على رحلاتك في شهرك الاول معنا'
-                  : 'Book with us now and enjoy a 20% discount on your trips during your first month with us'}
-              </p>
-              <div className="flex flex-wrap justify-center gap-4">
-                <a 
-                  href={`https://wa.me/${siteSettings.whatsapp}`} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="bg-gold text-white px-10 py-4 rounded-2xl font-bold text-lg hover:bg-gold/90 transition-all"
-                >
-                  {t('bookNow')}
-                </a>
-                <a 
-                  href={`tel:${siteSettings.phone}`} 
-                  className="bg-white/10 text-white backdrop-blur border border-white/20 px-10 py-4 rounded-2xl font-bold text-lg hover:bg-white/20 transition-all flex items-center gap-2"
-                >
-                  <Phone className="w-5 h-5" />
-                  {t('contactUs')}
-                </a>
+      {siteSettings.showCTASection && (
+        <section className="py-20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="bg-dark rounded-[3rem] p-12 lg:p-20 relative overflow-hidden text-center">
+              <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
+                <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-gold via-transparent to-transparent" />
               </div>
-            </motion.div>
+              
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                className="relative z-10"
+              >
+                <h2 className="text-4xl lg:text-5xl font-bold text-white mb-6">{lang === 'ar' ? 'جاهز لرحلتك القادمة؟' : 'Ready for your next trip?'}</h2>
+                <p className="text-gray-400 text-xl mb-10 max-w-2xl mx-auto">
+                  {lang === 'ar'
+                    ? 'احجز معنا الان واستمتع بخصم 20% على رحلاتك في شهرك الاول معنا'
+                    : 'Book with us now and enjoy a 20% discount on your trips during your first month with us'}
+                </p>
+                <div className="flex flex-wrap justify-center gap-4">
+                  <a 
+                    href={`https://wa.me/${siteSettings.whatsapp}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="bg-gold text-white px-10 py-4 rounded-2xl font-bold text-lg hover:bg-gold/90 transition-all"
+                  >
+                    {t('bookNow')}
+                  </a>
+                  <a 
+                    href={`tel:${siteSettings.phone}`} 
+                    className="bg-white/10 text-white backdrop-blur border border-white/20 px-10 py-4 rounded-2xl font-bold text-lg hover:bg-white/20 transition-all flex items-center gap-2"
+                  >
+                    <Phone className="w-5 h-5" />
+                    {t('contactUs')}
+                  </a>
+                </div>
+              </motion.div>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Footer */}
       <footer className="bg-white border-t border-gray-100 pt-20 pb-10">
@@ -2212,50 +2280,66 @@ function App() {
           <div className="grid md:grid-cols-4 gap-12 mb-16">
             <div className="col-span-2">
               <div className="flex items-center gap-2 mb-6">
-                {siteSettings.logo ? (
-                  <img src={siteSettings.logo} alt="Logo" className="h-12 w-auto object-contain" />
-                ) : (
-                  <>
-                    <div className="w-10 h-10 bg-dark rounded-xl flex items-center justify-center">
-                      <Car className="text-gold w-6 h-6" />
-                    </div>
-                    <span className="text-xl font-bold tracking-tighter text-dark uppercase">Alhatab VIP Taxi</span>
-                  </>
+                {siteSettings.showFooterLogo && (
+                  siteSettings.logo ? (
+                    <img src={siteSettings.logo} alt="Logo" className="h-12 w-auto object-contain" />
+                  ) : (
+                    <>
+                      <div className="w-10 h-10 bg-dark rounded-xl flex items-center justify-center">
+                        <Car className="text-gold w-6 h-6" />
+                      </div>
+                      <span className="text-xl font-bold tracking-tighter text-dark uppercase">GCC TAXI</span>
+                    </>
+                  )
                 )}
               </div>
               <p className="text-gray-500 max-w-sm mb-8">
                 {lang === 'ar' ? siteSettings.footerAbout : (siteSettings.footerAbout_en || siteSettings.footerAbout)}
               </p>
               <div className="flex gap-4">
-                {siteSettings.instagram && (
-                  <a 
-                    href={siteSettings.instagram} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center hover:bg-pink-600 hover:text-white transition-all cursor-pointer"
-                  >
-                    <Instagram className="w-5 h-5" />
-                  </a>
-                )}
-                {siteSettings.tiktok && (
-                  <a 
-                    href={siteSettings.tiktok} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center hover:bg-black hover:text-white transition-all cursor-pointer"
-                  >
-                    <Share2 className="w-5 h-5" />
-                  </a>
-                )}
-                {siteSettings.twitter && (
-                  <a 
-                    href={siteSettings.twitter} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center hover:bg-gray-900 hover:text-white transition-all cursor-pointer"
-                  >
-                    <Twitter className="w-5 h-5" />
-                  </a>
+                {siteSettings.showFooterSocials && (
+                  <>
+                    {siteSettings.instagram && (
+                      <a 
+                        href={siteSettings.instagram} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center hover:bg-pink-600 hover:text-white transition-all cursor-pointer"
+                      >
+                        <Instagram className="w-5 h-5" />
+                      </a>
+                    )}
+                    {siteSettings.telegram && (
+                      <a 
+                        href={siteSettings.telegram} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center hover:bg-blue-500 hover:text-white transition-all cursor-pointer"
+                      >
+                        <Send className="w-5 h-5" />
+                      </a>
+                    )}
+                    {siteSettings.tiktok && (
+                      <a 
+                        href={siteSettings.tiktok} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center hover:bg-black hover:text-white transition-all cursor-pointer"
+                      >
+                        <Share2 className="w-5 h-5" />
+                      </a>
+                    )}
+                    {siteSettings.twitter && (
+                      <a 
+                        href={siteSettings.twitter} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center hover:bg-gray-900 hover:text-white transition-all cursor-pointer"
+                      >
+                        <Twitter className="w-5 h-5" />
+                      </a>
+                    )}
+                  </>
                 )}
                 <a 
                   href={`https://wa.me/${siteSettings.whatsapp}`} 
@@ -2294,7 +2378,7 @@ function App() {
           </div>
           
           <div className="border-t border-gray-100 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-gray-400">
-            <p>© 2026 Alhatab VIP Taxi. {lang === 'ar' ? 'جميع الحقوق محفوظة.' : 'All rights reserved.'}</p>
+            <p>© 2026 GCC TAXI. {lang === 'ar' ? 'جميع الحقوق محفوظة.' : 'All rights reserved.'}</p>
             <div className="flex gap-8">
               <button onClick={() => setIsTermsOpen(true)} className="hover:text-dark transition-colors">{lang === 'ar' ? 'الشروط والأحكام' : 'Terms & Conditions'}</button>
               <button onClick={() => setIsPrivacyOpen(true)} className="hover:text-dark transition-colors">{lang === 'ar' ? 'سياسة الخصوصية' : 'Privacy Policy'}</button>
@@ -2333,7 +2417,7 @@ function App() {
               <div className="p-8 overflow-y-auto text-right dir-rtl" dir="rtl">
                 <div className="space-y-8 text-gray-600">
                   <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 mb-6">
-                    <p className="font-bold text-dark">اسم الشركة: Alhatab VIP Taxi</p>
+                    <p className="font-bold text-dark">اسم الشركة: GCC TAXI</p>
                     <p className="font-bold text-dark">للتواصل: +973 32325997</p>
                   </div>
 
@@ -2409,7 +2493,7 @@ function App() {
                   <div className="border-t border-gray-100 pt-8 mt-8">
                     <h3 className="text-xl font-bold text-dark mb-6 text-left" dir="ltr">Terms & Conditions – Car Rental with Driver</h3>
                     <div className="space-y-6 text-sm text-gray-500 text-left" dir="ltr">
-                      <p><strong>Company Name:</strong> Alhatab VIP Taxi</p>
+                      <p><strong>Company Name:</strong> GCC TAXI</p>
                       <p><strong>Contact:</strong> +973 32325997</p>
                       
                       <section>
@@ -2517,7 +2601,7 @@ function App() {
                 <div className="space-y-8 text-gray-600">
                   <section>
                     <h4 className="text-lg font-bold text-dark mb-3">مقدمة</h4>
-                    <p>نحن في Alhatab VIP Taxi نلتزم بحماية خصوصيتك وبياناتك الشخصية. توضح هذه السياسة كيفية جمعنا واستخدامنا وحمايتنا للمعلومات التي تقدمها لنا.</p>
+                    <p>نحن في GCC TAXI نلتزم بحماية خصوصيتك وبياناتك الشخصية. توضح هذه السياسة كيفية جمعنا واستخدامنا وحمايتنا للمعلومات التي تقدمها لنا.</p>
                   </section>
 
                   <section>
@@ -2684,6 +2768,48 @@ function App() {
                 <div className="space-y-12">
                   {activeTab === 'content' ? (
                     <>
+                      {/* General Controls */}
+                      <section className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm">
+                        <h4 className="text-xl font-bold flex items-center gap-2 mb-6">
+                          <Settings className="text-gold w-6 h-6" />
+                          التحكم في أقسام الموقع
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {[
+                            { key: 'showHeaderLogo', label: 'إظهار الشعار في الهيدر' },
+                            { key: 'showHeaderSocials', label: 'إظهار أيقونات التواصل في الهيدر' },
+                            { key: 'showFooterLogo', label: 'إظهار الشعار في الفوتر' },
+                            { key: 'showFooterSocials', label: 'إظهار أيقونات التواصل في الفوتر' },
+                            { key: 'showHeroSection', label: 'إظهار قسم البانر العلوي' },
+                            { key: 'showServicesSection', label: 'إظهار قسم الخدمات' },
+                            { key: 'showSpecializedSection', label: 'إظهار قسم الرحلات المتخصصة' },
+                            { key: 'showAboutSection', label: 'إظهار قسم "لماذا نحن"' },
+                            { key: 'showBookingSection', label: 'إظهار زر الحجز في الهيدر' },
+                            { key: 'showCTASection', label: 'إظهار قسم اتصل بنا (CTA)' },
+                          ].map((control) => (
+                            <div key={control.key} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl">
+                              <span className="text-sm font-bold text-gray-700">{control.label}</span>
+                              <button
+                                onClick={() => {
+                                  const newSettings = { ...siteSettings, [control.key]: !siteSettings[control.key as keyof SiteSettings] };
+                                  setSiteSettings(newSettings);
+                                  safeUpdateDoc(doc(db, 'settings', 'site'), newSettings);
+                                }}
+                                className={cn(
+                                  "w-12 h-6 rounded-full transition-all relative",
+                                  siteSettings[control.key as keyof SiteSettings] ? "bg-gold" : "bg-gray-300"
+                                )}
+                              >
+                                <div className={cn(
+                                  "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                                  siteSettings[control.key as keyof SiteSettings] ? "right-1" : "right-7"
+                                )} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+
                       {/* Site Settings */}
                       <section>
                         <h4 className="text-xl font-bold mb-6 flex items-center gap-2">
@@ -2807,6 +2933,20 @@ function App() {
                               value={siteSettings.tiktok || ''}
                               onChange={e => {
                                 const newSettings = { ...siteSettings, tiktok: e.target.value };
+                                setSiteSettings(newSettings);
+                                safeUpdateDoc(doc(db, 'settings', 'site'), newSettings);
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-600">رابط تيليجرام</label>
+                            <input 
+                              type="text" 
+                              className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
+                              placeholder="https://t.me/your_account"
+                              value={siteSettings.telegram || ''}
+                              onChange={e => {
+                                const newSettings = { ...siteSettings, telegram: e.target.value };
                                 setSiteSettings(newSettings);
                                 safeUpdateDoc(doc(db, 'settings', 'site'), newSettings);
                               }}
@@ -4521,7 +4661,7 @@ function App() {
                           await updateDoc(doc(db, 'trips', paymentTrip.id), {
                             paymentStatus: 'Paid'
                           });
-                          alert(lang === 'ar' ? 'تمت عملية الدفع بنجاح! شكراً لاختياركم الحطب VIP.' : 'Payment successful! Thank you for choosing Alhatab VIP.');
+                          alert(lang === 'ar' ? 'تمت عملية الدفع بنجاح! شكراً لاختياركم GCC TAXI.' : 'Payment successful! Thank you for choosing GCC TAXI.');
                           setIsPaymentOpen(false);
                           setPaymentTrip(null);
                           setSearchTripId('');
@@ -4585,7 +4725,7 @@ function App() {
                       <Car className="w-10 h-10 text-gray-300" />
                     </div>
                     <h4 className="text-xl font-bold text-dark mb-2">{lang === 'ar' ? 'لا توجد رحلات مسجلة' : 'No trips recorded'}</h4>
-                    <p className="text-gray-500">{lang === 'ar' ? 'لم تقم بأي رحلات مع Alhatab VIP Taxi بعد.' : 'You haven\'t taken any trips with Alhatab VIP Taxi yet.'}</p>
+                    <p className="text-gray-500">{lang === 'ar' ? 'لم تقم بأي رحلات مع GCC TAXI بعد.' : 'You haven\'t taken any trips with GCC TAXI yet.'}</p>
                   </div>
                 ) : (
                   <div className="grid gap-6">
