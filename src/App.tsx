@@ -38,6 +38,7 @@ import {
   PieChart,
   ArrowUp,
   ArrowDown,
+  Bus,
   Instagram,
   Twitter,
   Share2,
@@ -87,17 +88,23 @@ import firebaseConfig from '../firebase-applet-config.json';
 type ServiceType = 'luxury';
 
 interface BookingData {
+  bookingType: 'transfer' | 'hourly';
+  firstName: string;
+  lastName: string;
   customerName: string;
+  email: string;
   phone: string;
   confirmPhone: string;
   pickup: string;
   dropoff: string;
   date: string;
   time: string;
+  hours?: number;
   passengers: number;
   bags: number;
   carType: 'Standard' | 'VIP' | 'Van';
   service: string;
+  specialRequests?: string;
   distance?: number;
   amount?: number;
 }
@@ -170,7 +177,11 @@ interface UserProfile {
 interface Trip {
   id: string;
   userId?: string;
+  bookingType: 'transfer' | 'hourly';
+  firstName: string;
+  lastName: string;
   customerName: string;
+  email: string;
   phone: string;
   passengers: number;
   bags: number;
@@ -181,6 +192,7 @@ interface Trip {
   distance?: number; // in km
   date: string;
   time: string;
+  hours?: number;
   amount: number;
   driverType: 'In' | 'Out';
   driverName: string;
@@ -189,6 +201,7 @@ interface Trip {
   paymentStatus: 'Paid' | 'Unpaid' | 'Pending';
   status: 'Requested' | 'Confirmed' | 'Completed' | 'Cancelled';
   notes: string;
+  specialRequests?: string;
   createdAt: string;
 }
 
@@ -415,7 +428,11 @@ function App() {
   const [tripFilter, setTripFilter] = useState<'all' | 'requested' | 'unpaid' | 'pending_price'>('all');
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
   const [tripFormData, setTripFormData] = useState<Partial<Trip>>({
+    bookingType: 'transfer',
+    firstName: '',
+    lastName: '',
     customerName: '',
+    email: '',
     phone: '',
     passengers: 1,
     bags: 0,
@@ -425,12 +442,14 @@ function App() {
     dropoff: '',
     date: new Date().toISOString().split('T')[0],
     time: '10:00',
+    hours: 1,
     amount: 0,
     driverType: 'In',
     driverName: '',
     driverCost: 0,
     paymentStatus: 'Pending',
-    notes: ''
+    notes: '',
+    specialRequests: ''
   });
   
   const [services, setServices] = useState<Service[]>([]);
@@ -484,17 +503,23 @@ function App() {
   }, [lang]);
 
   const [bookingData, setBookingData] = useState<BookingData>({
+    bookingType: 'transfer',
+    firstName: '',
+    lastName: '',
     customerName: '',
+    email: '',
     phone: '',
     confirmPhone: '',
     pickup: '',
     dropoff: '',
     date: new Date().toISOString().split('T')[0],
     time: '10:00',
+    hours: 1,
     passengers: 1,
     bags: 0,
     carType: 'Standard',
-    service: 'luxury'
+    service: 'luxury',
+    specialRequests: ''
   });
 
   // Automatic translation when switching to English
@@ -677,6 +702,36 @@ function App() {
     document.documentElement.lang = lang;
   }, [lang]);
 
+  // Real-time price calculation for booking form
+  useEffect(() => {
+    if (bookingMode === 'fixed') {
+      const matchedRoute = fixedRoutes.find(r => 
+        r.pickup.trim().toLowerCase() === bookingData.pickup.trim().toLowerCase() && 
+        r.dropoff.trim().toLowerCase() === bookingData.dropoff.trim().toLowerCase()
+      );
+
+      if (matchedRoute) {
+        let price = matchedRoute.price;
+        if (bookingData.carType === 'VIP') price += 5;
+        else if (bookingData.carType === 'Van') price += 12;
+        
+        if (bookingData.amount !== price) {
+          setBookingData(prev => ({ ...prev, amount: price }));
+        }
+      } else {
+        if (bookingData.amount !== 0) {
+          setBookingData(prev => ({ ...prev, amount: 0 }));
+        }
+      }
+    } else {
+      // For custom mode, we don't auto-calculate price unless we have a distance-based logic
+      // But for now, we reset it to 0 so it shows "Price on Request"
+      if (bookingData.amount !== 0) {
+        setBookingData(prev => ({ ...prev, amount: 0 }));
+      }
+    }
+  }, [bookingMode, bookingData.pickup, bookingData.dropoff, bookingData.carType, fixedRoutes]);
+
   // Auto-fix broken specialized service images and missing order
   useEffect(() => {
     if (isAdmin && specializedServices.length > 0) {
@@ -817,22 +872,35 @@ function App() {
         r.dropoff.trim().toLowerCase() === bookingData.dropoff.trim().toLowerCase()
       ) : null;
       
-      const finalAmount = matchedRoute ? matchedRoute.price : (bookingData.amount || 0);
+      let finalAmount = matchedRoute ? matchedRoute.price : (bookingData.amount || 0);
 
+      // Apply car type surcharge for fixed routes
+      if (matchedRoute) {
+        if (bookingData.carType === 'VIP') finalAmount += 5;
+        else if (bookingData.carType === 'Van') finalAmount += 12;
+      }
+      
       // Save to Firestore first
       const tripData: Omit<Trip, 'id'> = {
         userId: user?.uid || null,
-        customerName: bookingData.customerName,
+        bookingType: bookingData.bookingType,
+        firstName: bookingData.firstName,
+        lastName: bookingData.lastName,
+        customerName: `${bookingData.firstName} ${bookingData.lastName}`.trim() || bookingData.customerName,
+        email: bookingData.email,
         phone: bookingData.phone,
         passengers: bookingData.passengers,
         bags: bookingData.bags,
         carType: bookingData.carType,
-        direction: `${bookingData.pickup} ← ${bookingData.dropoff}`,
+        direction: bookingData.bookingType === 'hourly' 
+          ? `${t('hourly')} (${bookingData.hours} ${t('hours')}) - ${bookingData.pickup}`
+          : `${bookingData.pickup} ← ${bookingData.dropoff}`,
         pickup: bookingData.pickup,
-        dropoff: bookingData.dropoff,
+        dropoff: bookingData.bookingType === 'hourly' ? `${bookingData.hours} ${t('hours')}` : bookingData.dropoff,
         distance: bookingData.distance || 0,
         date: bookingData.date,
         time: bookingData.time,
+        hours: bookingData.hours,
         amount: Number(finalAmount) || 0,
         driverType: 'In',
         driverName: '',
@@ -841,6 +909,7 @@ function App() {
         paymentStatus: 'Pending',
         status: Number(finalAmount) > 0 ? 'Confirmed' : 'Requested',
         notes: isCustom ? 'طلب حجز مخصص' : (matchedRoute ? 'حجز تلقائي (سعر ثابت)' : 'حجز عبر الموقع'),
+        specialRequests: bookingData.specialRequests,
         createdAt: new Date().toISOString()
       };
 
@@ -1229,7 +1298,11 @@ function App() {
       setIsTripFormOpen(false);
       setEditingTrip(null);
       setTripFormData({
+        bookingType: 'transfer',
+        firstName: '',
+        lastName: '',
         customerName: '',
+        email: '',
         phone: '',
         passengers: 1,
         bags: 0,
@@ -1240,13 +1313,15 @@ function App() {
         distance: 0,
         date: new Date().toISOString().split('T')[0],
         time: '10:00',
+        hours: 1,
         amount: 0,
         driverType: 'In',
         driverName: '',
         driverCost: 0,
         paymentStatus: 'Pending',
         status: 'Requested',
-        notes: ''
+        notes: '',
+        specialRequests: ''
       });
     } catch (error: any) {
       const errInfo = {
@@ -1583,212 +1658,300 @@ function App() {
 
               <form 
                 onSubmit={handleBookingSubmit}
-                className="p-8 lg:p-10 space-y-6"
+                className="p-8 lg:p-10 space-y-8"
               >
-                <div className="space-y-4">
-                  {bookingMode === 'fixed' ? (
-                    <div className="space-y-4">
-                      <div className="relative">
-                        <select 
-                          required
-                          className="w-full bg-gold/5 border-gold/20 text-dark rounded-2xl py-5 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-black text-lg appearance-none"
-                          onChange={e => {
-                            const route = fixedRoutes.find(r => r.id === e.target.value);
-                            if (route) {
-                              setBookingData({
-                                ...bookingData,
-                                pickup: route.pickup,
-                                dropoff: route.dropoff
-                              });
-                            }
-                          }}
-                        >
-                          <option value="">{t('selectDropoff')}</option>
-                          {fixedRoutes.map(route => (
-                            <option key={route.id} value={route.id}>
-                              {route.pickup} ← {route.dropoff} ({route.price} {t('bhd')})
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronRight className="absolute left-6 top-1/2 -translate-y-1/2 text-gold w-5 h-5 rotate-90 pointer-events-none" />
-                      </div>
-                      <div className="p-4 bg-green-50 rounded-2xl border border-green-100 flex items-center gap-3">
-                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                          <CreditCard className="text-green-600 w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-black text-green-700 uppercase">{t('fixedPrice')}</p>
-                          <p className="text-sm font-bold text-dark">{t('paymentSecure')}</p>
-                        </div>
-                      </div>
+                {/* Locations Selection - Priority for Fixed Mode */}
+                {bookingMode === 'fixed' ? (
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('selectDropoff')} *</label>
+                    <div className="relative">
+                      <select 
+                        required
+                        className="w-full bg-gold/5 border-gold/20 text-dark rounded-2xl py-5 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-black text-lg appearance-none"
+                        onChange={e => {
+                          const route = fixedRoutes.find(r => r.id === e.target.value);
+                          if (route) {
+                            setBookingData({
+                              ...bookingData,
+                              pickup: route.pickup,
+                              dropoff: route.dropoff,
+                              bookingType: 'transfer' // Fixed routes are always transfers
+                            });
+                          }
+                        }}
+                      >
+                        <option value="">{t('selectDropoff')}</option>
+                        {fixedRoutes.map(route => (
+                          <option key={route.id} value={route.id}>
+                            {route.pickup} ← {route.dropoff} ({route.price} {t('bhd')})
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronRight className="absolute left-6 top-1/2 -translate-y-1/2 text-gold w-5 h-5 rotate-90 pointer-events-none" />
                     </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="relative">
-                        <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                        <input 
-                          type="text" 
-                          placeholder={t('pickup')}
-                          required
-                          className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all"
-                          value={bookingData.pickup}
-                          onChange={e => setBookingData({...bookingData, pickup: e.target.value})}
-                        />
-                      </div>
-                      <div className="relative">
-                        <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-gold w-5 h-5" />
-                        <input 
-                          type="text" 
-                          placeholder={t('dropoff')}
-                          required
-                          className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all"
-                          value={bookingData.dropoff}
-                          onChange={e => setBookingData({...bookingData, dropoff: e.target.value})}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="relative">
-                          <Car className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                          <select 
-                            className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all appearance-none font-bold"
-                            value={bookingData.carType}
-                            onChange={e => setBookingData({...bookingData, carType: e.target.value as any})}
-                          >
-                            <option value="Standard">{lang === 'ar' ? 'عادي' : 'Standard'}</option>
-                            <option value="VIP">VIP</option>
-                            <option value="Van">{lang === 'ar' ? 'فان' : 'Van'}</option>
-                          </select>
+                  </div>
+                ) : (
+                  <>
+                    {/* Booking Type Selector - Only for Custom Mode */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <button
+                        type="button"
+                        onClick={() => setBookingData({...bookingData, bookingType: 'transfer'})}
+                        className={cn(
+                          "flex flex-col items-center justify-center p-6 rounded-3xl border-2 transition-all gap-3",
+                          bookingData.bookingType === 'transfer' 
+                            ? "bg-gold/5 border-gold text-gold shadow-lg shadow-gold/10" 
+                            : "bg-gray-50 border-transparent text-gray-400 hover:bg-gray-100"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-12 h-12 rounded-2xl flex items-center justify-center transition-all",
+                          bookingData.bookingType === 'transfer' ? "bg-gold text-white" : "bg-white text-gray-400"
+                        )}>
+                          <MapPin className="w-6 h-6" />
                         </div>
+                        <span className="font-black text-sm uppercase tracking-wider">{t('transfer')}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBookingData({...bookingData, bookingType: 'hourly'})}
+                        className={cn(
+                          "flex flex-col items-center justify-center p-6 rounded-3xl border-2 transition-all gap-3",
+                          bookingData.bookingType === 'hourly' 
+                            ? "bg-gold/5 border-gold text-gold shadow-lg shadow-gold/10" 
+                            : "bg-gray-50 border-transparent text-gray-400 hover:bg-gray-100"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-12 h-12 rounded-2xl flex items-center justify-center transition-all",
+                          bookingData.bookingType === 'hourly' ? "bg-gold text-white" : "bg-white text-gray-400"
+                        )}>
+                          <Clock className="w-6 h-6" />
+                        </div>
+                        <span className="font-black text-sm uppercase tracking-wider">{t('hourly')}</span>
+                      </button>
+                    </div>
+
+                    {/* Custom Locations */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('pickupLocation')} *</label>
                         <div className="relative">
-                          <ShoppingBag className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                          <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                           <input 
-                            type="number" 
-                            min="0"
-                            placeholder={lang === 'ar' ? 'الشنط' : 'Bags'}
+                            type="text" 
+                            required
                             className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
-                            value={bookingData.bags}
-                            onChange={e => setBookingData({...bookingData, bags: parseInt(e.target.value) || 0})}
+                            value={bookingData.pickup}
+                            onChange={e => setBookingData({...bookingData, pickup: e.target.value})}
                           />
                         </div>
                       </div>
-
-                      {bookingData.amount ? (
-                        <div className="p-4 bg-gold/10 rounded-2xl border border-gold/20 flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                              <DollarSign className="text-gold w-5 h-5" />
-                            </div>
-                            <div>
-                              <p className="text-[10px] font-black text-gold uppercase">{lang === 'ar' ? 'السعر المقدر' : 'Estimated Price'}</p>
-                              <p className="text-sm font-bold text-dark">{bookingData.distance} كم</p>
-                            </div>
-                          </div>
-                          <div className="text-xl font-black text-gold">
-                            {bookingData.amount} BHD
+                      {bookingData.bookingType === 'transfer' ? (
+                        <div className="space-y-2">
+                          <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('dropoffLocation')} *</label>
+                          <div className="relative">
+                            <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-gold w-5 h-5" />
+                            <input 
+                              type="text" 
+                              required
+                              className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
+                              value={bookingData.dropoff}
+                              onChange={e => setBookingData({...bookingData, dropoff: e.target.value})}
+                            />
                           </div>
                         </div>
                       ) : (
-                        <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex items-center gap-3">
-                          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                            <Clock className="text-blue-600 w-5 h-5" />
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-black text-blue-700 uppercase">{t('priceOnRequest')}</p>
-                            <p className="text-sm font-bold text-dark">{t('priceOnRequestDesc')}</p>
+                        <div className="space-y-2">
+                          <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('hours')} *</label>
+                          <div className="relative">
+                            <Clock className="absolute right-4 top-1/2 -translate-y-1/2 text-gold w-5 h-5" />
+                            <input 
+                              type="number" 
+                              min="1"
+                              required
+                              className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
+                              value={bookingData.hours}
+                              onChange={e => setBookingData({...bookingData, hours: parseInt(e.target.value) || 1})}
+                            />
                           </div>
                         </div>
                       )}
                     </div>
-                  )}
+                  </>
+                )}
 
+                <div className="space-y-6">
+                  {/* Name Fields */}
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="relative">
-                      <Users className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('firstName')} *</label>
                       <input 
                         type="text" 
-                        placeholder={t('customerName')}
                         required
-                        className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all"
-                        value={bookingData.customerName}
-                        onChange={e => setBookingData({...bookingData, customerName: e.target.value})}
+                        className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
+                        value={bookingData.firstName}
+                        onChange={e => setBookingData({...bookingData, firstName: e.target.value})}
                       />
                     </div>
-                    <div className="relative">
-                      <Phone className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('lastName')} *</label>
+                      <input 
+                        type="text" 
+                        required
+                        className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
+                        value={bookingData.lastName}
+                        onChange={e => setBookingData({...bookingData, lastName: e.target.value})}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Email & Phone */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('emailAddress')} *</label>
+                      <input 
+                        type="email" 
+                        required
+                        className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
+                        value={bookingData.email}
+                        onChange={e => setBookingData({...bookingData, email: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('phone')} *</label>
                       <input 
                         type="tel" 
-                        placeholder={t('phone')}
                         required
-                        className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 focus:ring-gold/20 transition-all"
+                        className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
                         value={bookingData.phone}
                         onChange={e => setBookingData({...bookingData, phone: e.target.value})}
                       />
                     </div>
                   </div>
 
-                  <div className="relative">
-                    <ShieldCheck className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input 
-                      type="tel" 
-                      placeholder={t('confirmPhone')}
-                      required
-                      className={cn(
-                        "w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 focus:ring-2 transition-all",
-                        bookingData.confirmPhone && bookingData.phone !== bookingData.confirmPhone 
-                          ? "ring-2 ring-red-500/50" 
-                          : "focus:ring-gold/20"
-                      )}
-                      value={bookingData.confirmPhone}
-                      onChange={e => setBookingData({...bookingData, confirmPhone: e.target.value})}
+                  {/* Date & Time */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('date')} *</label>
+                      <input 
+                        type="date" 
+                        required
+                        className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
+                        value={bookingData.date}
+                        onChange={e => setBookingData({...bookingData, date: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('time')} *</label>
+                      <input 
+                        type="time" 
+                        required
+                        className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
+                        value={bookingData.time}
+                        onChange={e => setBookingData({...bookingData, time: e.target.value})}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Vehicle Type Selection */}
+                  <div className="space-y-3">
+                    <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('vehicleType')} *</label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {[
+                        { id: 'Standard', label: t('sedan'), icon: Car },
+                        { id: 'VIP', label: t('miniVan'), icon: Users },
+                        { id: 'Van', label: t('miniBus'), icon: Bus }
+                      ].map((vehicle) => (
+                        <button
+                          key={vehicle.id}
+                          type="button"
+                          onClick={() => setBookingData({...bookingData, carType: vehicle.id as any})}
+                          className={cn(
+                            "flex items-center gap-3 p-4 rounded-2xl border-2 transition-all",
+                            bookingData.carType === vehicle.id 
+                              ? "bg-gold/5 border-gold text-gold" 
+                              : "bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100"
+                          )}
+                        >
+                          <vehicle.icon className="w-5 h-5" />
+                          <span className="text-xs font-bold">{vehicle.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Passengers & Bags */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('passengers')} *</label>
+                      <input 
+                        type="number" 
+                        min="1"
+                        required
+                        className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
+                        value={bookingData.passengers}
+                        onChange={e => setBookingData({...bookingData, passengers: parseInt(e.target.value) || 1})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-gray-400 uppercase mr-1">{lang === 'ar' ? 'الشنط' : 'Bags'}</label>
+                      <input 
+                        type="number" 
+                        min="0"
+                        className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
+                        value={bookingData.bags}
+                        onChange={e => setBookingData({...bookingData, bags: parseInt(e.target.value) || 0})}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Special Requests */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('specialRequests')}</label>
+                    <textarea 
+                      rows={3}
+                      className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold resize-none"
+                      value={bookingData.specialRequests}
+                      onChange={e => setBookingData({...bookingData, specialRequests: e.target.value})}
                     />
-                    {bookingData.confirmPhone && bookingData.phone !== bookingData.confirmPhone && (
-                      <p className="text-[10px] text-red-500 mt-1 mr-4 font-bold">{t('phoneMismatch')}</p>
-                    )}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="relative">
-                    <input 
-                      type="date" 
-                      required
-                      className="w-full bg-gray-50 border-none rounded-2xl py-4 px-4 focus:ring-2 focus:ring-gold/20 transition-all"
-                      value={bookingData.date}
-                      onChange={e => setBookingData({...bookingData, date: e.target.value})}
-                    />
+                {bookingData.amount ? (
+                  <div className="p-6 bg-gold/10 rounded-[2rem] border border-gold/20 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm">
+                        <DollarSign className="text-gold w-6 h-6" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-gold uppercase tracking-widest">{lang === 'ar' ? 'السعر المقدر' : 'Estimated Price'}</p>
+                        <p className="text-sm font-bold text-dark">{bookingData.distance} كم</p>
+                      </div>
+                    </div>
+                    <div className="text-2xl font-black text-gold">
+                      {bookingData.amount} BHD
+                    </div>
                   </div>
-                  <div className="relative">
-                    <input 
-                      type="time" 
-                      required
-                      className="w-full bg-gray-50 border-none rounded-2xl py-4 px-4 focus:ring-2 focus:ring-gold/20 transition-all"
-                      value={bookingData.time}
-                      onChange={e => setBookingData({...bookingData, time: e.target.value})}
-                    />
+                ) : (
+                  <div className="p-6 bg-blue-50 rounded-[2rem] border border-blue-100 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm">
+                      <Clock className="text-blue-600 w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-blue-700 uppercase tracking-widest">{t('priceOnRequest')}</p>
+                      <p className="text-sm font-bold text-dark">{t('priceOnRequestDesc')}</p>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <button 
                   type="submit"
-                  className="w-full bg-dark text-white py-5 rounded-2xl font-black text-lg hover:bg-gray-800 transform hover:-translate-y-1 transition-all flex items-center justify-center gap-2 shadow-xl shadow-dark/10"
+                  className="w-full bg-dark text-white py-6 rounded-[2rem] font-black text-xl hover:bg-gray-800 transform hover:-translate-y-1 transition-all flex items-center justify-center gap-3 shadow-2xl shadow-dark/20"
                 >
-                  {bookingMode === 'fixed' ? (
-                    <>
-                      <CreditCard className="w-5 h-5" />
-                      {t('confirmBooking')}
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="w-5 h-5" />
-                      {t('sendRequest')}
-                    </>
-                  )}
+                  <Star className="w-6 h-6 text-gold" />
+                  {bookingMode === 'fixed' ? t('confirmBooking') : t('sendRequest')}
                 </button>
-                <p className="text-[10px] text-center text-gray-400 font-bold">
-                  {bookingMode === 'fixed' 
-                    ? (lang === 'ar' ? '* سيتم حفظ بياناتك وتحويلك لبوابة الدفع الآمنة' : '* Your data will be saved and you will be redirected to the secure payment gateway')
-                    : (lang === 'ar' ? '* سيتم مراجعة طلبك وإرسال السعر عبر الواتساب' : '* Your request will be reviewed and the price will be sent via WhatsApp')}
-                </p>
               </form>
             </motion.div>
           </div>
@@ -3937,6 +4100,48 @@ function App() {
               </div>
 
               <div className="p-8 overflow-y-auto space-y-8">
+                {/* Booking Type & Name Info */}
+                <div className="grid md:grid-cols-4 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase">نوع الحجز</label>
+                    <select 
+                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                      value={tripFormData.bookingType}
+                      onChange={e => setTripFormData({ ...tripFormData, bookingType: e.target.value as any })}
+                    >
+                      <option value="transfer">توصيل</option>
+                      <option value="hourly">بالساعة</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase">الاسم الأول</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                      value={tripFormData.firstName}
+                      onChange={e => setTripFormData({ ...tripFormData, firstName: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase">الاسم الأخير</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                      value={tripFormData.lastName}
+                      onChange={e => setTripFormData({ ...tripFormData, lastName: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase">البريد الإلكتروني</label>
+                    <input 
+                      type="email" 
+                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
+                      value={tripFormData.email}
+                      onChange={e => setTripFormData({ ...tripFormData, email: e.target.value })}
+                    />
+                  </div>
+                </div>
+
                 {/* Customer Info */}
                 <div className="grid md:grid-cols-3 gap-6">
                   <div className="space-y-2">
@@ -4001,13 +4206,20 @@ function App() {
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-black text-gray-400 uppercase">المسافة (كم)</label>
+                    <label className="text-xs font-black text-gray-400 uppercase">المسافة / الساعات</label>
                     <input 
                       type="number" 
                       step="0.1"
                       className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
-                      value={tripFormData.distance || 0}
-                      onChange={e => setTripFormData({ ...tripFormData, distance: parseFloat(e.target.value) || 0 })}
+                      value={tripFormData.bookingType === 'hourly' ? tripFormData.hours : (tripFormData.distance || 0)}
+                      onChange={e => {
+                        const val = parseFloat(e.target.value) || 0;
+                        if (tripFormData.bookingType === 'hourly') {
+                          setTripFormData({ ...tripFormData, hours: Math.floor(val) });
+                        } else {
+                          setTripFormData({ ...tripFormData, distance: val });
+                        }
+                      }}
                     />
                   </div>
                 </div>
@@ -4148,12 +4360,12 @@ function App() {
                     </select>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-black text-gray-400 uppercase">ملاحظات</label>
-                    <input 
-                      type="text" 
-                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
-                      value={tripFormData.notes}
-                      onChange={e => setTripFormData({ ...tripFormData, notes: e.target.value })}
+                    <label className="text-xs font-black text-gray-400 uppercase">ملاحظات / طلبات خاصة</label>
+                    <textarea 
+                      rows={1}
+                      className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold resize-none"
+                      value={tripFormData.specialRequests || tripFormData.notes}
+                      onChange={e => setTripFormData({ ...tripFormData, specialRequests: e.target.value, notes: e.target.value })}
                     />
                   </div>
                 </div>
