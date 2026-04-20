@@ -44,9 +44,12 @@ service cloud.firestore {
 
     // Trips (Accounting)
     match /trips/{tripId} {
-      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow read: if isAdmin() || (resource.data.userId == null) || (isAuthenticated() && resource.data.userId == request.auth.uid);
       allow create: if true; 
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin() || 
+                    (resource.data.paymentStatus != 'Paid') || 
+                    (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow delete: if isAdmin();
     }
   }
 }

@@ -9,8 +9,22 @@ import compression from "compression";
 import morgan from "morgan";
 import cors from "cors";
 import { rateLimit } from "express-rate-limit";
+import admin from "firebase-admin";
+import { getFirestore } from "firebase-admin/firestore";
 
 dotenv.config();
+
+// Initialize Firebase Admin
+const firebaseConfig = {
+  projectId: "gen-lang-client-0407670768",
+  databaseId: "ai-studio-95f65e66-4b93-41d7-b06a-f978275c5d9e"
+};
+
+const adminApp = admin.initializeApp({
+  projectId: firebaseConfig.projectId
+});
+
+const adminDb = getFirestore(adminApp, firebaseConfig.databaseId);
 
 // Environment Variable Validation
 const requiredEnvVars = ['STRIPE_SECRET_KEY', 'RESEND_API_KEY'];
@@ -32,6 +46,9 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Trust proxy for rate limiting (needed behind Nginx/Cloud Run)
+  app.set('trust proxy', 1);
+
   // Security Middlewares
   app.use(helmet({
     contentSecurityPolicy: false, // Disabled to allow Vite's inline scripts in dev
@@ -51,6 +68,7 @@ async function startServer() {
     limit: 100, // Limit each IP to 100 requests per windowMs
     standardHeaders: 'draft-7',
     legacyHeaders: false,
+    validate: { xForwardedForHeader: false },
     message: { error: "Too many requests, please try again later." }
   });
 
@@ -102,10 +120,11 @@ async function startServer() {
         return res.json({ success: false, message: "Resend not configured" });
       }
 
-      const { customerName, phone, pickup, dropoff, date, time, passengers, amount, notes } = req.body;
+      const { customerName, phone, pickup, dropoff, date, time, passengers, amount, notes, companyName } = req.body;
+      const displayCompanyName = companyName || 'GCC TAXI';
 
       const { data, error } = await resend.emails.send({
-        from: 'GCC TAXI <onboarding@resend.dev>',
+        from: `${displayCompanyName} <onboarding@resend.dev>`,
         to: ['ahjm91@gmail.com'],
         subject: `حجز جديد: ${customerName} - ${pickup} ← ${dropoff}`,
         html: `
@@ -120,7 +139,7 @@ async function startServer() {
             <p><strong>السعر:</strong> ${amount > 0 ? `${amount} BHD` : 'بانتظار التسعير'}</p>
             <p><strong>ملاحظات:</strong> ${notes || 'لا يوجد'}</p>
             <hr />
-            <p style="font-size: 12px; color: #666;">تم إرسال هذا التنبيه تلقائياً من نظام GCC TAXI.</p>
+            <p style="font-size: 12px; color: #666;">تم إرسال هذا التنبيه تلقائياً من نظام ${displayCompanyName}.</p>
           </div>
         `,
       });
@@ -139,7 +158,8 @@ async function startServer() {
         throw new Error("Resend is not configured");
       }
 
-      const { trips } = req.body;
+      const { trips, companyName } = req.body;
+      const displayCompanyName = companyName || 'GCC TAXI';
       
       if (!trips || !Array.isArray(trips)) {
         return res.status(400).json({ error: "Invalid trips data" });
@@ -201,12 +221,12 @@ async function startServer() {
 
       htmlContent += `
           <hr style="margin-top: 40px; border: 0; border-top: 1px solid #eee;" />
-          <p style="font-size: 12px; color: #999; text-align: center;">نظام GCC TAXI - إدارة الرحلات</p>
+          <p style="font-size: 12px; color: #999; text-align: center;">نظام ${displayCompanyName} - إدارة الرحلات</p>
         </div>
       `;
 
       const { data, error } = await resend.emails.send({
-        from: 'GCC TAXI <onboarding@resend.dev>',
+        from: `${displayCompanyName} <onboarding@resend.dev>`,
         to: ['ahjm91@gmail.com'],
         subject: `📅 جدول الرحلات القادمة - تحديث ${new Date().toLocaleDateString('ar-BH')}`,
         html: htmlContent,
@@ -270,6 +290,115 @@ async function startServer() {
       res.json({ paymentUrl: data.Data.PaymentURL });
     } catch (error) {
       next(error);
+    }
+  });
+
+  // Tap Payment
+  app.post("/api/tap/execute-payment", async (req, res, next) => {
+    try {
+      const { amount, customerName, phone, tripId, secretKey } = req.body;
+      
+      if (!secretKey) {
+        return res.status(400).json({ error: "Tap Secret Key is missing" });
+      }
+
+      const names = customerName.trim().split(/\s+/);
+      const firstName = names[0] || 'Customer';
+      const lastName = names.slice(1).join(' ') || 'User';
+
+      const payload = {
+        draft: false,
+        due: Date.now() + 86400000,
+        expiry: Date.now() + 172800000,
+        description: `Trip Booking #${tripId}`,
+        mode: "INVOICE",
+        savecard: false,
+        notifications: {
+          channels: ["SMS", "EMAIL"],
+          dispatch: true
+        },
+        currencies: ["BHD"],
+        metadata: {
+          tripId: tripId
+        },
+        reference: {
+          order: tripId,
+          invoice: `INV-${tripId.substring(0, 8).toUpperCase()}`
+        },
+        customer: {
+          first_name: firstName,
+          last_name: lastName,
+          phone: {
+            country_code: "973",
+            number: phone.replace(/[^0-9]/g, '').slice(-8) // Take last 8 digits for Bahrain
+          }
+        },
+        order: {
+          amount: amount,
+          currency: "BHD",
+          items: [
+            {
+              amount: amount,
+              currency: "BHD",
+              description: `Trip Booking #${tripId}`,
+              name: "Trip Booking",
+              quantity: 1
+            }
+          ]
+        },
+        redirect: {
+          url: `${req.protocol}://${req.get('host')}/?pay_success=${tripId}`
+        },
+        post: {
+          url: `${req.protocol}://${req.get('host')}/api/tap/webhook`
+        }
+      };
+
+      const response = await fetch("https://api.tap.company/v2/invoices", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${secretKey}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+      
+      if (data.errors || !data.url) {
+        const errorMsg = data.errors ? data.errors[0].description : (data.message || "Tap API Error");
+        throw new Error(errorMsg);
+      }
+
+      res.json({ paymentUrl: data.url });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Tap Webhook
+  app.post("/api/tap/webhook", async (req, res) => {
+    try {
+      const payload = req.body;
+      console.log("🔵 Tap Webhook received:", JSON.stringify(payload));
+
+      const status = payload.status;
+      const tripId = payload.metadata?.tripId || payload.metadata?.udf1 || payload.reference?.order;
+
+      if ((status === 'PAID' || status === 'CAPTURED' || payload.track === 'PAYMENT_CAPTURED') && tripId) {
+        console.log(`✅ Payment successful for Trip #${tripId} via Webhook`);
+        
+        await adminDb.collection('trips').doc(tripId).update({
+          paymentStatus: 'Paid',
+          status: 'Confirmed',
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      }
+
+      res.sendStatus(200);
+    } catch (error: any) {
+      console.error("🔴 Tap Webhook Error:", error.message);
+      res.sendStatus(500);
     }
   });
 

@@ -47,7 +47,9 @@ import {
   CheckCircle,
   Wallet,
   Copy,
-  MessageCircle
+  MessageCircle,
+  Eye,
+  Bitcoin
 } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { GoogleGenAI } from "@google/genai";
@@ -134,6 +136,8 @@ interface SpecializedService {
 }
 
 interface SiteSettings {
+  companyName: string;
+  companyName_en?: string;
   heroTitle: string;
   heroTitle_en?: string;
   heroSubtitle: string;
@@ -162,8 +166,13 @@ interface SiteSettings {
   // Pricing & Payment
   pricePerKm: number;
   baseFee: number;
+  vipSurcharge: number;
+  vanSurcharge: number;
+  paymentGateway: 'MyFatoorah' | 'Tap' | 'Crypto';
   myFatoorahToken?: string;
   myFatoorahIsSandbox?: boolean;
+  tapSecretKey?: string;
+  cryptoWalletAddress?: string;
   // Visibility Controls
   showHeaderSocials: boolean;
   showFooterSocials: boolean;
@@ -470,6 +479,8 @@ function App() {
   const [fixedRoutes, setFixedRoutes] = useState<FixedRoute[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({
+    companyName: 'GCC TAXI',
+    companyName_en: 'GCC TAXI',
     heroTitle: 'GCC TAXI',
     heroSubtitle: 'فخامة التنقل',
     heroDescription: 'نقدم لك أرقى خدمات التوصيل واللوميزين في مملكة البحرين وجميع دول الخليج.',
@@ -490,7 +501,12 @@ function App() {
     adminEmails: ['ahjm91@gmail.com'],
     pricePerKm: 0.5,
     baseFee: 2,
+    vipSurcharge: 5,
+    vanSurcharge: 12,
+    paymentGateway: 'MyFatoorah',
     myFatoorahIsSandbox: true,
+    tapSecretKey: '',
+    cryptoWalletAddress: '',
     showHeaderSocials: false,
     showFooterSocials: true,
     showHeaderLogo: true,
@@ -526,6 +542,7 @@ function App() {
     }
   }, [lang]);
 
+  const [isBooking, setIsBooking] = useState(false);
   const [bookingData, setBookingData] = useState<BookingData>({
     bookingType: 'transfer',
     firstName: '',
@@ -736,8 +753,8 @@ function App() {
 
       if (matchedRoute) {
         let price = matchedRoute.price;
-        if (bookingData.carType === 'VIP') price += 5;
-        else if (bookingData.carType === 'Van') price += 12;
+        if (bookingData.carType === 'VIP') price += (siteSettings.vipSurcharge || 5);
+        else if (bookingData.carType === 'Van') price += (siteSettings.vanSurcharge || 12);
         
         if (bookingData.amount !== price) {
           setBookingData(prev => ({ ...prev, amount: price }));
@@ -879,14 +896,24 @@ function App() {
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Booking form submitted. Gateway:', siteSettings.paymentGateway, 'Amount:', bookingData.amount);
+    
+    if (isBooking) {
+      console.log('Already booking, ignoring click');
+      return;
+    }
+    setIsBooking(true);
     
     try {
-      // Validate phone confirmation
-      if (bookingData.phone !== bookingData.confirmPhone) {
-        alert(lang === 'ar' ? 'رقم الهاتف غير متطابق، يرجى التأكد من كتابة نفس الرقم في الخانتين.' : 'Phone numbers do not match.');
+      console.log('Validating booking data...');
+      // Remove phone confirmation check as it's not in the UI
+      if (!bookingData.phone || !bookingData.firstName || !bookingData.pickup) {
+        alert(lang === 'ar' ? 'يرجى ملء جميع الحقول المطلوبة.' : 'Please fill in all required fields.');
+        setIsBooking(false);
         return;
       }
 
+      console.log('Calculating price...');
       // Determine if it's a custom booking or fixed
       const isCustom = bookingMode === 'custom';
       
@@ -900,10 +927,12 @@ function App() {
 
       // Apply car type surcharge for fixed routes
       if (matchedRoute) {
-        if (bookingData.carType === 'VIP') finalAmount += 5;
-        else if (bookingData.carType === 'Van') finalAmount += 12;
+        if (bookingData.carType === 'VIP') finalAmount += (siteSettings.vipSurcharge || 5);
+        else if (bookingData.carType === 'Van') finalAmount += (siteSettings.vanSurcharge || 12);
       }
       
+      console.log('Final amount calculated:', finalAmount);
+
       // Save to Firestore first
       const tripData: Omit<Trip, 'id'> = {
         userId: user?.uid || null,
@@ -924,7 +953,7 @@ function App() {
         distance: bookingData.distance || 0,
         date: bookingData.date,
         time: bookingData.time,
-        hours: bookingData.hours,
+        hours: bookingData.hours || 1,
         amount: Number(finalAmount) || 0,
         driverType: 'In',
         driverName: '',
@@ -933,93 +962,109 @@ function App() {
         paymentStatus: 'Pending',
         status: Number(finalAmount) > 0 ? 'Confirmed' : 'Requested',
         notes: isCustom ? 'طلب حجز مخصص' : (matchedRoute ? 'حجز تلقائي (سعر ثابت)' : 'حجز عبر الموقع'),
-        specialRequests: bookingData.specialRequests,
+        specialRequests: bookingData.specialRequests || '',
         createdAt: new Date().toISOString()
       };
 
-      // Start saving to Firestore
+      console.log('Saving to Firestore...', tripData);
       const docRef = await safeAddDoc(collection(db, 'trips'), tripData);
       if (!docRef) {
-        throw new Error('Failed to save trip to database');
+        throw new Error('Failed to save trip to database (safeAddDoc returned null)');
       }
+      console.log('Trip saved with ID:', docRef.id);
+      
       const newTrip = { id: docRef.id, ...tripData } as Trip;
       
       // Notify Admin via Email
+      console.log('Sending notification email...');
       fetch('/api/notify-booking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newTrip)
-      })
-      .then(async res => {
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          console.error('Email notification server error:', res.status, errData);
-        }
-      })
-      .catch(emailErr => {
-        console.error('Failed to send email notification (Network Error):', emailErr);
-        if (emailErr instanceof Error) {
-          console.error('Error details:', {
-            message: emailErr.message,
-            stack: emailErr.stack,
-            url: '/api/notify-booking'
-          });
-        }
-      });
+        body: JSON.stringify({ ...newTrip, companyName: siteSettings.companyName })
+      }).catch(e => console.error('Notify error:', e));
 
       // WhatsApp Message Construction
       const adminMessage = `🔔 *حجز جديد من الموقع*\n\n` +
-                           `👤 العميل: ${bookingData.customerName}\n` +
-                           `📞 الهاتف: ${bookingData.phone}\n` +
-                           `📍 المسار: ${bookingData.pickup} ← ${bookingData.dropoff}\n` +
-                           `📅 التاريخ: ${bookingData.date}\n` +
-                           `🕒 الوقت: ${bookingData.time}\n` +
-                           `👥 الركاب: ${bookingData.passengers}\n` +
-                           `🚘 نوع السيارة: ${bookingData.carType}\n` +
-                           `💰 السعر: ${newTrip.amount > 0 ? newTrip.amount + ' BHD' : 'بانتظار التسعير'}\n` +
+                           `👤 العميل: ${tripData.customerName}\n` +
+                           `📞 الهاتف: ${tripData.phone}\n` +
+                           `📍 المسار: ${tripData.direction}\n` +
+                           `📅 التاريخ: ${tripData.date}\n` +
+                           `🕒 الوقت: ${tripData.time}\n` +
+                           `👥 الركاب: ${tripData.passengers}\n` +
+                           `🚘 نوع السيارة: ${tripData.carType}\n` +
+                           `💰 السعر: ${newTrip.amount > 0 ? newTrip.amount + ' BHD' : (lang === 'ar' ? 'بانتظار التسعير' : 'Pending Price')}\n` +
                            `🔗 يرجى الدخول للوحة التحكم للمتابعة.`;
       
-      const adminWhatsapp = siteSettings.notificationWhatsapp || siteSettings.whatsapp;
+      const adminWhatsapp = siteSettings.notificationWhatsapp || siteSettings.whatsapp || '97332325997';
       const whatsappUrl = `https://wa.me/${adminWhatsapp}?text=${encodeURIComponent(adminMessage)}`;
 
       // Redirect to payment if amount > 0
       if (newTrip.amount > 0) {
-        const confirmPay = window.confirm(lang === 'ar' 
-          ? 'تم تسجيل طلبك. هل تريد الدفع الآن إلكترونياً لتأكيد الحجز؟' 
-          : 'Your request is recorded. Do you want to pay online now to confirm?');
+        console.log('Trip has amount > 0, proceeding to payment gateway selection...');
+        const gateway = siteSettings.paymentGateway;
         
-        if (confirmPay) {
-          if (siteSettings.myFatoorahToken) {
-            const response = await fetch('/api/myfatoorah/execute-payment', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                amount: newTrip.amount,
-                customerName: newTrip.customerName,
-                phone: newTrip.phone,
-                tripId: docRef.id,
-                isSandbox: siteSettings.myFatoorahIsSandbox,
-                token: siteSettings.myFatoorahToken
-              })
-            });
-            const data = await response.json();
-            if (data.paymentUrl) {
-              window.open(data.paymentUrl, '_blank');
-              return;
-            }
-          } else {
-            setPaymentTrip(newTrip);
-            setIsPaymentOpen(true);
+        if (gateway === 'Tap' && siteSettings.tapSecretKey) {
+          console.log('Initiating Tap payment...');
+          const response = await fetch('/api/tap/execute-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              amount: newTrip.amount,
+              customerName: newTrip.customerName,
+              phone: newTrip.phone,
+              tripId: docRef.id,
+              secretKey: siteSettings.tapSecretKey
+            })
+          });
+          const data = await response.json();
+          if (data.paymentUrl) {
+            window.location.href = data.paymentUrl; // Use location.href instead of window.open to avoid popup blockers
+            setIsBooking(false);
             return;
+          } else {
+            console.error('Tap payment URL missing:', data);
           }
+        } else if (gateway === 'MyFatoorah' && siteSettings.myFatoorahToken) {
+          console.log('Initiating MyFatoorah payment...');
+          const response = await fetch('/api/myfatoorah/execute-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              amount: newTrip.amount,
+              customerName: newTrip.customerName,
+              phone: newTrip.phone,
+              tripId: docRef.id,
+              isSandbox: siteSettings.myFatoorahIsSandbox,
+              token: siteSettings.myFatoorahToken
+            })
+          });
+          const data = await response.json();
+          if (data.paymentUrl) {
+            window.location.href = data.paymentUrl; // Use location.href instead of window.open to avoid popup blockers
+            setIsBooking(false);
+            return;
+          } else {
+            console.error('MyFatoorah payment URL missing:', data);
+          }
+        } else {
+          // Crypto or other manual gateway
+          console.log('Opening manual payment modal (Crypto or fallback)...');
+          setPaymentTrip(newTrip);
+          setIsPaymentOpen(true);
+          setIsBooking(false);
+          return;
         }
       }
 
+      console.log('No payment amount or gateway not configured, redirecting to WhatsApp...');
       // If no payment or amount is 0, redirect to WhatsApp
       alert(lang === 'ar' ? 'تم استلام طلبك بنجاح! سيتم تحويلك الآن لتأكيد الحجز عبر واتساب.' : 'Your request has been received successfully! Redirecting to WhatsApp...');
       
       setBookingData({
         customerName: '',
+        firstName: '',
+        lastName: '',
+        email: '',
         phone: '',
         confirmPhone: '',
         pickup: '',
@@ -1029,13 +1074,18 @@ function App() {
         passengers: 1,
         bags: 0,
         carType: 'Standard',
-        service: 'luxury'
+        service: 'luxury',
+        bookingType: 'transfer',
+        hours: 1,
+        specialRequests: ''
       });
         
       window.open(whatsappUrl, '_blank');
     } catch (error) {
       console.error('Booking failed:', error);
       alert(lang === 'ar' ? 'فشل إرسال الطلب، يرجى المحاولة مرة أخرى.' : 'Booking failed, please try again.');
+    } finally {
+      setIsBooking(false);
     }
   };
 
@@ -1196,6 +1246,8 @@ function App() {
 
     // Seed Settings
     await setDoc(doc(db, 'settings', 'site'), {
+      companyName: 'GCC TAXI',
+      companyName_en: 'GCC TAXI',
       heroTitle: 'GCC TAXI',
       heroTitle_en: 'GCC TAXI',
       heroSubtitle: 'فخامة التنقل',
@@ -1205,10 +1257,12 @@ function App() {
       heroImage: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&q=80&w=1920',
       phone: '+973 32325997',
       whatsapp: '97332325997',
+      notificationWhatsapp: '97332325997',
       logo: '',
       instagram: '',
       tiktok: '',
       twitter: '',
+      telegram: '',
       primaryColor: '#D4AF37', // Gold
       secondaryColor: '#1A1A1A', // Dark
       accentColor: '#F5F5F5', // Light Gray
@@ -1216,7 +1270,26 @@ function App() {
       footerAbout: 'نحن متخصصون في تقديم خدمات النقل العائلي والفاخر، مع التركيز على الراحة والأمان في السفرات الطويلة بين مدن المملكة ودول الخليج.',
       footerAbout_en: 'We specialize in providing family and luxury transportation services, focusing on comfort and safety in long trips between the cities of the Kingdom and the GCC countries.',
       footerAddress: 'مملكة البحرين وجميع دول الخليج',
-      footerAddress_en: 'Kingdom of Bahrain and all GCC countries'
+      footerAddress_en: 'Kingdom of Bahrain and all GCC countries',
+      adminEmails: ['ahjm91@gmail.com'],
+      pricePerKm: 0.5,
+      baseFee: 2,
+      vipSurcharge: 5,
+      vanSurcharge: 12,
+      paymentGateway: 'MyFatoorah',
+      myFatoorahIsSandbox: true,
+      tapSecretKey: '',
+      cryptoWalletAddress: '',
+      showHeaderSocials: false,
+      showFooterSocials: true,
+      showHeaderLogo: true,
+      showFooterLogo: true,
+      showHeroSection: true,
+      showServicesSection: true,
+      showSpecializedSection: true,
+      showAboutSection: true,
+      showBookingSection: true,
+      showCTASection: true
     });
 
     alert('تم تهيئة قاعدة البيانات بنجاح!');
@@ -1282,7 +1355,7 @@ function App() {
       const response = await fetch('/api/send-full-schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trips: upcomingTrips })
+        body: JSON.stringify({ trips: upcomingTrips, companyName: siteSettings.companyName })
       });
 
       if (response.ok) {
@@ -1436,7 +1509,7 @@ function App() {
                     <div className="w-10 h-10 bg-dark rounded-xl flex items-center justify-center">
                       <Car className="text-gold w-6 h-6" />
                     </div>
-                    <span className="text-xl font-bold tracking-tighter text-dark uppercase">GCC TAXI</span>
+                    <span className="text-xl font-bold tracking-tighter text-dark uppercase">{lang === 'ar' ? siteSettings.companyName : (siteSettings.companyName_en || siteSettings.companyName)}</span>
                   </>
                 )
               )}
@@ -1444,6 +1517,25 @@ function App() {
 
             {/* Desktop Menu */}
             <div className="hidden md:flex items-center gap-8">
+              {siteSettings.showHeaderSocials && (
+                <div className="flex items-center gap-3 border-l border-gray-100 pl-6 mr-2">
+                  {siteSettings.instagram && (
+                    <a href={siteSettings.instagram} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-pink-600 transition-colors">
+                      <Instagram className="w-5 h-5" />
+                    </a>
+                  )}
+                  {siteSettings.telegram && (
+                    <a href={siteSettings.telegram} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-blue-500 transition-colors">
+                      <Send className="w-5 h-5" />
+                    </a>
+                  )}
+                  {siteSettings.whatsapp && (
+                    <a href={`https://wa.me/${siteSettings.whatsapp}`} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-green-600 transition-colors">
+                      <Phone className="w-5 h-5" />
+                    </a>
+                  )}
+                </div>
+              )}
               <button 
                 onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}
                 className="flex items-center gap-2 px-3 py-1 rounded-lg bg-gray-50 text-dark font-bold hover:bg-gray-100 transition-all border border-gray-200"
@@ -1730,10 +1822,16 @@ function App() {
                           onChange={e => {
                             const route = fixedRoutes.find(r => r.id === e.target.value);
                             if (route) {
+                              let price = route.price;
+                              // Match the car type surcharge logic in the useEffect
+                              if (bookingData.carType === 'VIP') price += (siteSettings.vipSurcharge || 5);
+                              else if (bookingData.carType === 'Van') price += (siteSettings.vanSurcharge || 12);
+                              
                               setBookingData({
                                 ...bookingData,
                                 pickup: route.pickup,
                                 dropoff: route.dropoff,
+                                amount: price,
                                 bookingType: 'transfer' // Fixed routes are always transfers
                               });
                             }
@@ -1925,7 +2023,28 @@ function App() {
                           <button
                             key={vehicle.id}
                             type="button"
-                            onClick={() => setBookingData({...bookingData, carType: vehicle.id as any})}
+                            onClick={() => {
+                              const newCarType = vehicle.id as any;
+                              let newAmount = bookingData.amount;
+                              
+                              if (bookingMode === 'fixed' && bookingData.pickup && bookingData.dropoff) {
+                                const route = fixedRoutes.find(r => 
+                                  r.pickup.trim().toLowerCase() === bookingData.pickup.trim().toLowerCase() && 
+                                  r.dropoff.trim().toLowerCase() === bookingData.dropoff.trim().toLowerCase()
+                                );
+                                if (route) {
+                                  newAmount = route.price;
+                                  if (newCarType === 'VIP') newAmount += (siteSettings.vipSurcharge || 5);
+                                  else if (newCarType === 'Van') newAmount += (siteSettings.vanSurcharge || 12);
+                                }
+                              }
+                              
+                              setBookingData({
+                                ...bookingData, 
+                                carType: newCarType,
+                                amount: newAmount
+                              });
+                            }}
                             className={cn(
                               "flex items-center gap-3 p-4 rounded-2xl border-2 transition-all",
                               bookingData.carType === vehicle.id 
@@ -2006,10 +2125,18 @@ function App() {
 
                   <button 
                     type="submit"
-                    className="w-full bg-dark text-white py-6 rounded-[2rem] font-black text-xl hover:bg-gray-800 transform hover:-translate-y-1 transition-all flex items-center justify-center gap-3 shadow-2xl shadow-dark/20"
+                    disabled={isBooking}
+                    className="w-full bg-dark text-white py-6 rounded-[2rem] font-black text-xl hover:bg-gray-800 transform hover:-translate-y-1 transition-all flex items-center justify-center gap-3 shadow-2xl shadow-dark/20 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Star className="w-6 h-6 text-gold" />
-                    {bookingMode === 'fixed' ? t('confirmBooking') : t('sendRequest')}
+                    {isBooking ? (
+                      <Loader2 className="w-6 h-6 animate-spin text-gold" />
+                    ) : (
+                      <Star className="w-6 h-6 text-gold" />
+                    )}
+                    {isBooking 
+                      ? (lang === 'ar' ? 'جاري الحفظ...' : 'Booking...') 
+                      : (bookingMode === 'fixed' ? t('confirmBooking') : t('sendRequest'))
+                    }
                   </button>
                 </form>
               </motion.div>
@@ -2187,7 +2314,11 @@ function App() {
               
               <div className="space-y-8">
                 <div>
-                  <h2 className="text-4xl font-bold text-dark mb-4">{lang === 'ar' ? 'لماذا تختار GCC TAXI؟' : 'Why Choose GCC TAXI?'}</h2>
+                  <h2 className="text-4xl font-bold text-dark mb-4">
+                    {lang === 'ar' 
+                      ? `لماذا تختار ${siteSettings.companyName}؟` 
+                      : `Why Choose ${siteSettings.companyName_en || siteSettings.companyName}?`}
+                  </h2>
                   <p className="text-gray-600">
                     {lang === 'ar'
                       ? 'نحن نؤمن بأن الرحلة لا تقل أهمية عن الوجهة. لذلك نسعى جاهدين لتقديم أفضل تجربة ممكنة.'
@@ -2288,7 +2419,7 @@ function App() {
                       <div className="w-10 h-10 bg-dark rounded-xl flex items-center justify-center">
                         <Car className="text-gold w-6 h-6" />
                       </div>
-                      <span className="text-xl font-bold tracking-tighter text-dark uppercase">GCC TAXI</span>
+                      <span className="text-xl font-bold tracking-tighter text-dark uppercase">{lang === 'ar' ? siteSettings.companyName : (siteSettings.companyName_en || siteSettings.companyName)}</span>
                     </>
                   )
                 )}
@@ -2378,7 +2509,7 @@ function App() {
           </div>
           
           <div className="border-t border-gray-100 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-gray-400">
-            <p>© 2026 GCC TAXI. {lang === 'ar' ? 'جميع الحقوق محفوظة.' : 'All rights reserved.'}</p>
+            <p>© {new Date().getFullYear()} {lang === 'ar' ? siteSettings.companyName : (siteSettings.companyName_en || siteSettings.companyName)}. {lang === 'ar' ? 'جميع الحقوق محفوظة.' : 'All rights reserved.'}</p>
             <div className="flex gap-8">
               <button onClick={() => setIsTermsOpen(true)} className="hover:text-dark transition-colors">{lang === 'ar' ? 'الشروط والأحكام' : 'Terms & Conditions'}</button>
               <button onClick={() => setIsPrivacyOpen(true)} className="hover:text-dark transition-colors">{lang === 'ar' ? 'سياسة الخصوصية' : 'Privacy Policy'}</button>
@@ -2417,7 +2548,7 @@ function App() {
               <div className="p-8 overflow-y-auto text-right dir-rtl" dir="rtl">
                 <div className="space-y-8 text-gray-600">
                   <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 mb-6">
-                    <p className="font-bold text-dark">اسم الشركة: GCC TAXI</p>
+                    <p className="font-bold text-dark">اسم الشركة: {siteSettings.companyName}</p>
                     <p className="font-bold text-dark">للتواصل: +973 32325997</p>
                   </div>
 
@@ -2493,7 +2624,7 @@ function App() {
                   <div className="border-t border-gray-100 pt-8 mt-8">
                     <h3 className="text-xl font-bold text-dark mb-6 text-left" dir="ltr">Terms & Conditions – Car Rental with Driver</h3>
                     <div className="space-y-6 text-sm text-gray-500 text-left" dir="ltr">
-                      <p><strong>Company Name:</strong> GCC TAXI</p>
+                      <p><strong>Company Name:</strong> {siteSettings.companyName_en || siteSettings.companyName}</p>
                       <p><strong>Contact:</strong> +973 32325997</p>
                       
                       <section>
@@ -2601,7 +2732,7 @@ function App() {
                 <div className="space-y-8 text-gray-600">
                   <section>
                     <h4 className="text-lg font-bold text-dark mb-3">مقدمة</h4>
-                    <p>نحن في GCC TAXI نلتزم بحماية خصوصيتك وبياناتك الشخصية. توضح هذه السياسة كيفية جمعنا واستخدامنا وحمايتنا للمعلومات التي تقدمها لنا.</p>
+                    <p>نحن في {lang === 'ar' ? siteSettings.companyName : (siteSettings.companyName_en || siteSettings.companyName)} نلتزم بحماية خصوصيتك وبياناتك الشخصية. توضح هذه السياسة كيفية جمعنا واستخدامنا وحمايتنا للمعلومات التي تقدمها لنا.</p>
                   </section>
 
                   <section>
@@ -3644,15 +3775,34 @@ function App() {
                                       "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
                                       trip.paymentStatus === 'Paid' ? "bg-green-100 text-green-700" :
                                       trip.paymentStatus === 'Unpaid' ? "bg-red-100 text-red-700" :
+                                      trip.paymentStatus === 'Pending Verification' ? "bg-blue-100 text-blue-700" :
                                       "bg-amber-100 text-amber-700"
                                     )}>
                                       {trip.paymentStatus === 'Paid' ? 'Paid' :
-                                       trip.paymentStatus === 'Unpaid' ? 'Unpaid' : 'Pending'}
+                                       trip.paymentStatus === 'Unpaid' ? 'Unpaid' : 
+                                       trip.paymentStatus === 'Pending Verification' ? 'Verify Crypto' : 'Pending'}
                                     </span>
                                   </td>
                                   <td className="p-4 text-gray-400 max-w-[150px] truncate">{trip.notes || '—'}</td>
                                   <td className="p-4">
                                     <div className="flex gap-2">
+                                      {trip.paymentStatus === 'Pending Verification' && (
+                                        <button 
+                                          onClick={async () => {
+                                            if (confirm(`Accept Crypto payment for ${trip.customerName}?`)) {
+                                              await updateDoc(doc(db, 'trips', trip.id), {
+                                                paymentStatus: 'Paid',
+                                                status: 'Confirmed'
+                                              });
+                                              alert('Payment confirmed and trip status updated.');
+                                            }
+                                          }}
+                                          className="p-2 hover:bg-gold/10 text-gold rounded-xl transition-colors"
+                                          title="Confirm Crypto Payment"
+                                        >
+                                          <ShieldCheck className="w-4 h-4" />
+                                        </button>
+                                      )}
                                       {trip.amount > 0 && trip.paymentStatus !== 'Paid' && (
                                         <>
                                           <button 
@@ -3948,6 +4098,34 @@ function App() {
                             />
                           </div>
                           <div className="space-y-4">
+                            <div className="grid md:grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-600">اسم الشركة (Company Name - AR)</label>
+                                <input 
+                                  type="text" 
+                                  className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
+                                  value={siteSettings.companyName || ''}
+                                  onChange={e => {
+                                    const newSettings = { ...siteSettings, companyName: e.target.value };
+                                    setSiteSettings(newSettings);
+                                    updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                  }}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-600">Company Name (EN)</label>
+                                <input 
+                                  type="text" 
+                                  className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
+                                  value={siteSettings.companyName_en || ''}
+                                  onChange={e => {
+                                    const newSettings = { ...siteSettings, companyName_en: e.target.value };
+                                    setSiteSettings(newSettings);
+                                    updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                  }}
+                                />
+                              </div>
+                            </div>
                             <div className="space-y-2">
                               <label className="text-sm font-bold text-gray-600">العنوان الرئيسي (Hero Title - AR)</label>
                               <input 
@@ -4084,6 +4262,316 @@ function App() {
                               }}
                             />
                           </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="text-xl font-bold mb-6 flex items-center gap-2">
+                          <Phone className="text-gold w-6 h-6" />
+                          روابط التواصل (Social Links)
+                        </h4>
+                        <div className="grid md:grid-cols-3 gap-6">
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-600">رقم الهاتف</label>
+                            <input 
+                              type="text" 
+                              className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
+                              value={siteSettings.phone}
+                              onChange={e => {
+                                const newSettings = { ...siteSettings, phone: e.target.value };
+                                setSiteSettings(newSettings);
+                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-600">رقم الواتساب (بدون +)</label>
+                            <input 
+                              type="text" 
+                              className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
+                              value={siteSettings.whatsapp}
+                              onChange={e => {
+                                const newSettings = { ...siteSettings, whatsapp: e.target.value };
+                                setSiteSettings(newSettings);
+                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-600">واتساب التنبيهات</label>
+                            <input 
+                              type="text" 
+                              className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
+                              value={siteSettings.notificationWhatsapp}
+                              onChange={e => {
+                                const newSettings = { ...siteSettings, notificationWhatsapp: e.target.value };
+                                setSiteSettings(newSettings);
+                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-600">انستقرام (Link)</label>
+                            <input 
+                              type="text" 
+                              className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
+                              value={siteSettings.instagram}
+                              onChange={e => {
+                                const newSettings = { ...siteSettings, instagram: e.target.value };
+                                setSiteSettings(newSettings);
+                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-600">تيك توك (Link)</label>
+                            <input 
+                              type="text" 
+                              className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
+                              value={siteSettings.tiktok}
+                              onChange={e => {
+                                const newSettings = { ...siteSettings, tiktok: e.target.value };
+                                setSiteSettings(newSettings);
+                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-bold text-gray-600">تليجرام (Link)</label>
+                            <input 
+                              type="text" 
+                              className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
+                              value={siteSettings.telegram}
+                              onChange={e => {
+                                const newSettings = { ...siteSettings, telegram: e.target.value };
+                                setSiteSettings(newSettings);
+                                updateDoc(doc(db, 'settings', 'site'), newSettings);
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-gray-100 pt-8 mt-8">
+                        <h4 className="text-xl font-bold mb-6 flex items-center gap-2">
+                          <CreditCard className="text-gold w-6 h-6" />
+                          التسعير والدفع (Pricing & Payment)
+                        </h4>
+                        <div className="grid md:grid-cols-2 gap-8">
+                          <div className="space-y-6">
+                            <h5 className="font-bold text-dark border-b pb-2 flex justify-between items-center">
+                              <span>إعدادات التسعير</span>
+                              <select 
+                                className="text-xs bg-gray-50 border-gray-200 rounded-lg p-1"
+                                value={siteSettings.paymentGateway}
+                                onChange={e => {
+                                  const newSettings = { ...siteSettings, paymentGateway: e.target.value as any };
+                                  setSiteSettings(newSettings);
+                                  updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                }}
+                              >
+                                <option value="MyFatoorah">MyFatoorah</option>
+                                <option value="Tap">Tap Payments</option>
+                                <option value="Crypto">Crypto Payment</option>
+                              </select>
+                            </h5>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-600">السعر لكل كم (BHD)</label>
+                                <input 
+                                  type="number" 
+                                  step="0.1"
+                                  className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
+                                  value={siteSettings.pricePerKm}
+                                  onChange={e => {
+                                    const newSettings = { ...siteSettings, pricePerKm: parseFloat(e.target.value) || 0 };
+                                    setSiteSettings(newSettings);
+                                    updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                  }}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-600">رسوم البداية (BHD)</label>
+                                <input 
+                                  type="number" 
+                                  step="0.1"
+                                  className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
+                                  value={siteSettings.baseFee}
+                                  onChange={e => {
+                                    const newSettings = { ...siteSettings, baseFee: parseFloat(e.target.value) || 0 };
+                                    setSiteSettings(newSettings);
+                                    updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                  }}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-600">إضافة VIP (BHD)</label>
+                                <input 
+                                  type="number" 
+                                  step="1"
+                                  className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
+                                  value={siteSettings.vipSurcharge}
+                                  onChange={e => {
+                                    const newSettings = { ...siteSettings, vipSurcharge: parseFloat(e.target.value) || 0 };
+                                    setSiteSettings(newSettings);
+                                    updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                  }}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-sm font-bold text-gray-600">إضافة Van (BHD)</label>
+                                <input 
+                                  type="number" 
+                                  step="1"
+                                  className="w-full bg-gray-50 border-gray-200 rounded-xl p-3"
+                                  value={siteSettings.vanSurcharge}
+                                  onChange={e => {
+                                    const newSettings = { ...siteSettings, vanSurcharge: parseFloat(e.target.value) || 0 };
+                                    setSiteSettings(newSettings);
+                                    updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-6">
+                            <h5 className="font-bold text-dark border-b pb-2">إعدادات الدفع</h5>
+                            
+                            {siteSettings.paymentGateway === 'MyFatoorah' ? (
+                              <div className="space-y-4">
+                                <div className="space-y-2">
+                                  <label className="text-sm font-bold text-gray-600">MyFatoorah Token</label>
+                                  <input 
+                                    type="password" 
+                                    className="w-full bg-gray-50 border-gray-200 rounded-xl p-3 text-xs"
+                                    value={siteSettings.myFatoorahToken || ''}
+                                    onChange={e => {
+                                      const newSettings = { ...siteSettings, myFatoorahToken: e.target.value };
+                                      setSiteSettings(newSettings);
+                                      updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                    }}
+                                  />
+                                </div>
+                                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                  <input 
+                                    type="checkbox" 
+                                    id="sandbox-mode"
+                                    className="w-5 h-5 rounded border-gray-300 text-gold focus:ring-gold"
+                                    checked={siteSettings.myFatoorahIsSandbox}
+                                    onChange={e => {
+                                      const newSettings = { ...siteSettings, myFatoorahIsSandbox: e.target.checked };
+                                      setSiteSettings(newSettings);
+                                      updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                    }}
+                                  />
+                                  <label htmlFor="sandbox-mode" className="text-sm font-bold text-gray-600 cursor-pointer">
+                                    وضع الاختبار (Sandbox Mode)
+                                  </label>
+                                </div>
+                              </div>
+                            ) : siteSettings.paymentGateway === 'Tap' ? (
+                              <div className="space-y-4">
+                                <div className="space-y-2">
+                                  <label className="text-sm font-bold text-gray-600">Tap Secret Key</label>
+                                  <input 
+                                    type="password" 
+                                    className="w-full bg-gray-50 border-gray-200 rounded-xl p-3 text-xs"
+                                    placeholder="sk_test_..."
+                                    value={siteSettings.tapSecretKey || ''}
+                                    onChange={e => {
+                                      const newSettings = { ...siteSettings, tapSecretKey: e.target.value };
+                                      setSiteSettings(newSettings);
+                                      updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                    }}
+                                  />
+                                </div>
+                                <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-[10px] text-blue-700">
+                                  يستخدم Tap العملة ISO BHD وتنسيق Invoice لضمان استقرار الدفع.
+                                </div>
+
+                                <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl space-y-2">
+                                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">رابط الـ Webhook (لإعدادات Tap)</label>
+                                  <div className="flex gap-2">
+                                    <input 
+                                      readOnly 
+                                      value={`${window.location.origin}/api/tap/webhook`}
+                                      className="flex-1 bg-white border-gray-200 rounded-lg p-2 text-[10px] font-mono focus:ring-1 focus:ring-blue-500 outline-none"
+                                    />
+                                    <button 
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(`${window.location.origin}/api/tap/webhook`);
+                                        alert('تم نسخ رابط الـ Webhook بنجاح');
+                                      }}
+                                      type="button"
+                                      className="p-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-lg transition-colors flex items-center justify-center"
+                                    >
+                                      <Copy className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                  <p className="text-[9px] text-gray-400">قم بنسخ هذا الرابط وضعه في خيار "Webhook URL" داخل لوحة تحكم Tap Payments.</p>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="space-y-4">
+                                <div className="space-y-2">
+                                  <label className="text-sm font-bold text-gray-600">Crypto Wallet Address</label>
+                                  <input 
+                                    type="text" 
+                                    className="w-full bg-gray-50 border-gray-200 rounded-xl p-3 text-xs font-mono"
+                                    placeholder="0x... or Wallet ID"
+                                    value={siteSettings.cryptoWalletAddress || ''}
+                                    onChange={e => {
+                                      const newSettings = { ...siteSettings, cryptoWalletAddress: e.target.value };
+                                      setSiteSettings(newSettings);
+                                      updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                    }}
+                                  />
+                                </div>
+                                <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl text-[10px] text-amber-700">
+                                  سيتم عرض عنوان المحفظة للعميل عند اختيار الدفع بالكريبتو لإتمام التحويل يدوياً.
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-gray-100 pt-8 mt-8">
+                        <h4 className="text-xl font-bold mb-6 flex items-center gap-2">
+                          <Eye className="text-gold w-6 h-6" />
+                          التحكم في العرض (Visibility Controls)
+                        </h4>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          {[
+                            { key: 'showHeaderSocials', label: 'أيقونات الهيدر' },
+                            { key: 'showFooterSocials', label: 'أيقونات الفوتر' },
+                            { key: 'showHeaderLogo', label: 'شعار الهيدر' },
+                            { key: 'showFooterLogo', label: 'شعار الفوتر' },
+                            { key: 'showHeroSection', label: 'قسم الهيرو' },
+                            { key: 'showServicesSection', label: 'قسم الخدمات' },
+                            { key: 'showSpecializedSection', label: 'قسم الرحلات' },
+                            { key: 'showAboutSection', label: 'قسم لماذا نحن' },
+                            { key: 'showBookingSection', label: 'قسم الحجز' },
+                            { key: 'showCTASection', label: 'قسم تواصل معنا' },
+                          ].map(item => (
+                            <div key={item.key} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                              <input 
+                                type="checkbox" 
+                                id={`vis-${item.key}`}
+                                className="w-5 h-5 rounded border-gray-300 text-gold focus:ring-gold"
+                                checked={(siteSettings as any)[item.key]}
+                                onChange={e => {
+                                  const newSettings = { ...siteSettings, [item.key]: e.target.checked };
+                                  setSiteSettings(newSettings);
+                                  updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                }}
+                              />
+                              <label htmlFor={`vis-${item.key}`} className="text-xs font-bold text-gray-600 cursor-pointer">
+                                {item.label}
+                              </label>
+                            </div>
+                          ))}
                         </div>
                       </div>
 
@@ -4654,20 +5142,137 @@ function App() {
                       </div>
                     </div>
 
-                    <Elements stripe={stripePromise}>
-                      <CheckoutForm 
-                        trip={paymentTrip} 
-                        onSucceed={async () => {
-                          await updateDoc(doc(db, 'trips', paymentTrip.id), {
-                            paymentStatus: 'Paid'
-                          });
-                          alert(lang === 'ar' ? 'تمت عملية الدفع بنجاح! شكراً لاختياركم GCC TAXI.' : 'Payment successful! Thank you for choosing GCC TAXI.');
-                          setIsPaymentOpen(false);
-                          setPaymentTrip(null);
-                          setSearchTripId('');
-                        }} 
-                      />
-                    </Elements>
+                    {siteSettings.paymentGateway === 'Tap' && siteSettings.tapSecretKey ? (
+                      <button 
+                        onClick={async () => {
+                          try {
+                            const response = await fetch('/api/tap/execute-payment', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                amount: paymentTrip.amount,
+                                customerName: paymentTrip.customerName,
+                                phone: paymentTrip.phone,
+                                tripId: paymentTrip.id,
+                                secretKey: siteSettings.tapSecretKey
+                              })
+                            });
+                            const data = await response.json();
+                            if (data.paymentUrl) {
+                              window.open(data.paymentUrl, '_blank');
+                              setIsPaymentOpen(false);
+                            } else {
+                              alert(data.error || 'Payment error');
+                            }
+                          } catch (err) {
+                            console.error(err);
+                            alert('Payment failed');
+                          }
+                        }}
+                        className="w-full bg-black text-white py-4 rounded-2xl font-bold hover:bg-gray-900 transition-all flex items-center justify-center gap-3 group relative overflow-hidden"
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                        <CreditCard className="w-5 h-5 text-gray-400" />
+                        <div className="flex flex-col items-center">
+                          <span className="text-sm">{lang === 'ar' ? 'الدفع عبر Tap Payments' : 'Pay via Tap Payments'}</span>
+                          <span className="text-[9px] text-gray-400 font-normal mt-0.5 uppercase tracking-tighter">Supports Apple Pay & Cards</span>
+                        </div>
+                      </button>
+                    ) : siteSettings.paymentGateway === 'MyFatoorah' && siteSettings.myFatoorahToken ? (
+                      <button 
+                        onClick={async () => {
+                          try {
+                            const response = await fetch('/api/myfatoorah/execute-payment', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                amount: paymentTrip.amount,
+                                customerName: paymentTrip.customerName,
+                                phone: paymentTrip.phone,
+                                tripId: paymentTrip.id,
+                                isSandbox: siteSettings.myFatoorahIsSandbox,
+                                token: siteSettings.myFatoorahToken
+                              })
+                            });
+                            const data = await response.json();
+                            if (data.paymentUrl) {
+                              window.open(data.paymentUrl, '_blank');
+                              setIsPaymentOpen(false);
+                            } else {
+                              alert(data.error || 'Payment error');
+                            }
+                          } catch (err) {
+                            console.error(err);
+                            alert('Payment failed');
+                          }
+                        }}
+                        className="w-full bg-green-600 text-white py-4 rounded-2xl font-bold hover:bg-green-700 transition-all flex items-center justify-center gap-2"
+                      >
+                        <CreditCard className="w-5 h-5" />
+                        {lang === 'ar' ? 'الدفع عبر MyFatoorah' : 'Pay via MyFatoorah'}
+                      </button>
+                    ) : siteSettings.paymentGateway === 'Crypto' && siteSettings.cryptoWalletAddress ? (
+                      <div className="space-y-4">
+                        <div className="bg-dark p-6 rounded-3xl border border-gray-800 text-center space-y-4">
+                          <div className="flex flex-col items-center gap-2">
+                             <div className="w-12 h-12 bg-gold/10 rounded-full flex items-center justify-center mb-2">
+                                <Bitcoin className="text-gold w-7 h-7" />
+                             </div>
+                             <h4 className="text-white font-bold">{lang === 'ar' ? 'الدفع بالعملات الرقمية' : 'Crypto Payment'}</h4>
+                             <p className="text-gray-400 text-xs">{lang === 'ar' ? 'يرجى تحويل المبلغ للمحفظة التالية:' : 'Please transfer the amount to the following wallet:'}</p>
+                          </div>
+                          
+                          <div className="bg-gray-900 p-4 rounded-xl space-y-2 border border-gray-800">
+                             <p className="text-[10px] text-gray-500 uppercase tracking-widest">{lang === 'ar' ? 'عنوان المحفظة' : 'Wallet Address'}</p>
+                             <p className="text-white font-mono text-xs break-all selection:bg-gold selection:text-dark">
+                               {siteSettings.cryptoWalletAddress}
+                             </p>
+                             <button 
+                               onClick={() => {
+                                 navigator.clipboard.writeText(siteSettings.cryptoWalletAddress || '');
+                                 alert(lang === 'ar' ? 'تم نسخ عنوان المحفظة' : 'Wallet address copied');
+                               }}
+                               className="text-gold text-[10px] font-bold hover:underline"
+                             >
+                               {lang === 'ar' ? 'نسخ العنوان' : 'Copy Address'}
+                             </button>
+                          </div>
+
+                          <button 
+                            onClick={async () => {
+                              if (confirm(lang === 'ar' ? 'هل قمت بالتحويل فعلاً؟ سيتم مراجعة الطلب من قبل الإدارة.' : 'Have you actually performed the transfer? The request will be reviewed by admin.')) {
+                                await updateDoc(doc(db, 'trips', paymentTrip.id), {
+                                  paymentStatus: 'Pending Verification',
+                                  manualPaymentMethod: 'Crypto'
+                                });
+                                setIsPaymentOpen(false);
+                                alert(lang === 'ar' ? 'تم تقديم طلب الدفع، جاري التحقق من قبل الإدارة.' : 'Payment request submitted, pending admin verification.');
+                              }
+                            }}
+                            className="w-full bg-gold text-dark py-4 rounded-2xl font-bold hover:bg-gold/90 transition-all"
+                          >
+                            {lang === 'ar' ? 'تأكيد التحويل' : 'Confirm Transfer'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Elements stripe={stripePromise}>
+                        <CheckoutForm 
+                          trip={paymentTrip} 
+                          onSucceed={async () => {
+                            await updateDoc(doc(db, 'trips', paymentTrip.id), {
+                              paymentStatus: 'Paid'
+                            });
+                            alert(lang === 'ar' 
+                              ? `تمت عملية الدفع بنجاح! شكراً لاختياركم ${siteSettings.companyName}.` 
+                              : `Payment successful! Thank you for choosing ${siteSettings.companyName_en || siteSettings.companyName}.`);
+                            setIsPaymentOpen(false);
+                            setPaymentTrip(null);
+                            setSearchTripId('');
+                          }} 
+                        />
+                      </Elements>
+                    )}
 
                     <button 
                       onClick={() => setPaymentTrip(null)}
@@ -4725,7 +5330,11 @@ function App() {
                       <Car className="w-10 h-10 text-gray-300" />
                     </div>
                     <h4 className="text-xl font-bold text-dark mb-2">{lang === 'ar' ? 'لا توجد رحلات مسجلة' : 'No trips recorded'}</h4>
-                    <p className="text-gray-500">{lang === 'ar' ? 'لم تقم بأي رحلات مع GCC TAXI بعد.' : 'You haven\'t taken any trips with GCC TAXI yet.'}</p>
+                    <p className="text-gray-500">
+                      {lang === 'ar' 
+                        ? `لم تقم بأي رحلات مع ${siteSettings.companyName} بعد.` 
+                        : `You haven't taken any trips with ${siteSettings.companyName_en || siteSettings.companyName} yet.`}
+                    </p>
                   </div>
                 ) : (
                   <div className="grid gap-6">
