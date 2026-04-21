@@ -42,6 +42,7 @@ import {
   Instagram,
   Twitter,
   Send,
+  Truck,
   Share2,
   Gift,
   Trophy,
@@ -454,6 +455,7 @@ function App() {
     }
   };
   const [activeTab, setActiveTab] = useState<'content' | 'accounting' | 'branding' | 'pricing' | 'users'>('content');
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [isUsersLoading, setIsUsersLoading] = useState(false);
   const [isAdminScheduleView, setIsAdminScheduleView] = useState(false);
@@ -636,8 +638,10 @@ function App() {
   useEffect(() => {
     const checkAdmin = () => {
       const primaryAdmin = 'ahjm91@gmail.com';
-      const isEmailMatch = user?.email === primaryAdmin || (siteSettings.adminEmails?.includes(user?.email || ''));
-      setIsAdmin(!!isEmailMatch);
+      const isSuper = user?.email === primaryAdmin;
+      const isStaff = siteSettings.adminEmails?.includes(user?.email || '');
+      setIsSuperAdmin(isSuper);
+      setIsAdmin(isSuper || isStaff);
       setIsEmailVerified(!!user?.emailVerified);
     };
     checkAdmin();
@@ -2736,24 +2740,28 @@ function App() {
                       >
                         {lang === 'ar' ? 'إدارة المحتوى' : 'Content Management'}
                       </button>
-                      <button 
-                        onClick={() => setActiveTab('accounting')}
-                        className={cn(
-                          "text-sm font-bold transition-colors",
-                          activeTab === 'accounting' ? "text-gold" : "text-gray-400 hover:text-gray-600"
-                        )}
-                      >
-                        {lang === 'ar' ? 'النظام المحاسبي' : 'Accounting System'}
-                      </button>
-                      <button 
-                        onClick={() => setActiveTab('pricing')}
-                        className={cn(
-                          "text-sm font-bold transition-colors",
-                          activeTab === 'pricing' ? "text-gold" : "text-gray-400 hover:text-gray-600"
-                        )}
-                      >
-                        {lang === 'ar' ? 'التسعيرات والربط' : 'Pricing & Integration'}
-                      </button>
+                      {isSuperAdmin && (
+                        <button 
+                          onClick={() => setActiveTab('accounting')}
+                          className={cn(
+                            "text-sm font-bold transition-colors",
+                            activeTab === 'accounting' ? "text-gold" : "text-gray-400 hover:text-gray-600"
+                          )}
+                        >
+                          {lang === 'ar' ? 'النظام المحاسبي' : 'Accounting System'}
+                        </button>
+                      )}
+                      {isSuperAdmin && (
+                        <button 
+                          onClick={() => setActiveTab('pricing')}
+                          className={cn(
+                            "text-sm font-bold transition-colors",
+                            activeTab === 'pricing' ? "text-gold" : "text-gray-400 hover:text-gray-600"
+                          )}
+                        >
+                          {lang === 'ar' ? 'التسعيرات والربط' : 'Pricing & Integration'}
+                        </button>
+                      )}
                       <button 
                         onClick={() => setActiveTab('users')}
                         className={cn(
@@ -3618,10 +3626,8 @@ function App() {
                                 <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Trip Date</th>
                                 <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Trip Time</th>
                                 <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Trip Amount (BHD)</th>
-                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Driver Type (In/Out)</th>
-                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Driver Name</th>
-                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Driver Cost (BHD)</th>
-                                <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Company Profit (BHD)</th>
+                                {isSuperAdmin && <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Driver Cost (BHD)</th>}
+                                {isSuperAdmin && <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Company Profit (BHD)</th>}
                                 <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Trip Status</th>
                                 <th className="p-4 font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Payment Status</th>
                                 <th className="p-4 font-black text-gray-400 uppercase tracking-wider">Notes</th>
@@ -3669,17 +3675,8 @@ function App() {
                                   <td className="p-4 font-bold text-dark whitespace-nowrap">{trip.date}</td>
                                   <td className="p-4 font-bold text-dark whitespace-nowrap">{trip.time}</td>
                                   <td className="p-4 font-black text-dark">{trip.amount}</td>
-                                  <td className="p-4">
-                                    <span className={cn(
-                                      "px-2 py-0.5 rounded font-bold",
-                                      trip.driverType === 'In' ? "bg-blue-50 text-blue-600" : "bg-purple-50 text-purple-600"
-                                    )}>
-                                      {trip.driverType === 'In' ? 'In' : 'Out'}
-                                    </span>
-                                  </td>
-                                  <td className="p-4 font-bold text-dark whitespace-nowrap">{trip.driverName}</td>
-                                  <td className="p-4 font-bold text-dark">{trip.driverCost}</td>
-                                  <td className="p-4 font-black text-green-600">{trip.profit?.toFixed(2)}</td>
+                                  {isSuperAdmin && <td className="p-4 font-bold text-dark">{trip.driverCost}</td>}
+                                  {isSuperAdmin && <td className="p-4 font-black text-green-600">{trip.profit?.toFixed(2)}</td>}
                                   <td className="p-4">
                                     <span className={cn(
                                       "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
@@ -3709,6 +3706,46 @@ function App() {
                                   <td className="p-4 text-gray-400 max-w-[150px] truncate">{trip.notes || '—'}</td>
                                   <td className="p-4">
                                     <div className="flex gap-2">
+                                      {trip.status === 'Requested' && (
+                                        <button 
+                                          onClick={async () => {
+                                            if (confirm(lang === 'ar' ? `هل تريد قبول الطلب وتنبيه العميل؟` : `Accept trip and notify customer?`)) {
+                                              await updateDoc(doc(db, 'trips', trip.id), {
+                                                status: 'Confirmed'
+                                              });
+                                              const message = lang === 'ar' 
+                                                ? `عزيزي ${trip.customerName}،\nتم قبول طلب حجزك بنجاح ✅\nالتفاصيل: ${trip.pickup} إلى ${trip.dropoff}\nالتاريخ: ${trip.date} ${trip.time}\nشكراً لاختيارك GCC TAXI.`
+                                                : `Dear ${trip.customerName},\nYour booking has been accepted successfully ✅\nDetails: ${trip.pickup} to ${trip.dropoff}\nDate: ${trip.date} ${trip.time}\nThank you for choosing GCC TAXI.`;
+                                              window.open(`https://wa.me/${trip.phone.replace(/\+/g, '').replace(/\s/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
+                                            }
+                                          }}
+                                          className="p-2 hover:bg-green-50 text-green-600 rounded-xl transition-colors"
+                                          title={lang === 'ar' ? 'قبول الطلب وتنبيه العميل' : 'Accept & Notify Customer'}
+                                        >
+                                          <CheckCircle className="w-4 h-4" />
+                                        </button>
+                                      )}
+                                      <button 
+                                        onClick={() => {
+                                          const message = `*تفاصيل رحلة جديدة (New Trip Details)* 🚖\n\n` +
+                                            `👤 *العميل:* ${trip.customerName}\n` +
+                                            `📞 *رقم العميل:* ${trip.phone}\n` +
+                                            `📅 *التاريخ:* ${trip.date}\n` +
+                                            `⏰ *الوقت:* ${trip.time}\n` +
+                                            `📍 *الاستلام:* ${trip.pickup}\n` +
+                                            `🏁 *الوجهة:* ${trip.dropoff}\n` +
+                                            `🚗 *نوع السيارة:* ${trip.carType}\n` +
+                                            `👥 *الركاب:* ${trip.passengers || 1}\n` +
+                                            `👜 *الحقائب:* ${trip.bags || 0}\n` +
+                                            `💰 *المبلغ:* ${trip.amount || 'يحدد لاحقاً'} BHD\n` +
+                                            `📝 *ملاحظات:* ${trip.notes || trip.specialRequests || 'لا يوجد'}`;
+                                          window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+                                        }}
+                                        className="p-2 hover:bg-blue-50 text-blue-600 rounded-xl transition-colors"
+                                        title={lang === 'ar' ? 'إرسال بيانات الرحلة للسائق' : 'Send to Driver'}
+                                      >
+                                        <Truck className="w-4 h-4" />
+                                      </button>
                                       {trip.paymentStatus === 'Pending Verification' && (
                                         <button 
                                           onClick={async () => {
@@ -4525,10 +4562,16 @@ function App() {
                       </div>
 
                       <div className="border-t border-gray-100 pt-8 mt-8">
-                        <h4 className="text-xl font-bold mb-6 flex items-center gap-2">
+                        <h4 className="text-xl font-bold mb-2 flex items-center gap-2">
                           <ShieldCheck className="text-gold w-6 h-6" />
-                          إدارة المدراء (Admins Management)
+                          إدارة الفريق (Employees & Supervisors)
                         </h4>
+                        <p className="text-xs text-gray-500 mb-6 bg-blue-50 p-4 rounded-2xl border border-blue-100 leading-relaxed">
+                          <span className="font-bold text-blue-700 block mb-1 underline">صلاحيات الأدوار:</span>
+                          • <span className="font-bold">المشرف (Supervisor):</span> يمكنه إدارة الرحلات والأسعار وتعديل المحتوى، لكنه <span className="text-red-600 font-black">لا يرى</span> الأرباح أو تكاليف السائقين ولا يمكنه دخول النظام المحاسبي.
+                          <br />
+                          • <span className="font-bold text-dark">المدير العام (Super Admin):</span> يملك كامل الصلاحيات بما في ذلك المحاسبة والبيانات المالية. (أنت فقط تملك هذه الصلاحيات).
+                        </p>
                         <div className="space-y-4">
                           <div className="flex gap-2">
                             <input 
@@ -4983,30 +5026,7 @@ function App() {
                 </div>
 
                 {/* Driver Info */}
-                <div className="bg-gray-50 p-8 rounded-[2.5rem] border border-gray-100 grid md:grid-cols-3 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-xs font-black text-gray-400 uppercase">نوع السائق</label>
-                    <div className="flex gap-2 p-1 bg-white rounded-xl border border-gray-200">
-                      <button 
-                        onClick={() => setTripFormData({ ...tripFormData, driverType: 'In' })}
-                        className={cn(
-                          "flex-1 py-2 rounded-lg text-xs font-bold transition-all",
-                          tripFormData.driverType === 'In' ? "bg-dark text-white" : "text-gray-400 hover:bg-gray-50"
-                        )}
-                      >
-                        داخلي
-                      </button>
-                      <button 
-                        onClick={() => setTripFormData({ ...tripFormData, driverType: 'Out' })}
-                        className={cn(
-                          "flex-1 py-2 rounded-lg text-xs font-bold transition-all",
-                          tripFormData.driverType === 'Out' ? "bg-dark text-white" : "text-gray-400 hover:bg-gray-50"
-                        )}
-                      >
-                        خارجي
-                      </button>
-                    </div>
-                  </div>
+                <div className="bg-gray-50 p-8 rounded-[2.5rem] border border-gray-100 grid md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-xs font-black text-gray-400 uppercase">اسم السائق</label>
                     <input 
@@ -5016,16 +5036,21 @@ function App() {
                       onChange={e => setTripFormData({ ...tripFormData, driverName: e.target.value })}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-black text-gray-400 uppercase">تكلفة السائق (BHD)</label>
-                    <input 
-                      type="number" 
-                      step="0.01"
-                      className="w-full bg-white border-gray-200 rounded-2xl p-4 font-bold"
-                      value={tripFormData.driverCost}
-                      onChange={e => setTripFormData({ ...tripFormData, driverCost: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
-                    />
-                  </div>
+                  {isSuperAdmin && (
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-gray-400 uppercase">تكلفة السائق (BHD)</label>
+                      <input 
+                        type="number" 
+                        step="0.01"
+                        className="w-full bg-white border-gray-200 rounded-2xl p-4 font-bold"
+                        value={tripFormData.driverCost}
+                        onChange={e => {
+                          const cost = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                          setTripFormData({ ...tripFormData, driverCost: cost, profit: (tripFormData.amount || 0) - cost });
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid md:grid-cols-3 gap-6">
