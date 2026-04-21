@@ -120,32 +120,73 @@ async function startServer() {
         return res.json({ success: false, message: "Resend not configured" });
       }
 
-      const { customerName, phone, pickup, dropoff, date, time, passengers, amount, notes, companyName } = req.body;
+      const { customerName, email, phone, pickup, dropoff, date, time, passengers, amount, notes, companyName, carType, bookingType, hours } = req.body;
       const displayCompanyName = companyName || 'GCC TAXI';
 
-      const { data, error } = await resend.emails.send({
+      // 1. Email to Admin
+      const adminEmail = await resend.emails.send({
         from: `${displayCompanyName} <onboarding@resend.dev>`,
         to: ['ahjm91@gmail.com'],
-        subject: `حجز جديد: ${customerName} - ${pickup} ← ${dropoff}`,
+        subject: `🔔 حجز جديد: ${customerName} - ${pickup}`,
         html: `
-          <div dir="rtl" style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-            <h2 style="color: #D4AF37;">🔔 حجز جديد من الموقع</h2>
-            <p><strong>العميل:</strong> ${customerName}</p>
-            <p><strong>الهاتف:</strong> ${phone}</p>
-            <p><strong>المسار:</strong> ${pickup} ← ${dropoff}</p>
-            <p><strong>التاريخ:</strong> ${date}</p>
-            <p><strong>الوقت:</strong> ${time}</p>
-            <p><strong>الركاب:</strong> ${passengers}</p>
-            <p><strong>السعر:</strong> ${amount > 0 ? `${amount} BHD` : 'بانتظار التسعير'}</p>
-            <p><strong>ملاحظات:</strong> ${notes || 'لا يوجد'}</p>
-            <hr />
-            <p style="font-size: 12px; color: #666;">تم إرسال هذا التنبيه تلقائياً من نظام ${displayCompanyName}.</p>
+          <div dir="rtl" style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px; background-color: #f9f9f9;">
+            <h2 style="color: #D4AF37; text-align: center; border-bottom: 2px solid #D4AF37; padding-bottom: 10px;">إشعار حجز جديد</h2>
+            <div style="background: white; padding: 15px; border-radius: 8px; margin-top: 20px;">
+              <p><strong>العميل:</strong> ${customerName}</p>
+              <p><strong>الإيميل:</strong> ${email || 'غير متوفر'}</p>
+              <p><strong>الهاتف:</strong> ${phone}</p>
+              <p><strong>نوع الخدمة:</strong> ${bookingType === 'hourly' ? 'بالساعة' : 'توصيل'}</p>
+              <p><strong>المسار:</strong> ${pickup} ← ${dropoff}</p>
+              <p><strong>نوع السيارة:</strong> ${carType}</p>
+              <p><strong>التاريخ:</strong> ${date}</p>
+              <p><strong>الوقت:</strong> ${time}</p>
+              ${bookingType === 'hourly' ? `<p><strong>عدد الساعات:</strong> ${hours}</p>` : ''}
+              <p><strong>الركاب:</strong> ${passengers}</p>
+              <p><strong>الإجمالي:</strong> <span style="color: #D4AF37; font-weight: bold; font-size: 1.2em;">${amount > 0 ? `${amount} BHD` : 'بانتظار التسعير'}</span></p>
+              <p><strong>ملاحظات:</strong> ${notes || 'لا يوجد'}</p>
+            </div>
+            <hr style="margin-top: 30px; border: 0; border-top: 1px solid #ddd;" />
+            <p style="font-size: 12px; color: #666; text-align: center;">تم إرسال هذا التنبيه تلقائياً من نظام ${displayCompanyName}.</p>
           </div>
         `,
       });
 
-      if (error) throw error;
-      res.json({ success: true, data });
+      // 2. Email to Customer (if email exists)
+      if (email && email.includes('@')) {
+        await resend.emails.send({
+          from: `${displayCompanyName} <onboarding@resend.dev>`,
+          to: [email],
+          subject: `تم استلام طلب حجزك - ${displayCompanyName}`,
+          html: `
+            <div dir="rtl" style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+              <div style="text-align: center; margin-bottom: 20px;">
+                <h1 style="color: #D4AF37;">شكراً لثقتك بنا!</h1>
+                <p style="font-size: 1.1em; color: #333;">لقد تلقينا طلب حجزك بنجاح في <strong>${displayCompanyName}</strong>.</p>
+              </div>
+              
+              <div style="background: #fdfaf0; padding: 20px; border-radius: 12px; margin: 20px 0; border-right: 5px solid #D4AF37;">
+                <h3 style="margin-top: 0; color: #D4AF37;">تفاصيل الحجز:</h3>
+                <ul style="list-style: none; padding: 0;">
+                  <li style="margin-bottom: 8px;"><strong>المسار:</strong> ${pickup} ← ${dropoff}</li>
+                  <li style="margin-bottom: 8px;"><strong>التاريخ والوقت:</strong> ${date} في ${time}</li>
+                  <li style="margin-bottom: 8px;"><strong>نوع السيارة:</strong> ${carType}</li>
+                  <li style="margin-bottom: 8px;"><strong>إجمالي المبلغ:</strong> ${amount > 0 ? `${amount} BHD` : 'سيتم التواصل معك لتحديد السعر'}</li>
+                </ul>
+              </div>
+
+              <p>سنقوم بالتواصل معك قريباً لتأكيد كافة التفاصيل.</p>
+              
+              <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #666;">
+                <p>إذا كان لديك أي استفسار، يسعدنا تواصلك معنا عبر الواتساب.</p>
+                <p><strong>${displayCompanyName} - فخامة وراحة في كل رحلة</strong></p>
+              </div>
+            </div>
+          `,
+        });
+      }
+
+      if (adminEmail.error) throw adminEmail.error;
+      res.json({ success: true, data: adminEmail.data });
     } catch (error) {
       next(error);
     }
@@ -399,6 +440,36 @@ async function startServer() {
     } catch (error: any) {
       console.error("🔴 Tap Webhook Error:", error.message);
       res.sendStatus(500);
+    }
+  });
+
+  // Test Email
+  app.post("/api/send-test-email", async (req, res, next) => {
+    try {
+      if (!resend) throw new Error("Resend is not configured");
+      const { email, companyName } = req.body;
+      const displayCompanyName = companyName || 'GCC TAXI';
+
+      const { data, error } = await resend.emails.send({
+        from: `${displayCompanyName} <onboarding@resend.dev>`,
+        to: [email || 'ahjm91@gmail.com'],
+        subject: '🚀 اختبار نظام البريد الإلكتروني',
+        html: `
+          <div dir="rtl" style="font-family: sans-serif; padding: 20px; border: 2px solid #D4AF37; border-radius: 15px; text-align: center;">
+            <h1 style="color: #D4AF37;">تم بنجاح!</h1>
+            <p style="font-size: 1.2em;">نظام البريد الإلكتروني الخاص بـ <strong>${displayCompanyName}</strong> يعمل بشكل مثالي.</p>
+            <div style="margin: 20px; padding: 20px; background: #f9f9f9; border-radius: 10px;">
+              <p>هذا الإيميل هو لاختبار الربط مع منصة Resend.</p>
+              <p>وقت الاختبار: ${new Date().toLocaleString('ar-BH')}</p>
+            </div>
+          </div>
+        `,
+      });
+
+      if (error) throw error;
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
     }
   });
 

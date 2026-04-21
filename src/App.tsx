@@ -43,6 +43,9 @@ import {
   Twitter,
   Send,
   Share2,
+  Gift,
+  Trophy,
+  Check,
   CreditCard,
   CheckCircle,
   Wallet,
@@ -194,6 +197,12 @@ interface UserProfile {
   photoURL?: string;
   role: 'admin' | 'customer';
   createdAt: string;
+  // Membership & Rewards
+  membershipStatus: 'Bronze' | 'Silver' | 'Gold' | 'VIP';
+  isVerified: boolean;
+  verificationMessage?: string;
+  cashbackBalance: number;
+  availableRewards: string[]; // List of prize descriptions
 }
 
 interface Trip {
@@ -381,6 +390,7 @@ function App() {
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
   const [isCustomerDashboardOpen, setIsCustomerDashboardOpen] = useState(false);
+  const [customerTab, setCustomerTab] = useState<'trips' | 'rewards'>('trips');
   const [bookingMode, setBookingMode] = useState<'fixed' | 'custom'>('fixed');
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -443,7 +453,9 @@ function App() {
       handleFirestoreError(error, OperationType.DELETE, docRef.path);
     }
   };
-  const [activeTab, setActiveTab] = useState<'content' | 'accounting' | 'branding' | 'pricing'>('content');
+  const [activeTab, setActiveTab] = useState<'content' | 'accounting' | 'branding' | 'pricing' | 'users'>('content');
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [isUsersLoading, setIsUsersLoading] = useState(false);
   const [isAdminScheduleView, setIsAdminScheduleView] = useState(false);
   const [tripToDelete, setTripToDelete] = useState<Trip | null>(null);
   const [isTripFormOpen, setIsTripFormOpen] = useState(false);
@@ -652,7 +664,12 @@ function App() {
             email: u.email || '',
             photoURL: u.photoURL || '',
             role: isUserAdmin ? 'admin' : 'customer',
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            membershipStatus: 'Bronze',
+            isVerified: false,
+            verificationMessage: 'جاري مراجعة طلب اشتراكك من قبل الإدارة لتفعيل العضوية.',
+            cashbackBalance: 0,
+            availableRewards: []
           };
           await setDoc(userRef, newProfile);
           setUserProfile(newProfile);
@@ -729,14 +746,25 @@ function App() {
       });
     }
 
+    let unsubscribeUsers = () => {};
+    if (isAdmin && activeTab === 'users') {
+      setIsUsersLoading(true);
+      unsubscribeUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as any as UserProfile));
+        setUsers(data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+        setIsUsersLoading(false);
+      });
+    }
+
     return () => {
       unsubscribeAuth();
       unsubscribeServices();
       unsubscribeSpecialized();
       unsubscribeSettings();
       unsubscribeTrips();
+      unsubscribeUsers();
     };
-  }, [isAdmin, user]);
+  }, [isAdmin, user, activeTab]);
 
   useEffect(() => {
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
@@ -1517,25 +1545,6 @@ function App() {
 
             {/* Desktop Menu */}
             <div className="hidden md:flex items-center gap-8">
-              {siteSettings.showHeaderSocials && (
-                <div className="flex items-center gap-3 border-l border-gray-100 pl-6 mr-2">
-                  {siteSettings.instagram && (
-                    <a href={siteSettings.instagram} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-pink-600 transition-colors">
-                      <Instagram className="w-5 h-5" />
-                    </a>
-                  )}
-                  {siteSettings.telegram && (
-                    <a href={siteSettings.telegram} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-blue-500 transition-colors">
-                      <Send className="w-5 h-5" />
-                    </a>
-                  )}
-                  {siteSettings.whatsapp && (
-                    <a href={`https://wa.me/${siteSettings.whatsapp}`} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-green-600 transition-colors">
-                      <Phone className="w-5 h-5" />
-                    </a>
-                  )}
-                </div>
-              )}
               <button 
                 onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}
                 className="flex items-center gap-2 px-3 py-1 rounded-lg bg-gray-50 text-dark font-bold hover:bg-gray-100 transition-all border border-gray-200"
@@ -1586,50 +1595,6 @@ function App() {
                   <LogOut className="w-5 h-5" />
                 </button>
               )}
-              {siteSettings.showHeaderSocials && (
-                <>
-                  {siteSettings.instagram && (
-                    <a 
-                      href={siteSettings.instagram} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-gray-600 hover:text-pink-600 transition-colors"
-                    >
-                      <Instagram className="w-6 h-6" />
-                    </a>
-                  )}
-                  {siteSettings.telegram && (
-                    <a 
-                      href={siteSettings.telegram} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-gray-600 hover:text-blue-500 transition-colors"
-                    >
-                      <Send className="w-6 h-6" />
-                    </a>
-                  )}
-                  {siteSettings.tiktok && (
-                    <a 
-                      href={siteSettings.tiktok} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-gray-600 hover:text-black transition-colors"
-                    >
-                      <Share2 className="w-6 h-6" />
-                    </a>
-                  )}
-                </>
-              )}
-              {siteSettings.twitter && (
-                <a 
-                  href={siteSettings.twitter} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-gray-600 hover:text-gray-900 transition-colors"
-                >
-                  <Twitter className="w-6 h-6" />
-                </a>
-              )}
               <a 
                 href="#booking-form" 
                 className="bg-dark text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition-all"
@@ -1672,67 +1637,6 @@ function App() {
               <a href="#services" onClick={() => setIsMenuOpen(false)}>{t('services')}</a>
               <a href="#specialized-services" onClick={() => setIsMenuOpen(false)}>{t('specializedServices')}</a>
               <a href="#about" onClick={() => setIsMenuOpen(false)}>{t('whyUs')}</a>
-              {siteSettings.showBookingSection && (
-                <a 
-                  href="#booking-form" 
-                  className="bg-dark text-white w-full py-4 rounded-2xl text-center"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  {t('bookNow')}
-                </a>
-              )}
-              {siteSettings.showHeaderSocials && (
-                <>
-                  {siteSettings.instagram && (
-                    <a 
-                      href={siteSettings.instagram} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-2 text-pink-600 font-bold py-4 border-2 border-pink-100 rounded-2xl"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      <Instagram className="w-6 h-6" />
-                      {lang === 'ar' ? 'تابعنا على انستقرام' : 'Follow us on Instagram'}
-                    </a>
-                  )}
-                  {siteSettings.telegram && (
-                    <a 
-                      href={siteSettings.telegram} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-center gap-2 text-blue-600 font-bold py-4 border-2 border-blue-100 rounded-2xl"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      <Send className="w-6 h-6" />
-                      {lang === 'ar' ? 'تابعنا على تيليجرام' : 'Follow us on Telegram'}
-                    </a>
-                  )}
-                </>
-              )}
-              {siteSettings.tiktok && (
-                <a 
-                  href={siteSettings.tiktok} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 text-black font-bold py-4 border-2 border-gray-100 rounded-2xl"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  <Share2 className="w-6 h-6" />
-                  {lang === 'ar' ? 'تابعنا على تيك توك' : 'Follow us on TikTok'}
-                </a>
-              )}
-              {siteSettings.twitter && (
-                <a 
-                  href={siteSettings.twitter} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 text-gray-900 font-bold py-4 border-2 border-gray-100 rounded-2xl"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  <Twitter className="w-6 h-6" />
-                  {lang === 'ar' ? 'تابعنا على منصة X' : 'Follow us on X'}
-                </a>
-              )}
             </div>
           </motion.div>
         )}
@@ -2472,14 +2376,24 @@ function App() {
                     )}
                   </>
                 )}
-                <a 
-                  href={`https://wa.me/${siteSettings.whatsapp}`} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center hover:bg-green-600 hover:text-white transition-all cursor-pointer"
-                >
-                  <Phone className="w-5 h-5" />
-                </a>
+                    {siteSettings.phone && (
+                      <a 
+                        href={`tel:${siteSettings.phone}`} 
+                        className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center hover:bg-dark hover:text-white transition-all cursor-pointer"
+                        title={lang === 'ar' ? 'اتصال هاتف' : 'Phone Call'}
+                      >
+                        <Phone className="w-5 h-5" />
+                      </a>
+                    )}
+                    <a 
+                      href={`https://wa.me/${siteSettings.whatsapp}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center hover:bg-green-600 hover:text-white transition-all cursor-pointer"
+                      title="WhatsApp"
+                    >
+                      <MessageCircle className="w-5 h-5" />
+                    </a>
               </div>
             </div>
             
@@ -2839,6 +2753,15 @@ function App() {
                         )}
                       >
                         {lang === 'ar' ? 'التسعيرات والربط' : 'Pricing & Integration'}
+                      </button>
+                      <button 
+                        onClick={() => setActiveTab('users')}
+                        className={cn(
+                          "text-sm font-bold transition-colors",
+                          activeTab === 'users' ? "text-gold" : "text-gray-400 hover:text-gray-600"
+                        )}
+                      >
+                        {lang === 'ar' ? 'إدارة المستخدمين' : 'Users Management'}
                       </button>
                     </div>
                   </div>
@@ -4360,20 +4283,46 @@ function App() {
                         <div className="grid md:grid-cols-2 gap-8">
                           <div className="space-y-6">
                             <h5 className="font-bold text-dark border-b pb-2 flex justify-between items-center">
-                              <span>إعدادات التسعير</span>
-                              <select 
-                                className="text-xs bg-gray-50 border-gray-200 rounded-lg p-1"
-                                value={siteSettings.paymentGateway}
-                                onChange={e => {
-                                  const newSettings = { ...siteSettings, paymentGateway: e.target.value as any };
-                                  setSiteSettings(newSettings);
-                                  updateDoc(doc(db, 'settings', 'site'), newSettings);
-                                }}
-                              >
-                                <option value="MyFatoorah">MyFatoorah</option>
-                                <option value="Tap">Tap Payments</option>
-                                <option value="Crypto">Crypto Payment</option>
-                              </select>
+                              <span>إعدادات الدفع والتنبيهات</span>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={async () => {
+                                    if (confirm('هل تريد إرسال إيميل تجريبي لتجربة نظام التنبيهات؟')) {
+                                      try {
+                                        const res = await fetch('/api/send-test-email', {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ 
+                                            email: userProfile?.email || 'ahjm91@gmail.com',
+                                            companyName: siteSettings.companyName 
+                                          })
+                                        });
+                                        const data = await res.json();
+                                        if (data.success) alert('تم إرسال الإيميل التجريبي بنجاح إلى: ' + (userProfile?.email || 'ahjm91@gmail.com'));
+                                        else alert('خطأ: ' + (data.error || 'فشل الإرسال'));
+                                      } catch (e) {
+                                        alert('خطأ في الاتصال بالخادم');
+                                      }
+                                    }
+                                  }}
+                                  className="text-[10px] bg-gold/10 text-gold px-2 py-1 rounded hover:bg-gold/20 transition-all font-bold"
+                                >
+                                  تجربة الإيميلات
+                                </button>
+                                <select 
+                                  className="text-xs bg-gray-50 border-gray-200 rounded-lg p-1"
+                                  value={siteSettings.paymentGateway}
+                                  onChange={e => {
+                                    const newSettings = { ...siteSettings, paymentGateway: e.target.value as any };
+                                    setSiteSettings(newSettings);
+                                    updateDoc(doc(db, 'settings', 'site'), newSettings);
+                                  }}
+                                >
+                                  <option value="MyFatoorah">MyFatoorah</option>
+                                  <option value="Tap">Tap Payments</option>
+                                  <option value="Crypto">Crypto Payment</option>
+                                </select>
+                              </div>
                             </h5>
                             <div className="grid grid-cols-2 gap-4">
                               <div className="space-y-2">
@@ -4628,6 +4577,124 @@ function App() {
                         </div>
                       </div>
                     </section>
+                  )}
+
+                  {activeTab === 'users' && (
+                    <div className="space-y-8">
+                      <div className="flex justify-between items-center">
+                        <h4 className="text-xl font-bold flex items-center gap-2">
+                          <Users className="text-gold w-6 h-6" />
+                          قائمة الأعضاء والمشتركين
+                        </h4>
+                        <div className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full font-bold">
+                          إجمالي: {users.length} مستخدم
+                        </div>
+                      </div>
+
+                      {isUsersLoading ? (
+                        <div className="flex justify-center p-20">
+                          <Loader2 className="w-10 h-10 text-gold animate-spin" />
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full border-collapse">
+                            <thead>
+                              <tr className="bg-gray-50 text-right text-xs font-black text-gray-400 uppercase tracking-widest">
+                                <th className="p-4 border-b border-gray-100">المستخدم</th>
+                                <th className="p-4 border-b border-gray-100">العضوية</th>
+                                <th className="p-4 border-b border-gray-100">التفعيل</th>
+                                <th className="p-4 border-b border-gray-100">الكاش باك (BHD)</th>
+                                <th className="p-4 border-b border-gray-100">إدارة الجوائز</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {users.map(u => (
+                                <tr key={u.uid} className="border-b border-gray-50 hover:bg-gray-50/50 transition-all font-bold text-sm">
+                                  <td className="p-4">
+                                    <div className="flex items-center gap-3">
+                                      {u.photoURL ? (
+                                        <img src={u.photoURL} alt="" className="w-10 h-10 rounded-full border-2 border-gold/10" />
+                                      ) : (
+                                        <div className="w-10 h-10 bg-gold/10 text-gold rounded-full flex items-center justify-center">
+                                          {u.name?.charAt(0) || 'U'}
+                                        </div>
+                                      )}
+                                      <div>
+                                        <div className="text-dark">{u.name}</div>
+                                        <div className="text-[10px] text-gray-400 font-mono">{u.email}</div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="p-4">
+                                    <select 
+                                      className="bg-white border-gray-200 rounded-lg text-xs p-1"
+                                      value={u.membershipStatus}
+                                      onChange={e => safeUpdateDoc(doc(db, 'users', u.uid), { membershipStatus: e.target.value })}
+                                    >
+                                      <option value="Bronze">Bronze</option>
+                                      <option value="Silver">Silver</option>
+                                      <option value="Gold">Gold</option>
+                                      <option value="VIP">VIP</option>
+                                    </select>
+                                  </td>
+                                  <td className="p-4">
+                                    <button 
+                                      onClick={() => safeUpdateDoc(doc(db, 'users', u.uid), { isVerified: !u.isVerified, verificationMessage: !u.isVerified ? 'تم تفعيل حسابك بنجاح! استمتع برحلاتك.' : 'جاري مراجعة طلب اشتراكك.' })}
+                                      className={cn(
+                                        "px-2 py-1 rounded text-[10px] text-white",
+                                        u.isVerified ? "bg-green-500" : "bg-orange-500"
+                                      )}
+                                    >
+                                      {u.isVerified ? 'مفعل' : 'قيد المراجعة'}
+                                    </button>
+                                  </td>
+                                  <td className="p-4">
+                                    <input 
+                                      type="number"
+                                      step="0.1"
+                                      className="w-20 text-center bg-white border border-gray-100 rounded text-xs p-1"
+                                      value={u.cashbackBalance || 0}
+                                      onChange={e => safeUpdateDoc(doc(db, 'users', u.uid), { cashbackBalance: parseFloat(e.target.value) || 0 })}
+                                    />
+                                  </td>
+                                  <td className="p-4">
+                                    <button 
+                                      onClick={() => {
+                                        const prize = prompt('أدخل اسم الجائزة الجديدة لهذا العميل:');
+                                        if (prize) {
+                                          const current = u.availableRewards || [];
+                                          safeUpdateDoc(doc(db, 'users', u.uid), { availableRewards: [...current, prize] });
+                                        }
+                                      }}
+                                      className="text-gold hover:text-gold/80 transition-all font-bold text-xs flex items-center gap-1"
+                                    >
+                                      <Plus className="w-4 h-4" />
+                                      إضافة جائزة
+                                    </button>
+                                    {u.availableRewards && u.availableRewards.length > 0 && (
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {u.availableRewards.map((reward, rid) => (
+                                          <span key={rid} className="text-[8px] bg-gold/10 text-gold px-1 rounded flex items-center gap-1">
+                                            {reward}
+                                            <X 
+                                              className="w-2 h-2 cursor-pointer" 
+                                              onClick={() => {
+                                                const filtered = u.availableRewards.filter((_, idx) => idx !== rid);
+                                                safeUpdateDoc(doc(db, 'users', u.uid), { availableRewards: filtered });
+                                              }}
+                                            />
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -5306,117 +5373,239 @@ function App() {
               className="relative bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
             >
               <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gold/10 rounded-xl flex items-center justify-center">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gold/10 rounded-2xl flex items-center justify-center">
                     <Users className="text-gold w-6 h-6" />
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-dark">{t('customerDashboard')}</h3>
-                    <p className="text-xs text-gray-500">{user?.email}</p>
+                    <div className="flex gap-4 mt-1">
+                      <button 
+                        onClick={() => setCustomerTab('trips')}
+                        className={cn(
+                          "text-xs font-bold transition-colors",
+                          customerTab === 'trips' ? "text-gold underline underline-offset-4" : "text-gray-400 hover:text-dark"
+                        )}
+                      >
+                        {lang === 'ar' ? 'رحلاتي' : 'My Trips'}
+                      </button>
+                      <button 
+                        onClick={() => setCustomerTab('rewards')}
+                        className={cn(
+                          "text-xs font-bold transition-colors border-r border-gray-200 pr-4",
+                          customerTab === 'rewards' ? "text-gold underline underline-offset-4" : "text-gray-400 hover:text-dark"
+                        )}
+                      >
+                        {lang === 'ar' ? 'العضوية والجوائز' : 'Membership & Rewards'}
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <button 
                   onClick={() => setIsCustomerDashboardOpen(false)}
-                  className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+                  className="p-3 hover:bg-gray-100 rounded-full transition-colors"
                 >
                   <X className="w-6 h-6" />
                 </button>
               </div>
 
-              <div className="p-8 overflow-y-auto flex-1">
-                {customerTrips.length === 0 ? (
-                  <div className="text-center py-20">
-                    <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                      <Car className="w-10 h-10 text-gray-300" />
+              <div className="p-8 overflow-y-auto flex-1 bg-gray-50/50">
+                {customerTab === 'trips' ? (
+                  customerTrips.length === 0 ? (
+                    <div className="text-center py-20">
+                      <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Car className="w-10 h-10 text-gray-300" />
+                      </div>
+                      <h4 className="text-xl font-bold text-dark mb-2">{lang === 'ar' ? 'لا توجد رحلات مسجلة' : 'No trips recorded'}</h4>
+                      <p className="text-gray-500">
+                        {lang === 'ar' 
+                          ? `لم تقم بأي رحلات مع ${siteSettings.companyName} بعد.` 
+                          : `You haven't taken any trips with ${siteSettings.companyName_en || siteSettings.companyName} yet.`}
+                      </p>
                     </div>
-                    <h4 className="text-xl font-bold text-dark mb-2">{lang === 'ar' ? 'لا توجد رحلات مسجلة' : 'No trips recorded'}</h4>
-                    <p className="text-gray-500">
-                      {lang === 'ar' 
-                        ? `لم تقم بأي رحلات مع ${siteSettings.companyName} بعد.` 
-                        : `You haven't taken any trips with ${siteSettings.companyName_en || siteSettings.companyName} yet.`}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid gap-6">
-                    {customerTrips.map((trip) => (
-                      <div key={trip.id} className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm hover:shadow-md transition-all">
-                        <div className="flex flex-wrap justify-between items-start gap-4 mb-6">
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className={cn(
-                                "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
-                                trip.paymentStatus === 'Paid' ? "bg-green-100 text-green-600" : "bg-orange-100 text-orange-600"
-                              )}>
-                                {trip.paymentStatus === 'Paid' ? (lang === 'ar' ? 'مدفوع' : 'Paid') : (lang === 'ar' ? 'معلق' : 'Pending')}
-                              </span>
-                              <span className="text-xs font-bold text-gray-400">#{trip.id.slice(-6).toUpperCase()}</span>
+                  ) : (
+                    <div className="grid gap-6">
+                      {customerTrips.map((trip) => (
+                        <div key={trip.id} className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm hover:shadow-md transition-all">
+                          <div className="flex flex-wrap justify-between items-start gap-4 mb-6">
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className={cn(
+                                  "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
+                                  trip.paymentStatus === 'Paid' ? "bg-green-100 text-green-600" : "bg-orange-100 text-orange-600"
+                                )}>
+                                  {trip.paymentStatus === 'Paid' ? (lang === 'ar' ? 'مدفوع' : 'Paid') : (lang === 'ar' ? 'معلق' : 'Pending')}
+                                </span>
+                                <span className="text-xs font-bold text-gray-400">#{trip.id.slice(-6).toUpperCase()}</span>
+                              </div>
+                              <h4 className="text-lg font-bold text-dark">{trip.direction}</h4>
                             </div>
-                            <h4 className="text-lg font-bold text-dark">{trip.direction}</h4>
+                            <div className="text-right">
+                              <p className="text-2xl font-black text-gold">{trip.amount} {t('bhd')}</p>
+                              <p className="text-xs font-bold text-gray-400 uppercase">{trip.date}</p>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <p className="text-2xl font-black text-gold">{trip.amount} {t('bhd')}</p>
-                            <p className="text-xs font-bold text-gray-400 uppercase">{trip.date}</p>
-                            {trip.amount > 0 && trip.paymentStatus !== 'Paid' && (
-                              <button 
-                                onClick={() => {
-                                  setPaymentTrip(trip);
-                                  setIsPaymentOpen(true);
-                                }}
-                                className="mt-2 bg-gold text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-opacity-90 transition-all flex items-center gap-2 ml-auto"
-                              >
-                                <Wallet className="w-4 h-4" />
-                                {lang === 'ar' ? 'ادفع الآن' : 'Pay Now'}
-                              </button>
-                            )}
-                          </div>
-                        </div>
 
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6 border-t border-gray-50">
-                          <div className="space-y-1">
-                            <p className="text-[10px] font-black text-gray-400 uppercase">{t('pickup')}</p>
-                            <p className="text-sm font-bold text-dark flex items-center gap-2">
-                              <MapPin className="w-3 h-3 text-gold" />
-                              {trip.pickup}
-                            </p>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6 border-t border-gray-50">
+                            <div className="space-y-1">
+                              <p className="text-[10px] font-black text-gray-400 uppercase">{t('pickup')}</p>
+                              <p className="text-sm font-bold text-dark flex items-center gap-2 line-clamp-1">
+                                <MapPin className="w-3 h-3 text-gold" />
+                                {trip.pickup}
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-[10px] font-black text-gray-400 uppercase">{t('dropoff')}</p>
+                              <p className="text-sm font-bold text-dark flex items-center gap-2 line-clamp-1">
+                                <MapPin className="w-3 h-3 text-gold" />
+                                {trip.dropoff}
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-[10px] font-black text-gray-400 uppercase">{lang === 'ar' ? 'الوقت' : 'Time'}</p>
+                              <p className="text-sm font-bold text-dark flex items-center gap-2">
+                                <Clock className="w-3 h-3 text-gold" />
+                                {trip.time}
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-[10px] font-black text-gray-400 uppercase">{lang === 'ar' ? 'الركاب' : 'Passengers'}</p>
+                              <p className="text-sm font-bold text-dark flex items-center gap-2">
+                                <Users className="w-3 h-3 text-gold" />
+                                {trip.passengers}
+                              </p>
+                            </div>
                           </div>
-                          <div className="space-y-1">
-                            <p className="text-[10px] font-black text-gray-400 uppercase">{t('dropoff')}</p>
-                            <p className="text-sm font-bold text-dark flex items-center gap-2">
-                              <MapPin className="w-3 h-3 text-gold" />
-                              {trip.dropoff}
-                            </p>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-[10px] font-black text-gray-400 uppercase">{lang === 'ar' ? 'الوقت' : 'Time'}</p>
-                            <p className="text-sm font-bold text-dark flex items-center gap-2">
-                              <Clock className="w-3 h-3 text-gold" />
-                              {trip.time}
-                            </p>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-[10px] font-black text-gray-400 uppercase">{lang === 'ar' ? 'الركاب' : 'Passengers'}</p>
-                            <p className="text-sm font-bold text-dark flex items-center gap-2">
-                              <Users className="w-3 h-3 text-gold" />
-                              {trip.passengers}
-                            </p>
-                          </div>
+                          
+                          {trip.amount > 0 && trip.paymentStatus !== 'Paid' && (
+                            <button
+                              onClick={() => {
+                                setPaymentTrip(trip);
+                                setIsPaymentOpen(true);
+                                setIsCustomerDashboardOpen(false);
+                              }}
+                              className="mt-6 w-full bg-dark text-white py-3 rounded-2xl font-bold hover:bg-gray-800 transition-all flex items-center justify-center gap-2 shadow-lg shadow-dark/10"
+                            >
+                              <CreditCard className="w-4 h-4" />
+                              {lang === 'ar' ? 'دفع الآن' : 'Pay Now'}
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )
+                ) : (
+                  <div className="space-y-8">
+                    {/* Membership Card */}
+                    <div className="relative bg-dark rounded-[2.5rem] p-8 text-white overflow-hidden shadow-2xl shadow-dark/20 border border-white/5">
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-gold/10 rounded-full blur-3xl -mr-32 -mt-32" />
+                      <div className="absolute bottom-0 left-0 w-48 h-48 bg-gold/5 rounded-full blur-2xl -ml-24 -mb-24" />
+                      
+                      <div className="relative flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
+                        <div className="space-y-2">
+                          <p className="text-gold font-black uppercase tracking-widest text-xs">{lang === 'ar' ? 'مستوى العضوية' : 'Membership Level'}</p>
+                          <h4 className="text-4xl font-black flex items-center gap-3">
+                            <Star className="text-gold w-10 h-10 fill-gold" />
+                            {userProfile?.membershipStatus || 'Bronze'}
+                          </h4>
+                          <p className="text-white/40 text-[10px] font-mono uppercase">Member since {userProfile?.createdAt ? new Date(userProfile.createdAt).getFullYear() : '2024'}</p>
                         </div>
                         
-                        {trip.paymentStatus !== 'Paid' && (
-                          <button
-                            onClick={() => {
-                              setPaymentTrip(trip);
-                              setIsPaymentOpen(true);
-                              setIsCustomerDashboardOpen(false);
-                            }}
-                            className="mt-6 w-full bg-dark text-white py-3 rounded-2xl font-bold hover:bg-gray-800 transition-all flex items-center justify-center gap-2"
-                          >
-                            <CreditCard className="w-4 h-4" />
-                            دفع الآن
-                          </button>
-                        )}
+                        <div className="bg-white/5 backdrop-blur-md p-6 rounded-3xl border border-white/10 text-center min-w-[200px]">
+                          <p className="text-white/60 text-xs font-bold mb-1">{lang === 'ar' ? 'رصيد الكاش باك' : 'Cashback Balance'}</p>
+                          <p className="text-3xl font-black text-gold">{userProfile?.cashbackBalance || '0.00'} <span className="text-xs font-bold text-white/40">BHD</span></p>
+                        </div>
                       </div>
-                    ))}
+
+                      <div className="mt-8 pt-8 border-t border-white/5">
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "w-3 h-3 rounded-full",
+                            userProfile?.isVerified ? "bg-green-500 animate-pulse" : "bg-orange-500"
+                          )} />
+                          <p className="text-sm font-bold text-white/80">
+                            {userProfile?.verificationMessage || (userProfile?.isVerified ? (lang === 'ar' ? 'حسابك مفعل وجاهز' : 'Your account is verified') : (lang === 'ar' ? 'جاري التحقق من بياناتك' : 'Verifying your account details'))}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Rewards & Prizes Grid */}
+                    <div className="grid md:grid-cols-2 gap-8">
+                      <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 flex flex-col">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div className="w-10 h-10 bg-gold/10 rounded-xl flex items-center justify-center">
+                            <Gift className="text-gold w-6 h-6" />
+                          </div>
+                          <h5 className="text-xl font-bold text-dark">{lang === 'ar' ? 'الجوائز المتاحة' : 'Available Prizes'}</h5>
+                        </div>
+                        
+                        <div className="flex-1 space-y-4">
+                          {!userProfile?.availableRewards || userProfile.availableRewards.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-10 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
+                              <Trophy className="w-12 h-12 text-gray-200 mb-3" />
+                              <p className="text-xs font-bold text-gray-400">{lang === 'ar' ? 'خدمة الجوائز ستتوفر قريباً' : 'Rewards coming soon'}</p>
+                            </div>
+                          ) : (
+                            userProfile.availableRewards.map((reward, idx) => (
+                              <div key={idx} className="flex items-center justify-between p-4 bg-gold/5 rounded-2xl border border-gold/10 group hover:bg-gold/10 transition-all">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                                    <Trophy className="w-4 h-4 text-gold" />
+                                  </div>
+                                  <span className="font-bold text-dark text-sm">{reward}</span>
+                                </div>
+                                <button className="text-[10px] font-black uppercase text-gold hover:text-dark transition-colors">
+                                  {lang === 'ar' ? 'عرض التفاصيل' : 'Details'}
+                                </button>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                        
+                        <p className="mt-6 text-[10px] text-gray-400 font-bold leading-relaxed">
+                          {lang === 'ar' 
+                            ? 'سيتم تحديث الجوائز بناءً على نشاطك وحجوزاتك المؤكدة. يرجى مراجعة هذه الصفحة باستمرار.' 
+                            : 'Prizes will be updated based on your activity and confirmed bookings. Check back regularly.'}
+                        </p>
+                      </div>
+
+                      <div className="space-y-6">
+                        <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100">
+                          <h5 className="text-lg font-bold text-dark mb-4">{lang === 'ar' ? 'مميزات العضوية' : 'Membership Benefits'}</h5>
+                          <ul className="space-y-4">
+                            {[
+                              { label: lang === 'ar' ? 'أولوية الحجز في المناسبات' : 'Priority Booking', active: true },
+                              { label: lang === 'ar' ? 'خصومات حصرية للأعضاء' : 'Exclusive Discounts', active: true },
+                              { label: lang === 'ar' ? 'خدمة عملاء VIP مخصصة' : 'Dedicated VIP Support', active: userProfile?.membershipStatus === 'VIP' },
+                              { label: lang === 'ar' ? 'ترقية فئة السيارة مجاناً' : 'Free Vehicle Upgrades', active: ['Gold', 'VIP'].includes(userProfile?.membershipStatus || '') },
+                            ].map((benefit, i) => (
+                              <li key={i} className={cn(
+                                "flex items-center gap-3 text-sm font-bold transition-all",
+                                benefit.active ? "text-dark" : "text-gray-300 line-through opacity-50"
+                              )}>
+                                <div className={cn(
+                                  "w-5 h-5 rounded-full flex items-center justify-center",
+                                  benefit.active ? "bg-gold/20 text-gold" : "bg-gray-100 text-gray-300"
+                                )}>
+                                  <Check className="w-3 h-3" />
+                                </div>
+                                {benefit.label}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        
+                        <div className="bg-gold p-6 rounded-[2rem] text-white">
+                          <p className="text-xs font-black uppercase tracking-wider mb-2">{lang === 'ar' ? 'نصيحة' : 'Tip'}</p>
+                          <p className="text-sm font-bold leading-relaxed">
+                            {lang === 'ar' 
+                              ? 'كلما زادت حجوزاتك، زادت فرصك في الحصول على كاش باك أعلى وجوائز VIP حصرية.' 
+                              : 'The more you book, the better your chances for higher cashback and exclusive VIP prizes.'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
