@@ -45,11 +45,11 @@ export const ContentTab = ({
            {/* Add New Service Card */}
            <button 
             onClick={() => {
-              const title = prompt('عنوان الخدمة (AR):');
-              const title_en = prompt('Service Title (EN):');
-              if (title) {
+              const name = prompt('عنوان الخدمة (AR):');
+              const name_en = prompt('Service Title (EN):');
+              if (name) {
                 safeAddDoc(collection(db, 'services'), {
-                  title, title_en, description: '', description_en: '', icon: 'Car', image: 'https://images.unsplash.com/photo-1449965024614-23b7a491bc60?auto=format&fit=crop&q=80&w=800'
+                  name, name_en, description: '', description_en: '', icon: 'Car', image: 'https://images.unsplash.com/photo-1449965024614-23b7a491bc60?auto=format&fit=crop&q=80&w=800'
                 });
               }
             }}
@@ -61,10 +61,10 @@ export const ContentTab = ({
               <span className="font-black text-gray-400 uppercase tracking-widest text-xs">إضافة خدمة جديدة</span>
            </button>
 
-           {services.map(service => (
+            {services.map(service => (
              <div key={service.id} className="group relative bg-white border border-gray-100 rounded-[3rem] overflow-hidden shadow-sm hover:shadow-2xl transition-all">
                 <div className="aspect-video relative overflow-hidden group-hover:aspect-[4/3] transition-all">
-                  <img src={service.image} alt={service.title} className="w-full h-full object-cover" />
+                  <img src={service.image} alt={service.name} className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-gradient-to-t from-dark/80 via-transparent to-transparent opacity-60 group-hover:opacity-100 transition-opacity" />
                   <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                     <ImageIcon className="w-8 h-8 text-white" />
@@ -81,8 +81,8 @@ export const ContentTab = ({
                 <div className="p-8 space-y-4">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h5 className="font-black text-dark text-lg">{service.title}</h5>
-                      <p className="text-[10px] text-gray-400 font-mono">{service.title_en}</p>
+                      <h5 className="font-black text-dark text-lg">{service.name}</h5>
+                      <p className="text-[10px] text-gray-400 font-mono">{service.name_en}</p>
                     </div>
                     <button 
                       onClick={() => safeDeleteDoc(doc(db, 'services', service.id))}

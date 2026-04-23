@@ -43,6 +43,8 @@ export interface SpecializedService {
   image: string;
   iconName: string;
   iconImage?: string;
+  price?: string;
+  price_en?: string;
   order: number;
 }
 
