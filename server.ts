@@ -34,11 +34,14 @@ requiredEnvVars.forEach(varName => {
   }
 });
 
-const stripe = process.env.STRIPE_SECRET_KEY 
+// Helper to validate API keys
+const isPlaceholderKey = (key: string | undefined) => !key || key === '0' || key.length < 5;
+
+const stripe = process.env.STRIPE_SECRET_KEY && !isPlaceholderKey(process.env.STRIPE_SECRET_KEY)
   ? new Stripe(process.env.STRIPE_SECRET_KEY) 
   : null;
 
-const resend = process.env.RESEND_API_KEY 
+const resend = process.env.RESEND_API_KEY && !isPlaceholderKey(process.env.RESEND_API_KEY)
   ? new Resend(process.env.RESEND_API_KEY) 
   : null;
 
@@ -153,13 +156,18 @@ async function startServer() {
       });
 
       if (adminEmail.error) {
-        console.error("Admin Email Error:", adminEmail.error);
+        // Handle Resend restrictions gracefully
+        if (adminEmail.error.name === 'validation_error') {
+          console.warn("⚠️ Resend Validation Error: Check your 'from' email and 'to' permissions.");
+        } else {
+          console.error("🔴 Admin Email Error:", adminEmail.error);
+        }
       }
 
       // 2. Email to Customer (if email exists)
       if (email && email.includes('@')) {
         console.log(`Sending customer confirmation to ${email}`);
-        const customerEmail = await resend.emails.send({
+        const customerResult = await resend.emails.send({
           from: `${displayCompanyName} <onboarding@resend.dev>`,
           to: [email],
           subject: `تم استلام طلب حجزك - ${displayCompanyName}`,
@@ -190,11 +198,12 @@ async function startServer() {
           `,
         });
 
-        if (customerEmail.error) {
-          console.error("Customer Email Error:", customerEmail.error);
+        if (customerResult.error) {
           // If we're using onboarding@resend.dev, we might get an error sending to unverified addresses
-          if (customerEmail.error.name === 'validation_error' || customerEmail.error.message?.includes('unverified')) {
-            console.warn("Resend restriction: Cannot send to unverified email addresses on Free Tier.");
+          if (customerResult.error.name === 'validation_error' || customerResult.error.message?.includes('unverified')) {
+            console.warn("⚠️ Resend restriction: Cannot send confirm email to unverified customer addresses on Free Tier.");
+          } else {
+            console.error("🔴 Customer Email Error:", customerResult.error);
           }
         }
       }
@@ -340,8 +349,8 @@ async function startServer() {
     try {
       const { amount, customerName, phone, tripId, isSandbox, token } = req.body;
       
-      if (!token) {
-        return res.status(400).json({ error: "MyFatoorah token is missing" });
+      if (isPlaceholderKey(token)) {
+        return res.status(400).json({ error: "MyFatoorah token is invalid or not set" });
       }
 
       const baseUrl = isSandbox 
@@ -394,8 +403,8 @@ async function startServer() {
     try {
       const { amount, customerName, phone, tripId, secretKey } = req.body;
       
-      if (!secretKey) {
-        return res.status(400).json({ error: "Tap Secret Key is missing" });
+      if (isPlaceholderKey(secretKey)) {
+        return res.status(400).json({ error: "Tap Secret Key is invalid or not set" });
       }
 
       const names = customerName.trim().split(/\s+/);

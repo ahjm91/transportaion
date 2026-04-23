@@ -910,7 +910,8 @@ function App() {
       }).catch(e => console.error('Notify error:', e));
 
       // WhatsApp Message Construction
-      const adminMessage = `🔔 *حجز جديد من الموقع*\n\n` +
+      const adminMessage = `👋 *طلب حجز جديد*\n\n` +
+                           `مرحباً، أرغب في تأكيد الحجز التالي:\n\n` +
                            `👤 العميل: ${tripData.customerName}\n` +
                            `📞 الهاتف: ${tripData.phone}\n` +
                            `📍 المسار: ${tripData.direction}\n` +
@@ -918,73 +919,13 @@ function App() {
                            `🕒 الوقت: ${tripData.time}\n` +
                            `👥 الركاب: ${tripData.passengers}\n` +
                            `🚘 نوع السيارة: ${tripData.carType}\n` +
-                           `💰 السعر: ${newTrip.amount > 0 ? newTrip.amount + ' BHD' : (lang === 'ar' ? 'بانتظار التسعير' : 'Pending Price')}\n` +
-                           `🔗 يرجى الدخول للوحة التحكم للمتابعة.`;
+                           `💰 السعر: ${newTrip.amount > 0 ? newTrip.amount + ' BHD' : (lang === 'ar' ? 'بانتظار التسعير' : 'Pending Price')}`;
       
       const adminWhatsapp = siteSettings.notificationWhatsapp || siteSettings.whatsapp || '97332325997';
       const whatsappUrl = `https://wa.me/${adminWhatsapp}?text=${encodeURIComponent(adminMessage)}`;
 
-      // Redirect to payment if amount > 0
-      if (newTrip.amount > 0) {
-        console.log('Trip has amount > 0, proceeding to payment gateway selection...');
-        const gateway = siteSettings.paymentGateway;
-        
-        if (gateway === 'Tap' && siteSettings.tapSecretKey) {
-          console.log('Initiating Tap payment...');
-          const response = await fetch('/api/tap/execute-payment', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              amount: newTrip.amount,
-              customerName: newTrip.customerName,
-              phone: newTrip.phone,
-              tripId: docRef.id,
-              secretKey: siteSettings.tapSecretKey
-            })
-          });
-          const data = await response.json();
-          if (data.paymentUrl) {
-            window.location.href = data.paymentUrl; // Use location.href instead of window.open to avoid popup blockers
-            setIsBooking(false);
-            return;
-          } else {
-            console.error('Tap payment URL missing:', data);
-          }
-        } else if (gateway === 'MyFatoorah' && siteSettings.myFatoorahToken) {
-          console.log('Initiating MyFatoorah payment...');
-          const response = await fetch('/api/myfatoorah/execute-payment', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              amount: newTrip.amount,
-              customerName: newTrip.customerName,
-              phone: newTrip.phone,
-              tripId: docRef.id,
-              isSandbox: siteSettings.myFatoorahIsSandbox,
-              token: siteSettings.myFatoorahToken
-            })
-          });
-          const data = await response.json();
-          if (data.paymentUrl) {
-            window.location.href = data.paymentUrl; // Use location.href instead of window.open to avoid popup blockers
-            setIsBooking(false);
-            return;
-          } else {
-            console.error('MyFatoorah payment URL missing:', data);
-          }
-        } else {
-          // Crypto or other manual gateway
-          console.log('Opening manual payment modal (Crypto or fallback)...');
-          setPaymentTrip(newTrip);
-          setIsPaymentOpen(true);
-          setIsBooking(false);
-          return;
-        }
-      }
-
-      console.log('No payment amount or gateway not configured, redirecting to WhatsApp...');
-      // If no payment or amount is 0, redirect to WhatsApp
-      alert(lang === 'ar' ? 'تم استلام طلبك بنجاح! سيتم تحويلك الآن لتأكيد الحجز عبر واتساب.' : 'Your request has been received successfully! Redirecting to WhatsApp...');
+      // Redirect to WhatsApp directly as requested
+      console.log('Redirecting to WhatsApp...');
       
       setBookingData({
         customerName: '',
@@ -2637,7 +2578,6 @@ function App() {
         siteSettings={siteSettings}
         lang={lang}
         t={t}
-        stripePromise={stripePromise}
       />
 
       {/* Customer Dashboard Modal */}
