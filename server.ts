@@ -112,7 +112,7 @@ async function startServer() {
     }
   });
 
-  // Email Notification
+  // Email Notification - New Booking
   app.post("/api/notify-booking", async (req, res, next) => {
     try {
       if (!resend) {
@@ -124,6 +124,7 @@ async function startServer() {
       const displayCompanyName = companyName || 'GCC TAXI';
 
       // 1. Email to Admin
+      console.log(`Sending admin notification for booking from ${customerName}`);
       const adminEmail = await resend.emails.send({
         from: `${displayCompanyName} <onboarding@resend.dev>`,
         to: ['ahjm91@gmail.com'],
@@ -151,9 +152,14 @@ async function startServer() {
         `,
       });
 
+      if (adminEmail.error) {
+        console.error("Admin Email Error:", adminEmail.error);
+      }
+
       // 2. Email to Customer (if email exists)
       if (email && email.includes('@')) {
-        await resend.emails.send({
+        console.log(`Sending customer confirmation to ${email}`);
+        const customerEmail = await resend.emails.send({
           from: `${displayCompanyName} <onboarding@resend.dev>`,
           to: [email],
           subject: `تم استلام طلب حجزك - ${displayCompanyName}`,
@@ -183,10 +189,59 @@ async function startServer() {
             </div>
           `,
         });
+
+        if (customerEmail.error) {
+          console.error("Customer Email Error:", customerEmail.error);
+          // If we're using onboarding@resend.dev, we might get an error sending to unverified addresses
+          if (customerEmail.error.name === 'validation_error' || customerEmail.error.message?.includes('unverified')) {
+            console.warn("Resend restriction: Cannot send to unverified email addresses on Free Tier.");
+          }
+        }
       }
 
-      if (adminEmail.error) throw adminEmail.error;
-      res.json({ success: true, data: adminEmail.data });
+      res.json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // Email Notification - Status Update (e.g., Accepted/Confirmed)
+  app.post("/api/notify-status-update", async (req, res, next) => {
+    try {
+      if (!resend) return res.json({ success: false });
+
+      const { email, customerName, status, pickup, dropoff, date, time, companyName } = req.body;
+      if (!email || !email.includes('@')) return res.json({ success: false });
+
+      const displayCompanyName = companyName || 'GCC TAXI';
+      const isConfirmed = status === 'Confirmed';
+
+      console.log(`Sending status update (${status}) to ${email}`);
+      const { data, error } = await resend.emails.send({
+        from: `${displayCompanyName} <onboarding@resend.dev>`,
+        to: [email],
+        subject: isConfirmed ? `تم قبول طلب رحلتك ✅ - ${displayCompanyName}` : `تحديث حالة رحلتك - ${displayCompanyName}`,
+        html: `
+          <div dir="rtl" style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+            <h2 style="color: #22c55e;">${isConfirmed ? 'تم قبول طلبك بنجاح!' : 'تحديث جديد لرحلتك'}</h2>
+            <p>عزيزي ${customerName}،</p>
+            <p>يسعدنا إبلاغك بأن طلب رحلتك قد تم تحديث حالته إلى: <strong>${isConfirmed ? 'مؤكدة ✅' : status}</strong></p>
+            
+            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <p><strong>تفاصيل الرحلة:</strong></p>
+              <p>المسار: ${pickup} ← ${dropoff}</p>
+              <p>التاريخ: ${date}</p>
+              <p>الوقت: ${time}</p>
+            </div>
+
+            <p>نتمنى لك رحلة سعيدة مع ${displayCompanyName}.</p>
+            <p style="font-size: 12px; color: #666;">شكراً لاختيارك خدماتنا.</p>
+          </div>
+        `,
+      });
+
+      if (error) console.error("Status Update Email Error:", error);
+      res.json({ success: !error });
     } catch (error) {
       next(error);
     }
