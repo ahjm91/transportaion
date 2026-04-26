@@ -99,7 +99,7 @@ export const PricingTab = ({
               <CreditCard className="w-6 h-6" />
             </div>
             <div>
-              <h4 className="text-xl font-black text-dark">بوابات الدفع الإلكتروني</h4>
+              <h4 className="text-xl font-black text-dark">نظام الدفع المعتمد</h4>
               <select 
                 className="bg-transparent border-none p-0 text-xs font-black text-gold uppercase tracking-widest focus:ring-0 cursor-pointer"
                 value={siteSettings.paymentGateway}
@@ -109,55 +109,24 @@ export const PricingTab = ({
                   updateDoc(doc(db, 'settings', 'site'), { paymentGateway: val });
                 }}
               >
-                <option value="MyFatoorah">MyFatoorah</option>
-                <option value="Tap">Tap Payments</option>
-                <option value="Crypto">Crypto Payment</option>
+                <option value="WhatsApp">تأكيد عبر واتساب (افتراضي)</option>
+                <option value="Crypto">عملات رقمية (Manual)</option>
               </select>
             </div>
           </div>
 
           <div className="space-y-6">
-            {siteSettings.paymentGateway === 'MyFatoorah' && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Token (API Key)</label>
-                  <input 
-                    type="password" 
-                    className="w-full bg-gray-50 border-gray-100 rounded-2xl py-4 px-6 font-bold"
-                    value={siteSettings.myFatoorahToken || ''}
-                    onChange={e => setSiteSettings({...siteSettings, myFatoorahToken: e.target.value})}
-                  />
+            {siteSettings.paymentGateway === 'WhatsApp' && (
+              <div className="p-6 bg-green-50 rounded-3xl border border-green-100 animate-in fade-in slide-in-from-bottom-2">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white">
+                    <Smartphone className="w-4 h-4" />
+                  </div>
+                  <h5 className="font-black text-green-700 text-sm">نظام التحويل اليدوي</h5>
                 </div>
-                <div className="flex items-center gap-3 bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                  <input 
-                    type="checkbox" 
-                    id="mf-sandbox"
-                    checked={siteSettings.myFatoorahIsSandbox}
-                    onChange={e => setSiteSettings({...siteSettings, myFatoorahIsSandbox: e.target.checked})}
-                    className="w-5 h-5 text-gold rounded-lg focus:ring-gold border-gray-200"
-                  />
-                  <label htmlFor="mf-sandbox" className="text-sm font-bold text-dark">تفعيل وضع التجربة (Sandbox Mode)</label>
-                </div>
-              </div>
-            )}
-
-            {siteSettings.paymentGateway === 'Tap' && (
-              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Secret API Key</label>
-                  <input 
-                    type="password" 
-                    className="w-full bg-gray-50 border-gray-100 rounded-2xl py-4 px-6 font-bold"
-                    value={siteSettings.tapSecretKey || ''}
-                    onChange={e => setSiteSettings({...siteSettings, tapSecretKey: e.target.value})}
-                  />
-                </div>
-                <div className="p-4 bg-orange-50 rounded-2xl border border-orange-100">
-                   <p className="text-[10px] text-orange-600 font-bold leading-relaxed flex items-start gap-2">
-                     <Smartphone className="w-3 h-3 shrink-0 mt-0.5" />
-                     يدعم Tap Payments الدفع عبر Apple Pay والبطاقات الائتمانية والمدى بشكل آلي.
-                   </p>
-                </div>
+                <p className="text-xs font-bold text-green-600 leading-relaxed">
+                  هذا الخيار يتخطى بوابات الدفع الإلكترونية حالياً. سيتم تحويل العميل مباشرة إلى الواتساب لتأكيد الحجز معك يدوياً.
+                </p>
               </div>
             )}
 

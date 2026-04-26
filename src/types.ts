@@ -79,7 +79,7 @@ export interface SiteSettings {
   baseFee: number;
   vipSurcharge: number;
   vanSurcharge: number;
-  paymentGateway: 'MyFatoorah' | 'Tap' | 'Crypto';
+  paymentGateway: 'MyFatoorah' | 'Tap' | 'Crypto' | 'WhatsApp';
   myFatoorahToken?: string;
   myFatoorahIsSandbox?: boolean;
   tapSecretKey?: string;

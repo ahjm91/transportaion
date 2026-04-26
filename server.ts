@@ -1,7 +1,6 @@
 import express from "express";
 import { createServer as createViteServer } from "vite";
 import path from "path";
-import Stripe from "stripe";
 import dotenv from "dotenv";
 import { Resend } from 'resend';
 import helmet from "helmet";
@@ -27,7 +26,7 @@ const adminApp = admin.initializeApp({
 const adminDb = getFirestore(adminApp, firebaseConfig.databaseId);
 
 // Environment Variable Validation
-const requiredEnvVars = ['STRIPE_SECRET_KEY', 'RESEND_API_KEY'];
+const requiredEnvVars = ['RESEND_API_KEY'];
 requiredEnvVars.forEach(varName => {
   if (!process.env[varName]) {
     console.warn(`⚠️ Warning: ${varName} is not set in environment variables.`);
@@ -36,10 +35,6 @@ requiredEnvVars.forEach(varName => {
 
 // Helper to validate API keys
 const isPlaceholderKey = (key: string | undefined) => !key || key === '0' || key.length < 5;
-
-const stripe = process.env.STRIPE_SECRET_KEY && !isPlaceholderKey(process.env.STRIPE_SECRET_KEY)
-  ? new Stripe(process.env.STRIPE_SECRET_KEY) 
-  : null;
 
 const resend = process.env.RESEND_API_KEY && !isPlaceholderKey(process.env.RESEND_API_KEY)
   ? new Resend(process.env.RESEND_API_KEY) 
@@ -85,34 +80,6 @@ async function startServer() {
       timestamp: new Date().toISOString(),
       env: process.env.NODE_ENV || 'development'
     });
-  });
-
-  // Stripe Payment Intent
-  app.post("/api/create-payment-intent", async (req, res, next) => {
-    try {
-      if (!stripe) {
-        throw new Error("Stripe is not configured");
-      }
-
-      const { amount, currency = "bhd", metadata } = req.body;
-
-      if (!amount || isNaN(amount)) {
-        return res.status(400).json({ error: "Invalid amount" });
-      }
-
-      const intent = await stripe.paymentIntents.create({
-        amount: Math.round(amount * 1000),
-        currency,
-        metadata,
-        automatic_payment_methods: {
-          enabled: true,
-        },
-      });
-
-      res.json({ clientSecret: intent.client_secret });
-    } catch (error) {
-      next(error);
-    }
   });
 
   // Email Notification - New Booking
@@ -341,169 +308,6 @@ async function startServer() {
       res.json({ success: true, data });
     } catch (error) {
       next(error);
-    }
-  });
-
-  // MyFatoorah Payment
-  app.post("/api/myfatoorah/execute-payment", async (req, res, next) => {
-    try {
-      const { amount, customerName, phone, tripId, isSandbox, token } = req.body;
-      
-      if (isPlaceholderKey(token)) {
-        return res.status(400).json({ error: "MyFatoorah token is invalid or not set" });
-      }
-
-      const baseUrl = isSandbox 
-        ? "https://apitest.myfatoorah.com" 
-        : "https://api.myfatoorah.com";
-
-      const payload = {
-        CustomerName: customerName,
-        DisplayCurrencyIso: "BHD",
-        MobileCountryCode: "973",
-        CustomerMobile: phone.replace(/[^0-9]/g, ''),
-        CustomerEmail: "customer@example.com",
-        InvoiceValue: amount,
-        CallBackUrl: `${req.protocol}://${req.get('host')}/?pay_success=${tripId}`,
-        ErrorUrl: `${req.protocol}://${req.get('host')}/?pay_error=${tripId}`,
-        Language: "ar",
-        CustomerReference: tripId,
-        UserDefinedField: tripId,
-        InvoiceItems: [
-          {
-            ItemName: `Trip Booking #${tripId}`,
-            Quantity: 1,
-            UnitPrice: amount
-          }
-        ]
-      };
-
-      const response = await fetch(`${baseUrl}/v2/ExecutePayment`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await response.json();
-      if (!data.IsSuccess) {
-        throw new Error(data.Message || "MyFatoorah error");
-      }
-
-      res.json({ paymentUrl: data.Data.PaymentURL });
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  // Tap Payment
-  app.post("/api/tap/execute-payment", async (req, res, next) => {
-    try {
-      const { amount, customerName, phone, tripId, secretKey } = req.body;
-      
-      if (isPlaceholderKey(secretKey)) {
-        return res.status(400).json({ error: "Tap Secret Key is invalid or not set" });
-      }
-
-      const names = customerName.trim().split(/\s+/);
-      const firstName = names[0] || 'Customer';
-      const lastName = names.slice(1).join(' ') || 'User';
-
-      const payload = {
-        draft: false,
-        due: Date.now() + 86400000,
-        expiry: Date.now() + 172800000,
-        description: `Trip Booking #${tripId}`,
-        mode: "INVOICE",
-        savecard: false,
-        notifications: {
-          channels: ["SMS", "EMAIL"],
-          dispatch: true
-        },
-        currencies: ["BHD"],
-        metadata: {
-          tripId: tripId
-        },
-        reference: {
-          order: tripId,
-          invoice: `INV-${tripId.substring(0, 8).toUpperCase()}`
-        },
-        customer: {
-          first_name: firstName,
-          last_name: lastName,
-          phone: {
-            country_code: "973",
-            number: phone.replace(/[^0-9]/g, '').slice(-8) // Take last 8 digits for Bahrain
-          }
-        },
-        order: {
-          amount: amount,
-          currency: "BHD",
-          items: [
-            {
-              amount: amount,
-              currency: "BHD",
-              description: `Trip Booking #${tripId}`,
-              name: "Trip Booking",
-              quantity: 1
-            }
-          ]
-        },
-        redirect: {
-          url: `${req.protocol}://${req.get('host')}/?pay_success=${tripId}`
-        },
-        post: {
-          url: `${req.protocol}://${req.get('host')}/api/tap/webhook`
-        }
-      };
-
-      const response = await fetch("https://api.tap.company/v2/invoices", {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${secretKey}`
-        },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await response.json();
-      
-      if (data.errors || !data.url) {
-        const errorMsg = data.errors ? data.errors[0].description : (data.message || "Tap API Error");
-        throw new Error(errorMsg);
-      }
-
-      res.json({ paymentUrl: data.url });
-    } catch (error) {
-      next(error);
-    }
-  });
-
-  // Tap Webhook
-  app.post("/api/tap/webhook", async (req, res) => {
-    try {
-      const payload = req.body;
-      console.log("🔵 Tap Webhook received:", JSON.stringify(payload));
-
-      const status = payload.status;
-      const tripId = payload.metadata?.tripId || payload.metadata?.udf1 || payload.reference?.order;
-
-      if ((status === 'PAID' || status === 'CAPTURED' || payload.track === 'PAYMENT_CAPTURED') && tripId) {
-        console.log(`✅ Payment successful for Trip #${tripId} via Webhook`);
-        
-        await adminDb.collection('trips').doc(tripId).update({
-          paymentStatus: 'Paid',
-          status: 'Confirmed',
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-      }
-
-      res.sendStatus(200);
-    } catch (error: any) {
-      console.error("🔴 Tap Webhook Error:", error.message);
-      res.sendStatus(500);
     }
   });
 

@@ -55,14 +55,7 @@ import {
   Eye,
   Bitcoin
 } from 'lucide-react';
-import { loadStripe } from '@stripe/stripe-js';
 import { GoogleGenAI } from "@google/genai";
-import {
-  Elements,
-  CardElement,
-  useStripe,
-  useElements,
-} from '@stripe/react-stripe-js';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 import { auth, db, storage } from './firebase';
@@ -107,85 +100,6 @@ import { BookingData, Service, SpecializedService, SiteSettings, UserProfile, Tr
 
 // Types
 type ServiceType = 'luxury';
-
-const CheckoutForm = ({ trip, onSucceed }: { trip: Trip; onSucceed: () => void }) => {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [error, setError] = useState<string | null>(null);
-  const [processing, setProcessing] = useState(false);
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!stripe || !elements) return;
-
-    setProcessing(true);
-    setError(null);
-
-    try {
-      const response = await fetch('/api/create-payment-intent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          amount: trip.amount,
-          metadata: { tripId: trip.id, customerName: trip.customerName }
-        }),
-      });
-
-      const { clientSecret, error: backendError } = await response.json();
-      if (backendError) throw new Error(backendError);
-
-      const result = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: {
-          card: elements.getElement(CardElement) as any,
-          billing_details: { name: trip.customerName },
-        },
-      });
-
-      if (result.error) {
-        setError(result.error.message || 'حدث خطأ في الدفع');
-      } else if (result.paymentIntent.status === 'succeeded') {
-        onSucceed();
-      }
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-        <CardElement options={{
-          style: {
-            base: {
-              fontSize: '16px',
-              color: '#1A1A1A',
-              '::placeholder': { color: '#A0A0A0' },
-            },
-          },
-        }} />
-      </div>
-      {error && <div className="text-red-500 text-sm font-bold text-center">{error}</div>}
-      <button
-        disabled={!stripe || processing}
-        className="w-full bg-gold text-white py-4 rounded-2xl font-bold hover:bg-opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-      >
-        {processing ? (
-          <>
-            <Loader2 className="w-5 h-5 animate-spin" />
-            جاري المعالجة...
-          </>
-        ) : (
-          <>
-            <CreditCard className="w-5 h-5" />
-            دفع {trip.amount} BHD
-          </>
-        )}
-      </button>
-    </form>
-  );
-};
 
 interface FirestoreErrorInfo {
   error: string;
@@ -280,7 +194,6 @@ function App() {
     }
   };
 
-  const stripePromise = loadStripe((import.meta as any).env.VITE_STRIPE_PUBLISHABLE_KEY || '');
   const [isUploading, setIsUploading] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -372,7 +285,7 @@ function App() {
     baseFee: 2,
     vipSurcharge: 5,
     vanSurcharge: 12,
-    paymentGateway: 'MyFatoorah',
+    paymentGateway: 'WhatsApp',
     myFatoorahIsSandbox: true,
     tapSecretKey: '',
     cryptoWalletAddress: '',
@@ -1143,7 +1056,7 @@ function App() {
       baseFee: 2,
       vipSurcharge: 5,
       vanSurcharge: 12,
-      paymentGateway: 'MyFatoorah',
+      paymentGateway: 'WhatsApp',
       myFatoorahIsSandbox: true,
       tapSecretKey: '',
       cryptoWalletAddress: '',
