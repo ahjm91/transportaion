@@ -96,6 +96,72 @@
         "price": { "type": "number" }
       },
       "required": ["pickup", "dropoff", "price"]
+    },
+    "Driver": {
+      "title": "Driver",
+      "description": "A driver profile for real-time dispatch",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "carType": { "type": "string", "enum": ["Standard", "VIP", "Van"] },
+        "status": { "type": "string", "enum": ["online", "offline", "busy"] },
+        "location": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          }
+        },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "phone", "carType", "status"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "A real-time booking request",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerName": { "type": "string" },
+        "phone": { "type": "string" },
+        "pickupLocation": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          }
+        },
+        "dropoffLocation": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          }
+        },
+        "pickupAddress": { "type": "string" },
+        "dropoffAddress": { "type": "string" },
+        "carType": { "type": "string", "enum": ["Standard", "VIP", "Van"] },
+        "price": { "type": "number" },
+        "status": { "type": "string", "enum": ["searching_driver", "driver_assigned", "on_the_way", "completed", "cancelled", "no_driver_found"] },
+        "assignedDriverId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["customerName", "phone", "pickupLocation", "dropoffLocation", "carType", "status"]
+    },
+    "DriverRequest": {
+      "title": "Driver Request",
+      "description": "A request sent to a specific driver",
+      "type": "object",
+      "properties": {
+        "driverId": { "type": "string" },
+        "bookingId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "rejected", "expired"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "number" }
+      },
+      "required": ["driverId", "bookingId", "status", "expiresAt"]
     }
   },
   "firestore": {
@@ -122,6 +188,18 @@
     "/trips/{tripId}": {
       "schema": "Trip",
       "description": "Accounting trips collection"
+    },
+    "/drivers/{driverId}": {
+      "schema": "Driver",
+      "description": "Active drivers collection"
+    },
+    "/bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "Real-time bookings collection"
+    },
+    "/driver_requests/{id}": {
+      "schema": "DriverRequest",
+      "description": "Individual requests to drivers"
     }
   }
 }

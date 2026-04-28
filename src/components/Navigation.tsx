@@ -12,7 +12,9 @@ interface NavigationProps {
   siteSettings: SiteSettings;
   user: User | null;
   isAdmin: boolean;
+  isDriver: boolean;
   setIsDashboardOpen: (open: boolean) => void;
+  setIsDriverDashboardOpen: (open: boolean) => void;
   setIsCustomerDashboardOpen: (open: boolean) => void;
   setIsPaymentOpen: (open: boolean) => void;
   handleLogin: () => void;
@@ -27,7 +29,9 @@ export const Navigation = ({
   siteSettings,
   user,
   isAdmin,
+  isDriver,
   setIsDashboardOpen,
+  setIsDriverDashboardOpen,
   setIsCustomerDashboardOpen,
   setIsPaymentOpen,
   handleLogin,
@@ -90,7 +94,20 @@ export const Navigation = ({
                   {t('dashboard')}
                 </button>
               )}
-              {user && !isAdmin && (
+              {isDriver && (
+                <button 
+                  onClick={() => {
+                    setIsDriverDashboardOpen(true);
+                    setIsDashboardOpen(false);
+                    setIsCustomerDashboardOpen(false);
+                  }}
+                  className="flex items-center gap-2 text-gold font-bold hover:text-gold/80 transition-colors"
+                >
+                  <Car className="w-5 h-5" />
+                  {lang === 'ar' ? 'لوحة السائق' : 'Driver Panel'}
+                </button>
+              )}
+              {user && !isAdmin && !isDriver && (
                 <button 
                   onClick={() => setIsCustomerDashboardOpen(true)}
                   className="flex items-center gap-2 text-gold font-bold hover:text-gold/80 transition-colors"
@@ -156,6 +173,19 @@ export const Navigation = ({
               <a href="#services" onClick={() => setIsMenuOpen(false)}>{t('services')}</a>
               <a href="#specialized-services" onClick={() => setIsMenuOpen(false)}>{t('specializedServices')}</a>
               <a href="#about" onClick={() => setIsMenuOpen(false)}>{t('whyUs')}</a>
+              
+              {isDriver && (
+                <button 
+                  onClick={() => {
+                    setIsDriverDashboardOpen(true);
+                    setIsMenuOpen(false);
+                  }}
+                  className="text-right font-bold text-gold flex items-center gap-2"
+                >
+                  <Car className="w-5 h-5" />
+                  {lang === 'ar' ? 'لوحة السائق' : 'Driver Panel'}
+                </button>
+              )}
               
               <div className="pt-6 border-t border-gray-100 flex flex-col gap-4">
                 <button 

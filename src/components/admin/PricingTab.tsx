@@ -74,6 +74,15 @@ export const PricingTab = ({
                 onChange={e => setSiteSettings({...siteSettings, vanSurcharge: parseFloat(e.target.value) || 0})}
               />
             </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-gold">العمولة الإدارية (%)</label>
+              <input 
+                type="number" 
+                className="w-full bg-gold/5 border-gold/10 rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-black text-gold"
+                value={siteSettings.commissionRate}
+                onChange={e => setSiteSettings({...siteSettings, commissionRate: parseFloat(e.target.value) || 0})}
+              />
+            </div>
           </div>
 
           <div className="p-5 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-100">

@@ -94,6 +94,7 @@ export interface SiteSettings {
   showAboutSection: boolean;
   showBookingSection: boolean;
   showCTASection: boolean;
+  commissionRate: number;
 }
 
 export interface UserProfile {
@@ -102,13 +103,69 @@ export interface UserProfile {
   email: string;
   phone?: string;
   photoURL?: string;
-  role: 'admin' | 'customer';
+  role: 'admin' | 'customer' | 'driver';
   createdAt: string;
   membershipStatus: 'Bronze' | 'Silver' | 'Gold' | 'VIP';
+  membershipNumber: number;
   isVerified: boolean;
   verificationMessage?: string;
   cashbackBalance: number;
   availableRewards: string[]; 
+  driverApplicationStatus?: 'pending' | 'approved' | 'rejected';
+  wallet?: number;
+  carImage?: string;
+  plateNumber?: string;
+  driverApplicationData?: {
+    carType: string;
+    carModel: string;
+    plateNumber: string;
+    experience: string;
+    appliedAt: string;
+  };
+}
+
+export interface Location {
+  lat: number;
+  lng: number;
+}
+
+export interface Driver {
+  id: string;
+  name: string;
+  phone: string;
+  carType: 'Standard' | 'VIP' | 'Van';
+  status: 'online' | 'offline' | 'busy';
+  location: Location;
+  lastUpdated: any;
+  wallet?: number;
+  carImage?: string;
+  plateNumber?: string;
+}
+
+export interface Booking {
+  id: string;
+  customerName: string;
+  phone: string;
+  pickupLocation: Location;
+  dropoffLocation: Location;
+  pickupAddress: string;
+  dropoffAddress: string;
+  carType: 'Standard' | 'VIP' | 'Van';
+  price: number;
+  commission?: number;
+  status: 'pending' | 'searching_driver' | 'driver_assigned' | 'driver_arriving' | 'trip_started' | 'completed' | 'cancelled' | 'no_driver_found';
+  assignedDriverId: string | null;
+  userId?: string;
+  createdAt: any;
+}
+
+export interface DriverRequest {
+  id?: string;
+  driverId: string;
+  bookingId: string;
+  status: 'pending' | 'accepted' | 'rejected' | 'expired';
+  createdAt: any;
+  expiresAt: number;
 }
 
 export interface Trip {
@@ -137,8 +194,10 @@ export interface Trip {
   profit: number;
   paymentStatus: 'Paid' | 'Unpaid' | 'Pending';
   status: 'Requested' | 'Confirmed' | 'Completed' | 'Cancelled';
+  assignedDriverId?: string;
   notes: string;
   specialRequests?: string;
+  membershipNumber?: number;
   createdAt: string;
 }
 

@@ -1,14 +1,16 @@
 
 import React from 'react';
 import { motion } from 'motion/react';
-import { DollarSign, Search, Calendar, Phone, Truck, ShieldCheck, Wallet, Copy, Settings, Trash2, CheckCircle, Loader2 } from 'lucide-react';
-import { Trip, SiteSettings } from '../../types';
+import { DollarSign, Search, Calendar, Phone, Truck, ShieldCheck, Wallet, Copy, Settings, Trash2, CheckCircle, Loader2, Zap } from 'lucide-react';
+import { Trip, SiteSettings, Booking, UserProfile } from '../../types';
 import { cn } from '../../lib/utils';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 interface AccountingTabProps {
   trips: Trip[];
+  bookings: Booking[];
+  users: UserProfile[];
   tripFilter: string;
   setTripFilter: (filter: any) => void;
   isAdminScheduleView: boolean;
@@ -22,10 +24,40 @@ interface AccountingTabProps {
 }
 
 export const AccountingTab = ({
-  trips, tripFilter, setTripFilter, isAdminScheduleView, setIsAdminScheduleView,
+  trips, bookings, users, tripFilter, setTripFilter, isAdminScheduleView, setIsAdminScheduleView,
   lang, isSuperAdmin, setEditingTrip, setTripFormData, setIsTripFormOpen, setTripToDelete
 }: AccountingTabProps) => {
-  const filteredTrips = trips.filter(t => {
+  // Convert bookings to trip-like items for display
+  const bookingTrips: any[] = bookings.map(b => {
+    const userProfile = users.find(u => u.uid === b.userId);
+    return {
+      id: b.id,
+      customerName: b.customerName,
+      phone: b.phone,
+      direction: `${b.pickupAddress} ← ${b.dropoffAddress}`,
+      pickup: b.pickupAddress,
+      dropoff: b.dropoffAddress,
+      carType: b.carType,
+      status: b.status === 'searching_driver' ? 'Requested' : 
+              (b.status === 'driver_assigned' || b.status === 'driver_arriving' || b.status === 'trip_started') ? 'Confirmed' :
+              b.status === 'completed' ? 'Completed' : 'Cancelled',
+      amount: b.price,
+      commission: b.commission || 0,
+      date: b.createdAt?.seconds ? new Date(b.createdAt.seconds * 1000).toISOString().split('T')[0] : '---',
+      time: b.createdAt?.seconds ? new Date(b.createdAt.seconds * 1000).toLocaleTimeString('ar-BH', { hour: '2-digit', minute: '2-digit' }) : '---',
+      driverName: (b as any).driverName || '',
+      paymentStatus: 'Pending',
+      isRealtime: true,
+      membershipNumber: userProfile?.membershipNumber
+    };
+  });
+
+  const combinedItems = [...trips.map(t => {
+    const userProfile = users.find(u => u.uid === t.userId);
+    return { ...t, commission: t.profit, membershipNumber: t.membershipNumber || userProfile?.membershipNumber };
+  }), ...bookingTrips];
+
+  const filteredTrips = combinedItems.filter(t => {
     if (tripFilter === 'all') return true;
     if (tripFilter === 'requested') return t.status === 'Requested';
     if (tripFilter === 'pending_price') return !t.amount || t.amount <= 0;
@@ -34,8 +66,8 @@ export const AccountingTab = ({
     return true;
   });
 
-  const totalProfit = trips.reduce((acc, t) => acc + (t.profit || 0), 0);
-  const totalAmount = trips.reduce((acc, t) => acc + (t.amount || 0), 0);
+  const totalCommission = combinedItems.reduce((acc, t) => acc + (t.commission || 0), 0);
+  const totalAmount = combinedItems.reduce((acc, t) => acc + (t.amount || 0), 0);
 
   return (
     <div className="space-y-8">
@@ -47,8 +79,8 @@ export const AccountingTab = ({
         </div>
         {isSuperAdmin && (
           <div className="bg-green-50 p-6 rounded-3xl border border-green-100">
-            <p className="text-xs font-black text-green-600 uppercase mb-1">صافي الربح</p>
-            <h4 className="text-2xl font-black text-dark">{totalProfit.toFixed(2)} BHD</h4>
+            <p className="text-xs font-black text-green-600 uppercase mb-1">إجمالي العمولات</p>
+            <h4 className="text-2xl font-black text-dark">{totalCommission.toFixed(2)} BHD</h4>
           </div>
         )}
         <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100">
@@ -102,11 +134,11 @@ export const AccountingTab = ({
                   <th className="p-4 border-b">العميل</th>
                   <th className="p-4 border-b">المسار</th>
                   <th className="p-4 border-b">السيارة</th>
+                  <th className="p-4 border-b">السائق</th>
                   <th className="p-4 border-b text-center">الحالة</th>
                   <th className="p-4 border-b text-center">الدفع</th>
                   <th className="p-4 border-b text-center">المبلغ</th>
-                  {isSuperAdmin && <th className="p-4 border-b text-center">التكلفة</th>}
-                  {isSuperAdmin && <th className="p-4 border-b text-center">الربح</th>}
+                  {isSuperAdmin && <th className="p-4 border-b text-center">العمولة</th>}
                   <th className="p-4 border-b text-center">إجراءات</th>
                 </tr>
               </thead>
@@ -118,7 +150,17 @@ export const AccountingTab = ({
                       <div className="text-[10px] text-gray-400">{trip.time}</div>
                     </td>
                     <td className="p-4">
-                      <div className="text-dark">{trip.customerName}</div>
+                      <div className="flex items-center gap-2">
+                        {trip.isRealtime && <Zap className="w-3 h-3 text-orange-500 fill-orange-500" title="طلب فوري" />}
+                        <div className="text-dark">
+                          {trip.customerName}
+                          {trip.membershipNumber && (
+                            <span className="mr-2 px-1.5 py-0.5 bg-gray-100 text-gray-500 text-[10px] rounded-md font-bold">
+                              #{trip.membershipNumber}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                       <div className="text-[10px] text-gray-400">{trip.phone}</div>
                     </td>
                     <td className="p-4">
@@ -128,6 +170,9 @@ export const AccountingTab = ({
                       <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded-lg text-[10px]">
                         {trip.carType}
                       </span>
+                    </td>
+                    <td className="p-4">
+                      <div className="text-dark font-black">{trip.driverName || '---'}</div>
                     </td>
                     <td className="p-4 text-center">
                       <span className={cn(
@@ -148,8 +193,7 @@ export const AccountingTab = ({
                       </span>
                     </td>
                     <td className="p-4 text-center text-dark">{trip.amount}</td>
-                    {isSuperAdmin && <td className="p-4 text-center text-red-500">{trip.driverCost}</td>}
-                    {isSuperAdmin && <td className="p-4 text-center text-green-600 font-black">{trip.profit}</td>}
+                    {isSuperAdmin && <td className="p-4 text-center text-green-600 font-black">{(trip as any).commission?.toFixed(2)}</td>}
                     <td className="p-4">
                       <div className="flex justify-center gap-2">
                         {trip.status === 'Requested' && (
@@ -207,13 +251,13 @@ export const AccountingTab = ({
         <div className="grid gap-6">
           {/* Schedule View Implementation */}
           {/* Grouped by date */}
-          {Object.entries(
+          {(Object.entries(
             filteredTrips.reduce((acc, t) => {
               if (!acc[t.date]) acc[t.date] = [];
               acc[t.date].push(t);
               return acc;
-            }, {} as Record<string, Trip[]>)
-          ).sort().map(([date, dateTrips]) => (
+            }, {} as Record<string, any[]>)
+          ) as [string, any[]][]).sort().map(([date, dateTrips]) => (
             <div key={date} className="space-y-4">
               <h5 className="font-black text-dark flex items-center gap-2">
                 <div className="w-2 h-8 bg-gold rounded-full" />

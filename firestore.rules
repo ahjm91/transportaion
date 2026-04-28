@@ -7,15 +7,33 @@ service cloud.firestore {
     }
     
     function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == "ahjm91@gmail.com" || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isDriver() {
       return isAuthenticated() && 
-        (request.auth.token.email == "ahjm91@gmail.com" || 
-         request.auth.token.email in get(/databases/$(database)/documents/settings/site).data.adminEmails) && 
-        request.auth.token.email_verified == true;
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'driver';
+    }
+
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
     }
 
     // Users collection
     match /users/{userId} {
-      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      allow read: if (isAuthenticated() && request.auth.uid == userId) || isAdmin();
+      allow write: if (isAuthenticated() && request.auth.uid == userId && 
+                    (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isVerified', 'uid']))) || isAdmin();
+      allow create: if isAuthenticated() && request.auth.uid == userId;
     }
 
     // Site settings
@@ -44,12 +62,35 @@ service cloud.firestore {
 
     // Trips (Accounting)
     match /trips/{tripId} {
-      allow read: if isAdmin() || (resource.data.userId == null) || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
       allow create: if true; 
-      allow update: if isAdmin() || 
-                    (resource.data.paymentStatus != 'Paid') || 
-                    (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow update: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
       allow delete: if isAdmin();
+    }
+
+    // Drivers collection
+    match /drivers/{driverId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || (isAuthenticated() && request.auth.uid == driverId);
+    }
+
+    // Bookings collection
+    match /bookings/{bookingId} {
+      allow read: if isAdmin() || 
+                   (isAuthenticated() && resource.data.userId == request.auth.uid) ||
+                   (isAuthenticated() && resource.data.get('assignedDriverId', '') == request.auth.uid);
+      allow create: if isAuthenticated();
+      allow update: if isAdmin() || 
+                    (isAuthenticated() && request.auth.uid == resource.data.assignedDriverId) ||
+                    (isAuthenticated() && request.auth.uid == resource.data.userId && resource.data.status == 'searching_driver');
+      allow delete: if isAdmin();
+    }
+
+    // Driver Requests
+    match /driver_requests/{requestId} {
+      allow read: if isAuthenticated() && (resource.data.driverId == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && (resource.data.driverId == request.auth.uid || isAdmin());
+      allow read, write: if isAdmin();
     }
   }
 }

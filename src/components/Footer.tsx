@@ -1,16 +1,28 @@
 
-import React from 'react';
-import { Instagram, Twitter, Send, Phone, MapPin, Car } from 'lucide-react';
-import { SiteSettings } from '../types';
+import React, { useState } from 'react';
+import { Instagram, Twitter, Send, Phone, MapPin, Car, Briefcase } from 'lucide-react';
+import { SiteSettings, UserProfile } from '../types';
 import { translations } from '../translations';
+import { DriverRegistrationModal } from './modals/DriverRegistrationModal';
 
 interface FooterProps {
   lang: 'ar' | 'en';
   siteSettings: SiteSettings;
+  userProfile: UserProfile | null;
+  handleLogin: () => void;
 }
 
-export const Footer = ({ lang, siteSettings }: FooterProps) => {
+export const Footer = ({ lang, siteSettings, userProfile, handleLogin }: FooterProps) => {
   const t = (key: keyof typeof translations.ar) => translations[lang][key] || key;
+  const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
+
+  const handleJoinAsDriver = () => {
+    if (!userProfile) {
+      handleLogin();
+    } else {
+      setIsDriverModalOpen(true);
+    }
+  };
   
   return (
     <footer className="bg-dark text-white pt-20 pb-10">
@@ -54,6 +66,15 @@ export const Footer = ({ lang, siteSettings }: FooterProps) => {
               <li><a href="#services" className="hover:text-white transition-colors">{t('services')}</a></li>
               <li><a href="#specialized-services" className="hover:text-white transition-colors">{t('specializedServices')}</a></li>
               <li><a href="#about" className="hover:text-white transition-colors">{t('whyUs')}</a></li>
+              <li>
+                <button 
+                  onClick={handleJoinAsDriver}
+                  className="flex items-center gap-2 text-gold group hover:brightness-110 transition-all font-bold"
+                >
+                  <Briefcase className="w-4 h-4" />
+                  {lang === 'ar' ? 'انضم كشريك سائق' : 'Join as Driver'}
+                </button>
+              </li>
             </ul>
           </div>
           
@@ -82,6 +103,13 @@ export const Footer = ({ lang, siteSettings }: FooterProps) => {
           </div>
         </div>
       </div>
+
+      <DriverRegistrationModal 
+        isOpen={isDriverModalOpen}
+        onClose={() => setIsDriverModalOpen(false)}
+        userProfile={userProfile}
+        lang={lang}
+      />
     </footer>
   );
 };

@@ -53,7 +53,8 @@ import {
   Copy,
   MessageCircle,
   Eye,
-  Bitcoin
+  Bitcoin,
+  Navigation as NavigationIcon
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import { motion, AnimatePresence } from 'motion/react';
@@ -78,7 +79,9 @@ import {
   getDoc,
   query,
   where,
-  getDocs
+  getDocs,
+  runTransaction,
+  increment
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { translations } from './translations';
@@ -90,13 +93,15 @@ import { Footer } from './components/Footer';
 import { Hero, Services, SpecializedServices } from './components/LandingSections';
 import { BookingForm } from './components/landing/BookingForm';
 import { AdminDashboard } from './components/admin/AdminDashboard';
+import DriverDashboard from './components/DriverDashboard';
+import LiveTrackingMap from './components/LiveTrackingMap';
 import { TripForm } from './components/admin/TripForm';
 import { TripDeleteModal } from './components/admin/TripDeleteModal';
 import { PaymentModal } from './components/modals/PaymentModal';
 import { CustomerDashboardModal } from './components/modals/CustomerDashboardModal';
 import { TermsModal, PrivacyModal } from './components/common/Modals';
 import { handleFirestoreError as handleFirestoreErrorUtils } from './lib/firestoreUtils';
-import { BookingData, Service, SpecializedService, SiteSettings, UserProfile, Trip, FixedRoute, OperationType } from './types';
+import { BookingData, Service, SpecializedService, SiteSettings, UserProfile, Trip, FixedRoute, OperationType, Booking, Driver } from './types';
 
 // Types
 type ServiceType = 'luxury';
@@ -159,9 +164,12 @@ function App() {
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
+  const [isDriverDashboardOpen, setIsDriverDashboardOpen] = useState(false);
   const [isCustomerDashboardOpen, setIsCustomerDashboardOpen] = useState(false);
   const [customerTab, setCustomerTab] = useState<'trips' | 'rewards'>('trips');
-  const [bookingMode, setBookingMode] = useState<'fixed' | 'custom'>('fixed');
+  const [bookingMode, setBookingMode] = useState<'fixed' | 'custom' | 'realtime'>('fixed');
+  const [activeRealtimeBooking, setActiveRealtimeBooking] = useState<Booking | null>(null);
+  const [activeDriver, setActiveDriver] = useState<Driver | null>(null);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [customerTrips, setCustomerTrips] = useState<Trip[]>([]);
@@ -215,6 +223,49 @@ function App() {
     }
   };
 
+  // Real-time Booking Listener
+  useEffect(() => {
+    if (!activeRealtimeBooking?.id) return;
+
+    const unsub = onSnapshot(doc(db, 'bookings', activeRealtimeBooking.id), (snapshot) => {
+      if (snapshot.exists()) {
+        const data = { id: snapshot.id, ...snapshot.data() } as Booking;
+        setActiveRealtimeBooking(data);
+
+        // If driver assigned, start tracking them
+        if (data.assignedDriverId && (!activeDriver || activeDriver.id !== data.assignedDriverId)) {
+          const driverRef = doc(db, 'drivers', data.assignedDriverId);
+          getDoc(driverRef).then(snap => {
+            if (snap.exists()) setActiveDriver({ id: snap.id, ...snap.data() } as Driver);
+          });
+        }
+
+        // If completed or cancelled, clear after a delay
+        if (['completed', 'cancelled', 'no_driver_found'].includes(data.status)) {
+          setTimeout(() => {
+            setActiveRealtimeBooking(null);
+            setActiveDriver(null);
+          }, 10000); // Keep map visible for 10s
+        }
+      }
+    });
+
+    return () => unsub();
+  }, [activeRealtimeBooking?.id, activeDriver]);
+
+  // Driver Location Tracking Listener
+  useEffect(() => {
+    if (!activeDriver?.id || !activeRealtimeBooking) return;
+
+    const unsub = onSnapshot(doc(db, 'drivers', activeDriver.id), (snapshot) => {
+      if (snapshot.exists()) {
+        setActiveDriver({ id: snapshot.id, ...snapshot.data() } as Driver);
+      }
+    });
+
+    return () => unsub();
+  }, [activeDriver?.id, activeRealtimeBooking]);
+
   const safeDeleteDoc = async (docRef: any) => {
     try {
       await deleteDoc(docRef);
@@ -260,6 +311,8 @@ function App() {
   const [specializedServices, setSpecializedServices] = useState<SpecializedService[]>([]);
   const [fixedRoutes, setFixedRoutes] = useState<FixedRoute[]>([]);
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({
     companyName: 'GCC TAXI',
     companyName_en: 'GCC TAXI',
@@ -298,7 +351,8 @@ function App() {
     showSpecializedSection: true,
     showAboutSection: true,
     showBookingSection: true,
-    showCTASection: true
+    showCTASection: true,
+    commissionRate: 10
   });
 
   // Handle payment redirect
@@ -444,55 +498,113 @@ function App() {
 
   useEffect(() => {
     const checkAdmin = () => {
+      if (!user) {
+        setIsAdmin(false);
+        setIsSuperAdmin(false);
+        setIsEmailVerified(false);
+        return;
+      }
       const primaryAdmin = 'ahjm91@gmail.com';
-      const isSuper = user?.email === primaryAdmin;
-      const isStaff = siteSettings.adminEmails?.includes(user?.email || '');
-      setIsSuperAdmin(isSuper);
-      setIsAdmin(isSuper || isStaff);
-      setIsEmailVerified(!!user?.emailVerified);
+      setIsSuperAdmin(user.email === primaryAdmin);
+      setIsEmailVerified(!!user.emailVerified);
     };
     checkAdmin();
-  }, [user, siteSettings.adminEmails]);
+  }, [user]);
 
   // Auth & Data Fetching
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (u) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
       setUser(u);
-      
-      if (u) {
-        const primaryAdmin = 'ahjm91@gmail.com';
-        const isEmailMatch = u.email === primaryAdmin || (siteSettings.adminEmails?.includes(u.email || ''));
-        const isUserAdmin = isEmailMatch && u.emailVerified === true;
+    });
 
-        // Sync profile
-        const userRef = doc(db, 'users', u.uid);
-        const userSnap = await getDoc(userRef);
+    return () => unsubscribeAuth();
+  }, []);
+
+  // Real-time Profile Sync
+  useEffect(() => {
+    if (!user) {
+      setUserProfile(null);
+      setIsAdmin(false);
+      return;
+    }
+
+    const userRef = doc(db, 'users', user.uid);
+    const unsubscribeProfile = onSnapshot(userRef, async (docSnap) => {
+      if (docSnap.exists()) {
+        const profile = docSnap.data() as UserProfile;
         
-        if (!userSnap.exists()) {
-          const newProfile: UserProfile = {
-            uid: u.uid,
-            name: u.displayName || 'عميل جديد',
-            email: u.email || '',
-            photoURL: u.photoURL || '',
-            role: isUserAdmin ? 'admin' : 'customer',
-            createdAt: new Date().toISOString(),
-            membershipStatus: 'Bronze',
-            isVerified: false,
-            verificationMessage: 'جاري مراجعة طلب اشتراكك من قبل الإدارة لتفعيل العضوية.',
-            cashbackBalance: 0,
-            availableRewards: []
-          };
-          await setDoc(userRef, newProfile);
-          setUserProfile(newProfile);
-        } else {
-          setUserProfile(userSnap.data() as UserProfile);
+        // If existing user has no membership number, assign one
+        if (!profile.membershipNumber) {
+          try {
+            await runTransaction(db, async (transaction) => {
+              const statsRef = doc(db, 'settings', 'stats');
+              const statsSnap = await transaction.get(statsRef);
+              
+              let nextNum = 1250;
+              if (statsSnap.exists()) {
+                nextNum = (statsSnap.data().lastMembershipNumber || 1249) + 1;
+              }
+              
+              transaction.update(userRef, { membershipNumber: nextNum });
+              transaction.set(statsRef, { lastMembershipNumber: nextNum }, { merge: true });
+            });
+          } catch (e) {
+            console.error("Error assigning membership number:", e);
+          }
         }
-        console.log('User status:', u.email, 'Verified:', u.emailVerified, 'IsAdmin:', isUserAdmin);
+        
+        setUserProfile(profile);
+        
+        // Recalculate admin status based on profile role or email
+        const primaryAdmin = 'ahjm91@gmail.com';
+        const isEmailMatch = user.email === primaryAdmin || (siteSettings.adminEmails?.includes(user.email || ''));
+        const isUserAdmin = (isEmailMatch && (user.emailVerified === true || user.email === primaryAdmin)) || profile.role === 'admin';
+        setIsAdmin(isUserAdmin);
       } else {
-        setUserProfile(null);
+        const primaryAdmin = 'ahjm91@gmail.com';
+        const isEmailMatch = user.email === primaryAdmin || (siteSettings.adminEmails?.includes(user.email || ''));
+        const isUserAdmin = (isEmailMatch && (user.emailVerified === true || user.email === primaryAdmin));
+
+        try {
+          await runTransaction(db, async (transaction) => {
+            const statsRef = doc(db, 'settings', 'stats');
+            const statsSnap = await transaction.get(statsRef);
+            
+            let nextNum = 1250;
+            if (statsSnap.exists()) {
+              nextNum = (statsSnap.data().lastMembershipNumber || 1249) + 1;
+            }
+
+            const newProfile: UserProfile = {
+              uid: user.uid,
+              name: user.displayName || 'عميل جديد',
+              email: user.email || '',
+              photoURL: user.photoURL || '',
+              role: isUserAdmin ? 'admin' : 'customer',
+              createdAt: new Date().toISOString(),
+              membershipStatus: 'Bronze',
+              membershipNumber: nextNum,
+              isVerified: false,
+              verificationMessage: 'جاري مراجعة طلب اشتراكك من قبل الإدارة لتفعيل العضوية.',
+              cashbackBalance: 0,
+              availableRewards: []
+            };
+
+            transaction.set(userRef, newProfile);
+            transaction.set(statsRef, { lastMembershipNumber: nextNum }, { merge: true });
+            setUserProfile(newProfile);
+            setIsAdmin(isUserAdmin);
+          });
+        } catch (e) {
+          console.error("Error creating profile with membership number:", e);
+        }
       }
     });
 
+    return () => unsubscribeProfile();
+  }, [user, siteSettings.adminEmails]);
+
+  useEffect(() => {
     const unsubscribeServices = onSnapshot(collection(db, 'services'), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
       console.log('Services updated from Firestore:', data);
@@ -544,17 +656,28 @@ function App() {
     }
 
     let unsubscribeTrips = () => {};
+    let unsubscribeBookings = () => {};
     if (isAdmin) {
       unsubscribeTrips = onSnapshot(collection(db, 'trips'), (snapshot) => {
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Trip));
         setTrips(data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-      });
+      }, (error) => handleFirestoreError(error, OperationType.GET, 'trips'));
+
+      unsubscribeBookings = onSnapshot(collection(db, 'bookings'), (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking));
+        setBookings(data.sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds));
+      }, (error) => handleFirestoreError(error, OperationType.GET, 'bookings'));
+
+      onSnapshot(collection(db, 'drivers'), (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Driver));
+        setAllDrivers(data);
+      }, (error) => handleFirestoreError(error, OperationType.GET, 'drivers'));
     } else if (user) {
       const q = query(collection(db, 'trips'), where('userId', '==', user.uid));
       unsubscribeTrips = onSnapshot(q, (snapshot) => {
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Trip));
         setCustomerTrips(data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-      });
+      }, (error) => handleFirestoreError(error, OperationType.GET, 'trips (customer)'));
     }
 
     let unsubscribeUsers = () => {};
@@ -564,15 +687,19 @@ function App() {
         const data = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as any as UserProfile));
         setUsers(data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
         setIsUsersLoading(false);
+      }, (error) => {
+        handleFirestoreError(error, OperationType.GET, 'users');
+        setIsUsersLoading(false);
       });
     }
 
     return () => {
-      unsubscribeAuth();
       unsubscribeServices();
       unsubscribeSpecialized();
+      unsubscribeFixedRoutes();
       unsubscribeSettings();
       unsubscribeTrips();
+      unsubscribeBookings();
       unsubscribeUsers();
     };
   }, [isAdmin, user, activeTab]);
@@ -745,9 +872,49 @@ function App() {
     
     try {
       console.log('Validating booking data...');
-      // Remove phone confirmation check as it's not in the UI
-      if (!bookingData.phone || !bookingData.firstName || !bookingData.pickup) {
+      
+      if (!bookingData.phone || !bookingData.customerName || !bookingData.pickup) {
         alert(lang === 'ar' ? 'يرجى ملء جميع الحقول المطلوبة.' : 'Please fill in all required fields.');
+        setIsBooking(false);
+        return;
+      }
+
+      if (bookingMode === 'realtime') {
+        const response = await fetch('/api/create-booking', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customerName: bookingData.customerName,
+            phone: bookingData.phone,
+            pickupLocation: { lat: 26.22, lng: 50.58 }, // Demo coordinates, in real app would use geocoding
+            dropoffLocation: { lat: 26.25, lng: 50.60 },
+            pickupAddress: bookingData.pickup,
+            dropoffAddress: bookingData.dropoff,
+            carType: bookingData.carType,
+            price: 15 // Mock price for demo
+          })
+        });
+        const result = await response.json();
+        if (result.success) {
+          setActiveRealtimeBooking({
+            id: result.bookingId,
+            customerName: bookingData.customerName,
+            phone: bookingData.phone,
+            pickupAddress: bookingData.pickup,
+            dropoffAddress: bookingData.dropoff,
+            carType: bookingData.carType,
+            status: 'searching_driver',
+            pickupLocation: { lat: 26.22, lng: 50.58 },
+            dropoffLocation: { lat: 26.25, lng: 50.60 },
+            price: 15,
+            createdAt: new Date(),
+            assignedDriverId: null
+          });
+          // Scroll to tracking section
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } else {
+          throw new Error(result.error);
+        }
         setIsBooking(false);
         return;
       }
@@ -797,7 +964,7 @@ function App() {
         driverType: 'In',
         driverName: '',
         driverCost: 0,
-        profit: Number(finalAmount) || 0,
+        profit: (Number(finalAmount) * (siteSettings.commissionRate || 10)) / 100,
         paymentStatus: 'Pending',
         status: Number(finalAmount) > 0 ? 'Confirmed' : 'Requested',
         notes: isCustom ? 'طلب حجز مخصص' : (matchedRoute ? 'حجز تلقائي (سعر ثابت)' : 'حجز عبر الموقع'),
@@ -1272,127 +1439,110 @@ function App() {
         .rounded-custom-2xl { border-radius: calc(var(--radius) * 2); }
       `}</style>
       {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
-            <div className="flex items-center gap-2">
-              {siteSettings.showHeaderLogo && (
-                siteSettings.logo ? (
-                  <img 
-                    src={siteSettings.logo} 
-                    alt="Logo" 
-                    className="h-12 w-auto object-contain"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <>
-                    <div className="w-10 h-10 bg-dark rounded-xl flex items-center justify-center">
-                      <Car className="text-gold w-6 h-6" />
-                    </div>
-                    <span className="text-xl font-bold tracking-tighter text-dark uppercase">{lang === 'ar' ? siteSettings.companyName : (siteSettings.companyName_en || siteSettings.companyName)}</span>
-                  </>
-                )
-              )}
-            </div>
+      <Navigation 
+        lang={lang} 
+        setLang={setLang}
+        siteSettings={siteSettings}
+        user={user}
+        isAdmin={isAdmin}
+        isDriver={userProfile?.role === 'driver'}
+        setIsDashboardOpen={setIsDashboardOpen}
+        setIsDriverDashboardOpen={setIsDriverDashboardOpen}
+        setIsCustomerDashboardOpen={setIsCustomerDashboardOpen}
+        setIsPaymentOpen={setIsPaymentOpen}
+        handleLogin={handleLogin}
+        handleLogout={handleLogout}
+        isMenuOpen={isMenuOpen}
+        setIsMenuOpen={setIsMenuOpen}
+      />
 
-            {/* Desktop Menu */}
-            <div className="hidden md:flex items-center gap-8">
-              <button 
-                onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}
-                className="flex items-center gap-2 px-3 py-1 rounded-lg bg-gray-50 text-dark font-bold hover:bg-gray-100 transition-all border border-gray-200"
-              >
-                {lang === 'ar' ? 'English' : 'العربية'}
-              </button>
-              <a href="#" className="text-gray-600 hover:text-dark transition-colors">{t('home')}</a>
-              <a href="#services" className="text-gray-600 hover:text-dark transition-colors">{t('services')}</a>
-              <a href="#specialized-services" className="text-gray-600 hover:text-dark transition-colors">{t('specializedServices')}</a>
-              <a href="#about" className="text-gray-600 hover:text-dark transition-colors">{t('whyUs')}</a>
-              <button 
-                onClick={() => setIsPaymentOpen(true)}
-                className="flex items-center gap-2 text-dark font-bold hover:text-gold transition-colors"
-              >
-                <Wallet className="w-5 h-5" />
-                {t('payTrip')}
-              </button>
-              {isAdmin && (
-                <button 
-                  onClick={() => setIsDashboardOpen(true)}
-                  className="flex items-center gap-2 text-gold font-bold hover:text-gold/80 transition-colors"
-                >
-                  <Settings className="w-5 h-5" />
-                  {t('dashboard')}
-                </button>
-              )}
-              {user && !isAdmin && (
-                <button 
-                  onClick={() => setIsCustomerDashboardOpen(true)}
-                  className="flex items-center gap-2 text-gold font-bold hover:text-gold/80 transition-colors"
-                >
-                  <Users className="w-5 h-5" />
-                  {t('customerDashboard')}
-                </button>
-              )}
-              {!user ? (
-                <button 
-                  onClick={handleLogin}
-                  className="bg-dark text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition-all"
-                >
-                  {t('login')}
-                </button>
-              ) : (
-                <button 
-                  onClick={handleLogout}
-                  className="flex items-center gap-2 text-gray-600 hover:text-red-500 transition-colors"
-                >
-                  <LogOut className="w-5 h-5" />
-                </button>
-              )}
-              <a 
-                href="#booking-form" 
-                className="bg-dark text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition-all"
-              >
-                {t('bookNow')}
-              </a>
-            </div>
-
-            {/* Mobile Menu Button */}
-            <button 
-              className="md:hidden p-2"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-            >
-              {isMenuOpen ? <X /> : <Menu />}
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      {/* Mobile Menu Overlay */}
-      <AnimatePresence>
-        {isMenuOpen && (
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed inset-0 z-40 bg-white pt-24 px-6 md:hidden overflow-y-auto"
+      {isDriverDashboardOpen ? (
+        <div className="pt-20 min-h-screen bg-gray-50">
+          <button 
+            onClick={() => setIsDriverDashboardOpen(false)}
+            className="fixed bottom-8 left-8 z-50 bg-dark text-white p-4 rounded-full shadow-2xl hover:bg-gray-800 transition-all flex items-center gap-2"
           >
-            <div className="flex flex-col gap-6 text-xl font-medium">
-              <div className="flex justify-center mb-4">
-                {siteSettings.logo ? (
-                  <img src={siteSettings.logo} alt="Logo" className="h-20 w-auto object-contain" />
-                ) : (
-                  <div className="w-16 h-16 bg-dark rounded-2xl flex items-center justify-center">
-                    <Car className="text-gold w-10 h-10" />
-                  </div>
-                )}
+            <ArrowLeft className="w-5 h-5" />
+            <span className="font-bold">{lang === 'ar' ? 'الرجوع للرئيسية' : 'Back to Home'}</span>
+          </button>
+          <DriverDashboard />
+        </div>
+      ) : (
+        <>
+          {activeRealtimeBooking && (
+        <section className="bg-dark py-12 px-4 md:px-8 border-b border-white/5">
+          <div className="max-w-7xl mx-auto grid lg:grid-cols-3 gap-12 text-white items-center">
+            <div className="lg:col-span-1 space-y-8">
+              <div className="inline-flex items-center gap-2 bg-gold text-dark px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest shadow-lg shadow-gold/20">
+                <NavigationIcon className="w-3 h-3 animate-pulse" />
+                {lang === 'ar' ? 'رحلة قيد البحث' : 'Live Tracking'}
               </div>
-              <a href="#" onClick={() => setIsMenuOpen(false)}>{t('home')}</a>
-              <a href="#services" onClick={() => setIsMenuOpen(false)}>{t('services')}</a>
-              <a href="#specialized-services" onClick={() => setIsMenuOpen(false)}>{t('specializedServices')}</a>
-              <a href="#about" onClick={() => setIsMenuOpen(false)}>{t('whyUs')}</a>
+              <div>
+                <h3 className="text-4xl font-black mb-2">{lang === 'ar' ? 'تتبع رحلتك الآن' : 'Track Your Ride'}</h3>
+                <p className="text-gray-400 font-bold">
+                  {activeRealtimeBooking.status === 'searching_driver' 
+                    ? (lang === 'ar' ? 'نبحث عن أقرب سائق متاح...' : 'Finding nearby drivers...')
+                    : (lang === 'ar' ? 'تم تعيين سائق لطلبك!' : 'Driver is on the way!')}
+                </p>
+              </div>
+
+              {activeDriver && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-white/5 p-6 rounded-3xl border border-white/10 flex items-center gap-6"
+                >
+                  <div className="w-20 h-20 bg-gold rounded-full flex items-center justify-center shrink-0 border-4 border-dark overflow-hidden">
+                    <Car className="w-10 h-10 text-dark" />
+                  </div>
+                  <div className="flex-1">
+                    {activeDriver.carImage && (
+                      <div className="mb-4">
+                        <img 
+                          src={activeDriver.carImage} 
+                          alt="Vehicle" 
+                          className="w-full h-32 object-cover rounded-xl border border-white/10" 
+                        />
+                      </div>
+                    )}
+                    <h4 className="text-xl font-bold">{activeDriver.name}</h4>
+                    <div className="flex items-center gap-2 mt-1">
+                      <p className="text-gold text-sm font-black">{activeDriver.carType}</p>
+                      <span className="text-white/20 text-xs">•</span>
+                      <p className="text-gray-400 font-mono text-sm">{activeDriver.plateNumber || (lang === 'ar' ? 'بدون رقم لوحة' : 'No plate number')}</p>
+                    </div>
+                    <div className="flex gap-4 mt-4">
+                      <a href={`tel:${activeDriver.phone}`} className="flex-1 bg-white/10 py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-white/20 transition-all">
+                        <Phone className="w-4 h-4" />
+                        <span className="text-xs font-bold">{lang === 'ar' ? 'اتصال' : 'Call'}</span>
+                      </a>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              <div className="space-y-4 pt-8 border-t border-white/5">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 font-bold text-sm">{lang === 'ar' ? 'رقم الطلب' : 'Booking ID'}</span>
+                  <span className="font-mono text-sm text-gold">{activeRealtimeBooking.id.slice(-6)}</span>
+                </div>
+                <div className="flex justify-between items-center text-xl font-bold">
+                  <span>{lang === 'ar' ? 'السعر المقدر' : 'Est. Price'}</span>
+                  <span className="text-gold text-2xl">BHD {activeRealtimeBooking.price}</span>
+                </div>
+              </div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
+            <div className="lg:col-span-2">
+              <LiveTrackingMap 
+                driverLocation={activeDriver?.location || null}
+                pickupLocation={activeRealtimeBooking.pickupLocation}
+                dropoffLocation={activeRealtimeBooking.dropoffLocation}
+              />
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Hero Section */}
       {siteSettings.showHeroSection && (
@@ -2071,127 +2221,12 @@ function App() {
       )}
 
       {/* Footer */}
-      <footer className="bg-white border-t border-gray-100 pt-20 pb-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-12 mb-16">
-            <div className="col-span-2">
-              <div className="flex items-center gap-2 mb-6">
-                {siteSettings.showFooterLogo && (
-                  siteSettings.logo ? (
-                    <img src={siteSettings.logo} alt="Logo" className="h-12 w-auto object-contain" />
-                  ) : (
-                    <>
-                      <div className="w-10 h-10 bg-dark rounded-xl flex items-center justify-center">
-                        <Car className="text-gold w-6 h-6" />
-                      </div>
-                      <span className="text-xl font-bold tracking-tighter text-dark uppercase">{lang === 'ar' ? siteSettings.companyName : (siteSettings.companyName_en || siteSettings.companyName)}</span>
-                    </>
-                  )
-                )}
-              </div>
-              <p className="text-gray-500 max-w-sm mb-8">
-                {lang === 'ar' ? siteSettings.footerAbout : (siteSettings.footerAbout_en || siteSettings.footerAbout)}
-              </p>
-              <div className="flex gap-4">
-                {siteSettings.showFooterSocials && (
-                  <>
-                    {siteSettings.instagram && (
-                      <a 
-                        href={siteSettings.instagram} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center hover:bg-pink-600 hover:text-white transition-all cursor-pointer"
-                      >
-                        <Instagram className="w-5 h-5" />
-                      </a>
-                    )}
-                    {siteSettings.telegram && (
-                      <a 
-                        href={siteSettings.telegram} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center hover:bg-blue-500 hover:text-white transition-all cursor-pointer"
-                      >
-                        <Send className="w-5 h-5" />
-                      </a>
-                    )}
-                    {siteSettings.tiktok && (
-                      <a 
-                        href={siteSettings.tiktok} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center hover:bg-black hover:text-white transition-all cursor-pointer"
-                      >
-                        <Share2 className="w-5 h-5" />
-                      </a>
-                    )}
-                    {siteSettings.twitter && (
-                      <a 
-                        href={siteSettings.twitter} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center hover:bg-gray-900 hover:text-white transition-all cursor-pointer"
-                      >
-                        <Twitter className="w-5 h-5" />
-                      </a>
-                    )}
-                  </>
-                )}
-                    {siteSettings.phone && (
-                      <a 
-                        href={`tel:${siteSettings.phone}`} 
-                        className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center hover:bg-dark hover:text-white transition-all cursor-pointer"
-                        title={lang === 'ar' ? 'اتصال هاتف' : 'Phone Call'}
-                      >
-                        <Phone className="w-5 h-5" />
-                      </a>
-                    )}
-                    <a 
-                      href={`https://wa.me/${siteSettings.whatsapp}`} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center hover:bg-green-600 hover:text-white transition-all cursor-pointer"
-                      title="WhatsApp"
-                    >
-                      <MessageCircle className="w-5 h-5" />
-                    </a>
-              </div>
-            </div>
-            
-            <div>
-              <h4 className="font-bold mb-6">{lang === 'ar' ? 'روابط سريعة' : 'Quick Links'}</h4>
-              <ul className="space-y-4 text-gray-500">
-                <li><a href="#" className="hover:text-gold transition-colors">{t('home')}</a></li>
-                <li><a href="#services" className="hover:text-gold transition-colors">{t('services')}</a></li>
-                <li><a href="#specialized-services" className="hover:text-gold transition-colors">{t('specializedServices')}</a></li>
-                <li><a href="#about" className="hover:text-gold transition-colors">{t('whyUs')}</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="font-bold mb-6">{lang === 'ar' ? 'تواصل معنا' : 'Contact Us'}</h4>
-              <ul className="space-y-4 text-gray-500">
-                <li className="flex items-center gap-3">
-                  <Phone className="w-5 h-5 text-gold" />
-                  {siteSettings.phone}
-                </li>
-                <li className="flex items-center gap-3">
-                  <MapPin className="w-5 h-5 text-gold" />
-                  {lang === 'ar' ? siteSettings.footerAddress : (siteSettings.footerAddress_en || siteSettings.footerAddress)}
-                </li>
-              </ul>
-            </div>
-          </div>
-          
-          <div className="border-t border-gray-100 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-gray-400">
-            <p>© {new Date().getFullYear()} {lang === 'ar' ? siteSettings.companyName : (siteSettings.companyName_en || siteSettings.companyName)}. {lang === 'ar' ? 'جميع الحقوق محفوظة.' : 'All rights reserved.'}</p>
-            <div className="flex gap-8">
-              <button onClick={() => setIsTermsOpen(true)} className="hover:text-dark transition-colors">{lang === 'ar' ? 'الشروط والأحكام' : 'Terms & Conditions'}</button>
-              <button onClick={() => setIsPrivacyOpen(true)} className="hover:text-dark transition-colors">{lang === 'ar' ? 'سياسة الخصوصية' : 'Privacy Policy'}</button>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Footer 
+        lang={lang} 
+        siteSettings={siteSettings} 
+        userProfile={userProfile}
+        handleLogin={handleLogin}
+      />
 
       {/* Terms & Conditions Modal */}
       <AnimatePresence>
@@ -2464,7 +2499,9 @@ function App() {
         siteSettings={siteSettings}
         setSiteSettings={setSiteSettings}
         trips={trips}
+        bookings={bookings}
         users={users}
+        allDrivers={allDrivers}
         services={services}
         specializedServices={specializedServices}
         fixedRoutes={fixedRoutes}
@@ -2525,7 +2562,73 @@ function App() {
         isSuperAdmin={isSuperAdmin}
       />
 
-      {/* Delete Confirmation Modal */}
+        </>
+      )}
+
+      {/* Modals & Dashboards */}
+      <AdminDashboard
+        isOpen={isDashboardOpen && isAdmin}
+        onClose={() => setIsDashboardOpen(false)}
+        siteSettings={siteSettings}
+        setSiteSettings={setSiteSettings}
+        trips={trips}
+        bookings={bookings}
+        users={users}
+        allDrivers={allDrivers}
+        services={services}
+        specializedServices={specializedServices}
+        fixedRoutes={fixedRoutes}
+        isUsersLoading={isUsersLoading}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab as any}
+        lang={lang}
+        isSuperAdmin={isSuperAdmin}
+        setEditingTrip={setEditingTrip}
+        setTripFormData={setTripFormData}
+        setIsTripFormOpen={setIsTripFormOpen}
+        setTripToDelete={setTripToDelete}
+        handleSaveSettings={handleSaveSettings}
+        handleImageUpload={handleImageUpload}
+        safeAddDoc={safeAddDoc}
+        safeUpdateDoc={safeUpdateDoc}
+        safeDeleteDoc={safeDeleteDoc}
+      />
+
+      <PaymentModal
+        isOpen={isPaymentOpen}
+        onClose={() => setIsPaymentOpen(false)}
+        siteSettings={siteSettings}
+        lang={lang}
+        t={t}
+      />
+
+      <CustomerDashboardModal
+        isOpen={isCustomerDashboardOpen}
+        onClose={() => setIsCustomerDashboardOpen(false)}
+        lang={lang}
+        t={t}
+        siteSettings={siteSettings}
+        userProfile={userProfile}
+        customerTrips={customerTrips}
+        customerTab={customerTab}
+        setCustomerTab={setCustomerTab}
+        onPayNow={(trip) => {
+          setPaymentTrip(trip);
+          setIsPaymentOpen(true);
+          setIsCustomerDashboardOpen(false);
+        }}
+      />
+
+      <TripForm
+        isOpen={isTripFormOpen}
+        onClose={() => setIsTripFormOpen(false)}
+        editingTrip={editingTrip}
+        tripFormData={tripFormData}
+        setTripFormData={setTripFormData}
+        onSubmit={handleSaveTrip}
+        isSuperAdmin={isSuperAdmin}
+      />
+
       <TripDeleteModal
         trip={tripToDelete}
         onClose={() => setTripToDelete(null)}

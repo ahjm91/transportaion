@@ -10,6 +10,7 @@ import cors from "cors";
 import { rateLimit } from "express-rate-limit";
 import admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
+import { getDistance } from "geolib";
 
 dotenv.config();
 
@@ -72,6 +73,103 @@ async function startServer() {
 
   // Apply rate limiter to sensitive endpoints
   app.use("/api/", apiLimiter);
+
+  // --- Ride Hailing Logic (Stages 2 & 3) ---
+
+  const isNearby = (driverLoc: { lat: number, lng: number }, pickupLoc: { lat: number, lng: number }, radius = 5000) => {
+    try {
+      const distance = getDistance(
+        { latitude: driverLoc.lat, longitude: driverLoc.lng },
+        { latitude: pickupLoc.lat, longitude: pickupLoc.lng }
+      );
+      return distance <= radius;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const findNearbyDrivers = async (pickupLocation: { lat: number, lng: number }, carType: string) => {
+    const snapshot = await adminDb.collection("drivers")
+      .where("status", "==", "online")
+      .where("carType", "==", carType)
+      .get();
+  
+    const drivers: any[] = [];
+    snapshot.forEach(doc => {
+      const driver = doc.data();
+      if (isNearby(driver.location, pickupLocation)) {
+        drivers.push({ id: doc.id, ...driver });
+      }
+    });
+    return drivers;
+  };
+
+  // Endpoint to create a real-time booking (Stage 3)
+  app.post("/api/create-booking", async (req, res, next) => {
+    try {
+      const { customerName, phone, pickupLocation, dropoffLocation, pickupAddress, dropoffAddress, carType } = req.body;
+
+      // Fetch Site Settings for Commission and Pricing
+      const settingsDoc = await adminDb.collection("settings").doc("site").get();
+      const settings = settingsDoc.data() || {};
+      const commissionRate = settings.commissionRate || 10;
+      const baseFee = settings.baseFee || 2;
+      const pricePerKm = settings.pricePerKm || 0.5;
+      
+      // Calculate Price (Rough estimate for now if not provided, or trust admin settings)
+      // For now we'll use a fixed price logic or improve it later if geocoding is added
+      const mockPrice = 15; 
+      const commission = (mockPrice * commissionRate) / 100;
+
+      // Add booking to Firestore
+      const bookingRef = await adminDb.collection("bookings").add({
+        customerName,
+        phone,
+        pickupLocation,
+        dropoffLocation,
+        pickupAddress,
+        dropoffAddress,
+        carType,
+        price: mockPrice,
+        commission: commission,
+        status: "searching_driver",
+        assignedDriverId: null,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      const drivers = await findNearbyDrivers(pickupLocation, carType);
+
+      // Smart Dispatch: Sort by distance and take top 5
+      const candidates = drivers
+        .map(d => {
+          const distance = getDistance(
+            { latitude: d.location.lat, longitude: d.location.lng },
+            { latitude: pickupLocation.lat, longitude: pickupLocation.lng }
+          );
+          return { ...d, distance };
+        })
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, 5);
+
+      // Create requests for each candidate driver
+      const batch = adminDb.batch();
+      for (const driver of candidates) {
+        const requestRef = adminDb.collection("driver_requests").doc();
+        batch.set(requestRef, {
+          driverId: driver.id,
+          bookingId: bookingRef.id,
+          status: "pending",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          expiresAt: Date.now() + 60000 // 1 minute expiry
+        });
+      }
+      await batch.commit();
+
+      res.json({ success: true, bookingId: bookingRef.id, driversCount: candidates.length });
+    } catch (error) {
+      next(error);
+    }
+  });
 
   // API Routes
   app.get("/api/health", (req, res) => {

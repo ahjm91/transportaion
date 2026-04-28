@@ -11,8 +11,8 @@ interface BookingFormProps {
   siteSettings: SiteSettings;
   bookingData: BookingData;
   setBookingData: (data: BookingData) => void;
-  bookingMode: 'fixed' | 'custom';
-  setBookingMode: (mode: 'fixed' | 'custom') => void;
+  bookingMode: 'fixed' | 'custom' | 'realtime';
+  setBookingMode: (mode: 'fixed' | 'custom' | 'realtime') => void;
   handleBooking: (e: React.FormEvent) => void;
   isBooking: boolean;
 }
@@ -70,20 +70,29 @@ export const BookingForm = ({
             viewport={{ once: true }}
             className="bg-white rounded-[3rem] p-8 md:p-12 shadow-2xl shadow-dark/5 border border-gray-100"
           >
-            <div className="flex gap-4 p-2 bg-gray-50 rounded-2xl mb-8">
+            <div className="flex gap-4 p-2 bg-gray-50 rounded-2xl mb-8 overflow-x-auto">
+              <button 
+                onClick={() => setBookingMode('realtime')}
+                className={cn(
+                  "flex-1 py-3 rounded-xl text-sm font-bold transition-all whitespace-nowrap px-4",
+                  bookingMode === 'realtime' ? "bg-white text-dark shadow-sm" : "text-gray-400 hover:text-dark"
+                )}
+              >
+                {lang === 'ar' ? 'حجز فوري (تتبع مباشر)' : 'Instant (Live Tracking)'}
+              </button>
               <button 
                 onClick={() => setBookingMode('custom')}
                 className={cn(
-                  "flex-1 py-3 rounded-xl text-sm font-bold transition-all",
+                  "flex-1 py-3 rounded-xl text-sm font-bold transition-all whitespace-nowrap px-4",
                   bookingMode === 'custom' ? "bg-white text-dark shadow-sm" : "text-gray-400 hover:text-dark"
                 )}
               >
-                {lang === 'ar' ? 'رحلة مخصصة' : 'Custom Trip'}
+                {lang === 'ar' ? 'رحلة مخصصة (واتساب)' : 'Custom (WhatsApp)'}
               </button>
               <button 
                 onClick={() => setBookingMode('fixed')}
                 className={cn(
-                  "flex-1 py-3 rounded-xl text-sm font-bold transition-all",
+                  "flex-1 py-3 rounded-xl text-sm font-bold transition-all whitespace-nowrap px-4",
                   bookingMode === 'fixed' ? "bg-white text-dark shadow-sm" : "text-gray-400 hover:text-dark"
                 )}
               >
@@ -224,7 +233,7 @@ export const BookingForm = ({
                 )}
                 {isBooking 
                   ? (lang === 'ar' ? 'جاري الحفظ...' : 'Booking...') 
-                  : (bookingMode === 'fixed' ? t('confirmBooking') : t('sendRequest'))
+                  : (bookingMode === 'realtime' ? (lang === 'ar' ? 'ابدأ البحث عن سائق' : 'Start Searching') : (bookingMode === 'fixed' ? t('confirmBooking') : t('sendRequest')))
                 }
                 {!isBooking && <ArrowRight className={cn("w-5 h-5", lang === 'ar' ? "rotate-180" : "")} />}
               </button>

@@ -5,7 +5,7 @@ import {
   X, Layout, Box, Globe, DollarSign, Users, PieChart, Star, 
   Settings, LogOut, Search, Bell, Menu, Shield, Loader2
 } from 'lucide-react';
-import { Trip, SiteSettings, Service, SpecializedService, UserProfile, FixedRoute } from '../../types';
+import { Trip, SiteSettings, Service, SpecializedService, UserProfile, FixedRoute, Booking, Driver } from '../../types';
 import { AccountingTab } from './AccountingTab';
 import { ContentTab } from './ContentTab';
 import { BrandingTab } from './BrandingTab';
@@ -19,7 +19,9 @@ interface AdminDashboardProps {
   siteSettings: SiteSettings;
   setSiteSettings: (settings: SiteSettings) => void;
   trips: Trip[];
+  bookings: Booking[];
   users: UserProfile[];
+  allDrivers: Driver[];
   services: Service[];
   specializedServices: SpecializedService[];
   fixedRoutes: FixedRoute[];
@@ -44,7 +46,7 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard = ({
-  isOpen, onClose, siteSettings, setSiteSettings, trips, users, 
+  isOpen, onClose, siteSettings, setSiteSettings, trips, bookings, users, allDrivers,
   services, specializedServices, fixedRoutes, isUsersLoading,
   activeTab, setActiveTab, lang, isSuperAdmin,
   setEditingTrip, setTripFormData, setIsTripFormOpen, setTripToDelete,
@@ -126,8 +128,48 @@ export const AdminDashboard = ({
           </div>
         </div>
 
+        {/* Pro Stats Summary */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-8 mb-4 shrink-0">
+          <div className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4 shadow-sm group hover:shadow-md transition-all">
+            <div className="w-10 h-10 bg-gold/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+              <PieChart className="w-5 h-5 text-gold" />
+            </div>
+            <div>
+              <div className="text-[10px] text-gray-400 font-bold uppercase">إجمالي الرحلات</div>
+              <div className="text-lg font-black text-dark">{trips.length + bookings.filter(b => b.status === 'completed').length}</div>
+            </div>
+          </div>
+          <div className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4 shadow-sm group hover:shadow-md transition-all">
+            <div className="w-10 h-10 bg-green-50 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Users className="w-5 h-5 text-green-500" />
+            </div>
+            <div>
+              <div className="text-[10px] text-gray-400 font-bold uppercase">سائقين متصلين</div>
+              <div className="text-lg font-black text-dark">{allDrivers.filter(d => d.status === 'online').length}</div>
+            </div>
+          </div>
+          <div className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4 shadow-sm group hover:shadow-md transition-all">
+            <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Star className="w-5 h-5 text-blue-500" />
+            </div>
+            <div>
+              <div className="text-[10px] text-gray-400 font-bold uppercase">رحلات نشطة</div>
+              <div className="text-lg font-black text-dark">{bookings.filter(b => !['completed', 'cancelled', 'no_driver_found'].includes(b.status)).length}</div>
+            </div>
+          </div>
+          <div className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4 shadow-sm group hover:shadow-md transition-all">
+            <div className="w-10 h-10 bg-orange-50 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Shield className="w-5 h-5 text-orange-500" />
+            </div>
+            <div>
+              <div className="text-[10px] text-gray-400 font-bold uppercase">وقت الوصول تقديراً</div>
+              <div className="text-lg font-black text-dark">8-12 د</div>
+            </div>
+          </div>
+        </div>
+
         {/* Main Content Area */}
-        <div className="flex-1 overflow-y-auto p-8 lg:p-12">
+        <div className="flex-1 overflow-y-auto p-8 lg:p-12 pt-4 lg:pt-4">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -139,6 +181,8 @@ export const AdminDashboard = ({
               {activeTab === 'accounting' && (
                 <AccountingTab 
                   trips={trips}
+                  bookings={bookings}
+                  users={users}
                   tripFilter={tripFilter}
                   setTripFilter={setTripFilter}
                   isAdminScheduleView={isAdminScheduleView}
@@ -179,6 +223,7 @@ export const AdminDashboard = ({
               {activeTab === 'users' && (
                 <UsersTab 
                   users={users}
+                  allDrivers={allDrivers}
                   isUsersLoading={isUsersLoading}
                   safeUpdateDoc={safeUpdateDoc}
                   lang={lang}
