@@ -7,10 +7,12 @@ import {
   doc, 
   runTransaction,
   updateDoc,
-  serverTimestamp 
+  addDoc,
+  serverTimestamp, 
+  getDoc
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
-import { DriverRequest, Booking, Driver } from '../types';
+import { DriverRequest, Booking, Driver, PayoutRequest } from '../types';
 import { 
   CheckCircle2, 
   XCircle, 
@@ -20,7 +22,9 @@ import {
   Clock,
   Car,
   AlertCircle,
-  DollarSign
+  DollarSign,
+  Star,
+  Wallet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -29,6 +33,10 @@ const DriverDashboard: React.FC = () => {
   const [driver, setDriver] = useState<Driver | null>(null);
   const [requests, setRequests] = useState<DriverRequest[]>([]);
   const [activeBooking, setActiveBooking] = useState<Booking | null>(null);
+  const [payouts, setPayouts] = useState<PayoutRequest[]>([]);
+  const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
+  const [payoutAmount, setPayoutAmount] = useState('');
+  const [bankDetails, setBankDetails] = useState('');
   const [loading, setLoading] = useState(true);
   const user = auth.currentUser;
 
@@ -56,9 +64,20 @@ const DriverDashboard: React.FC = () => {
       setRequests(reqData);
     });
 
+    // Load Payouts
+    const qPayouts = query(
+      collection(db, 'payout_requests'),
+      where('driverId', '==', user.uid)
+    );
+    const unsubPayouts = onSnapshot(qPayouts, (snapshot) => {
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as PayoutRequest));
+      setPayouts(data);
+    });
+
     return () => {
       unsubDriver();
       unsubRequests();
+      unsubPayouts();
     };
   }, [user]);
 
@@ -234,11 +253,21 @@ const DriverDashboard: React.FC = () => {
         </div>
         <div className="flex items-center gap-3">
           <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-3">
-            <DollarSign className="w-5 h-5 text-gold" />
-            <div className="text-right">
-              <p className="text-[10px] text-gray-400 font-bold leading-none uppercase">المحفظة</p>
-              <p className="font-black text-sm text-dark">{driver.wallet || 0} BHD</p>
-            </div>
+             <Star className="w-5 h-5 text-gold fill-gold" />
+             <div className="text-right">
+                <p className="text-[10px] text-gray-400 font-bold leading-none uppercase">التقييم</p>
+                <p className="font-black text-sm text-dark">{driver.rating || '5.0'}</p>
+             </div>
+          </div>
+          <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-3 group relative cursor-pointer pt-6" onClick={() => setIsPayoutModalOpen(true)}>
+             <div className="absolute -top-1 right-2 px-2 py-0.5 bg-green-500 text-white text-[8px] font-black rounded-full">سحب رصيد</div>
+             <div className="flex items-center gap-3">
+                <Wallet className="w-5 h-5 text-green-500" />
+                <div className="text-right">
+                  <p className="text-[10px] text-gray-400 font-bold leading-none uppercase">المحفظة</p>
+                  <p className="font-black text-sm text-dark">{driver.wallet || 0} BHD</p>
+                </div>
+             </div>
           </div>
           <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-3 group relative cursor-pointer pt-6">
              <div className="absolute -top-1 right-2 px-2 py-0.5 bg-gold text-[8px] font-black text-dark rounded-full">تفاصيل المركبة</div>

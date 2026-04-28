@@ -1,8 +1,8 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Users, MapPin, Calendar, Clock, CreditCard, Star, Trophy, Gift, Check, Car } from 'lucide-react';
-import { Trip, SiteSettings, UserProfile } from '../../types';
+import { X, Users, MapPin, Calendar, Clock, CreditCard, Star, Trophy, Gift, Check, Car, Copy, Share2 } from 'lucide-react';
+import { Trip, SiteSettings, UserProfile, Booking } from '../../types';
 import { cn } from '../../lib/utils';
 
 interface CustomerDashboardModalProps {
@@ -13,13 +13,14 @@ interface CustomerDashboardModalProps {
   siteSettings: SiteSettings;
   userProfile: UserProfile | null;
   customerTrips: Trip[];
+  realtimeBookings: Booking[];
   customerTab: string;
-  setCustomerTab: (tab: 'trips' | 'rewards') => void;
+  setCustomerTab: (tab: 'trips' | 'rewards' | 'referral') => void;
   onPayNow: (trip: Trip) => void;
 }
 
 export const CustomerDashboardModal = ({
-  isOpen, onClose, lang, t, siteSettings, userProfile, customerTrips, customerTab, setCustomerTab, onPayNow
+  isOpen, onClose, lang, t, siteSettings, userProfile, customerTrips, realtimeBookings, customerTab, setCustomerTab, onPayNow
 }: CustomerDashboardModalProps) => {
   return (
     <AnimatePresence>
@@ -65,6 +66,15 @@ export const CustomerDashboardModal = ({
                     >
                       {lang === 'ar' ? 'العضوية والجوائز' : 'Membership & Rewards'}
                     </button>
+                    <button 
+                      onClick={() => setCustomerTab('referral')}
+                      className={cn(
+                        "text-xs font-bold transition-colors border-r border-gray-200 pr-4",
+                        customerTab === 'referral' ? "text-gold underline underline-offset-4" : "text-gray-400 hover:text-dark"
+                      )}
+                    >
+                      {lang === 'ar' ? 'أرسل واكسب' : 'Referral'}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -78,7 +88,7 @@ export const CustomerDashboardModal = ({
 
             <div className="p-8 overflow-y-auto flex-1 bg-gray-50/50">
               {customerTab === 'trips' ? (
-                customerTrips.length === 0 ? (
+                [...customerTrips, ...realtimeBookings].length === 0 ? (
                   <div className="text-center py-20">
                     <Car className="w-16 h-16 text-gray-200 mx-auto mb-4" />
                     <h4 className="text-lg font-bold text-dark">{lang === 'ar' ? 'لا توجد رحلات' : 'No trips found'}</h4>
@@ -86,38 +96,43 @@ export const CustomerDashboardModal = ({
                   </div>
                 ) : (
                   <div className="grid gap-6">
-                     {customerTrips.map(trip => (
-                       <div key={trip.id} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
-                          <div className="flex justify-between items-start">
-                             <span className={cn(
-                               "px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest",
-                               trip.paymentStatus === 'Paid' ? "bg-green-100 text-green-600" : "bg-orange-100 text-orange-600"
-                             )}>
-                               {trip.paymentStatus}
-                             </span>
-                             <p className="text-xl font-black text-gold">{trip.amount} BHD</p>
-                          </div>
-                          <h5 className="font-black text-dark">{trip.direction}</h5>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-bold text-gray-500">
-                             <div className="flex items-center gap-2"><MapPin className="w-3 h-3" /> {trip.pickup}</div>
-                             <div className="flex items-center gap-2"><Calendar className="w-3 h-3" /> {trip.date}</div>
-                             <div className="flex items-center gap-2"><Clock className="w-3 h-3" /> {trip.time}</div>
-                             <div className="flex items-center gap-2"><Users className="w-3 h-3" /> {trip.passengers} pax</div>
-                          </div>
-                          {trip.amount > 0 && trip.paymentStatus !== 'Paid' && (
-                            <button 
-                              onClick={() => onPayNow(trip)}
-                              className="w-full bg-dark text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gold transition-all"
-                            >
-                              <CreditCard className="w-4 h-4" />
-                              {lang === 'ar' ? 'دفع الآن' : 'Pay Now'}
-                            </button>
-                          )}
-                       </div>
-                     ))}
+                     {[...customerTrips, ...realtimeBookings].sort((a: any, b: any) => {
+                       const dateA = a.createdAt?.seconds ? a.createdAt.seconds : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+                       const dateB = b.createdAt?.seconds ? b.createdAt.seconds : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+                       return dateB - dateA;
+                     }).map(tripEntry => {
+                       const trip = tripEntry as any;
+                       const isRealtime = trip.pickupLocation !== undefined;
+                       return (
+                         <div key={trip.id} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
+                            <div className="flex justify-between items-start">
+                               <div className="flex flex-col gap-1">
+                                 <span className={cn(
+                                   "px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest w-fit",
+                                   trip.status === 'Completed' || trip.status === 'completed' ? "bg-green-100 text-green-600" : 
+                                   (trip.status === 'Cancelled' || trip.status === 'cancelled' ? "bg-red-100 text-red-600" : "bg-orange-100 text-orange-600")
+                                 )}>
+                                   {trip.status}
+                                 </span>
+                                 <span className="text-[10px] text-gray-400 font-bold">
+                                   {isRealtime ? (lang === 'ar' ? 'حجز فوري' : 'Live Booking') : (lang === 'ar' ? 'حجز مسبق' : 'Scheduled')}
+                                 </span>
+                               </div>
+                               <p className="text-xl font-black text-gold">{trip.amount || trip.price} BHD</p>
+                            </div>
+                            <h5 className="font-black text-dark">{isRealtime ? `${trip.pickupAddress} ➔ ${trip.dropoffAddress}` : trip.direction}</h5>
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-xs font-bold text-gray-500">
+                               <div className="flex items-center gap-2 truncate"><MapPin className="w-3 h-3 text-gold" /> {isRealtime ? trip.pickupAddress : trip.pickup}</div>
+                               <div className="flex items-center gap-2"><Calendar className="w-3 h-3 text-gold" /> {trip.date}</div>
+                               <div className="flex items-center gap-2"><Clock className="w-3 h-3 text-gold" /> {trip.time}</div>
+                               <div className="flex items-center gap-2"><Star className="w-3 h-3 text-gold" /> {trip.rating || (lang === 'ar' ? 'بدون تقييم' : 'No rating')}</div>
+                            </div>
+                         </div>
+                       );
+                     })}
                   </div>
                 )
-              ) : (
+              ) : customerTab === 'rewards' ? (
                 <div className="space-y-8">
                   {/* Membership Card */}
                   <div className="bg-dark rounded-[2.5rem] p-8 text-white relative overflow-hidden">
@@ -170,6 +185,51 @@ export const CustomerDashboardModal = ({
                             </li>
                           ))}
                        </ul>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+                  <div className="bg-gradient-to-br from-gold to-dark rounded-[2.5rem] p-10 text-white relative overflow-hidden text-center">
+                    <div className="relative z-10 space-y-6">
+                      <div className="w-20 h-20 bg-white/20 backdrop-blur-xl rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Gift className="w-10 h-10 text-white" />
+                      </div>
+                      <h4 className="text-3xl font-black">{lang === 'ar' ? 'شارك واربح رصيد!' : 'Refer & Earn Credit!'}</h4>
+                      <p className="text-white/70 max-w-sm mx-auto text-sm leading-relaxed">
+                        {lang === 'ar' 
+                          ? 'أرسل كود الإحالة لأصدقائك واحصل على 5 BHD رصيد في محفظتك لكل صديق يقوم برحلته الأولى.'
+                          : 'Send your referral code to friends and get 5 BHD credit in your wallet for every friend who completes their first trip.'}
+                      </p>
+                      
+                      <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 flex flex-col items-center gap-4 max-w-sm mx-auto">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-gold">{lang === 'ar' ? 'كود الإحالة الخاص بك' : 'Your Referral Code'}</p>
+                        <div className="flex items-center gap-4">
+                          <span className="text-2xl font-black tracking-widest">{userProfile?.referralCode || '------'}</span>
+                          <button 
+                            onClick={() => {
+                              navigator.clipboard.writeText(userProfile?.referralCode || '');
+                              alert(lang === 'ar' ? 'تم نسخ الكود!' : 'Code copied!');
+                            }}
+                            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                          >
+                            <Copy className="w-4 h-4 text-gold" />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <button 
+                        onClick={() => {
+                          const message = lang === 'ar' 
+                            ? `استخدم كودي ${userProfile?.referralCode} في GCC TAXI واحصل على خصم أول رحلة!`
+                            : `Use my code ${userProfile?.referralCode} on GCC TAXI and get a discount on your first trip!`;
+                          window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+                        }}
+                        className="bg-white text-dark py-4 px-8 rounded-2xl font-black text-sm flex items-center justify-center gap-2 mx-auto hover:bg-gold transition-all"
+                      >
+                        <Share2 className="w-4 h-4" />
+                        {lang === 'ar' ? 'مشاركة عبر واتساب' : 'Share on WhatsApp'}
+                      </button>
                     </div>
                   </div>
                 </div>

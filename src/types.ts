@@ -21,6 +21,8 @@ export interface BookingData {
   specialRequests?: string;
   distance?: number;
   amount?: number;
+  promoCode?: string;
+  discount?: number;
 }
 
 export interface Service {
@@ -95,6 +97,7 @@ export interface SiteSettings {
   showBookingSection: boolean;
   showCTASection: boolean;
   commissionRate: number;
+  promoCodes?: { code: string; discountPercent: number; maxUsage?: number }[];
 }
 
 export interface UserProfile {
@@ -113,6 +116,8 @@ export interface UserProfile {
   availableRewards: string[]; 
   driverApplicationStatus?: 'pending' | 'approved' | 'rejected';
   wallet?: number;
+  referralCode?: string;
+  referredBy?: string;
   carImage?: string;
   plateNumber?: string;
   driverApplicationData?: {
@@ -140,6 +145,8 @@ export interface Driver {
   wallet?: number;
   carImage?: string;
   plateNumber?: string;
+  rating?: number;
+  totalRatings?: number;
 }
 
 export interface Booking {
@@ -153,6 +160,10 @@ export interface Booking {
   carType: 'Standard' | 'VIP' | 'Van';
   price: number;
   commission?: number;
+  rating?: number;
+  review?: string;
+  promoCode?: string;
+  discount?: number;
   status: 'pending' | 'searching_driver' | 'driver_assigned' | 'driver_arriving' | 'trip_started' | 'completed' | 'cancelled' | 'no_driver_found';
   assignedDriverId: string | null;
   userId?: string;
@@ -206,6 +217,16 @@ export interface FixedRoute {
   pickup: string;
   dropoff: string;
   price: number;
+}
+
+export interface PayoutRequest {
+  id: string;
+  driverId: string;
+  driverName: string;
+  amount: number;
+  status: 'pending' | 'completed' | 'rejected';
+  bankDetails?: string;
+  createdAt: any;
 }
 
 export enum OperationType {

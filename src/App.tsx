@@ -173,10 +173,13 @@ function App() {
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [customerTrips, setCustomerTrips] = useState<Trip[]>([]);
+  const [userRealtimeBookings, setUserRealtimeBookings] = useState<Booking[]>([]);
   const [paymentTrip, setPaymentTrip] = useState<Trip | null>(null);
   const [searchTripId, setSearchTripId] = useState('');
   const [isSearchingTrip, setIsSearchingTrip] = useState(false);
   const [isTranslating, setIsTranslating] = useState<string | null>(null);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [completedBooking, setCompletedBooking] = useState<Booking | null>(null);
 
   const translateText = async (text: string) => {
     if (!text || !text.trim()) return '';
@@ -230,6 +233,11 @@ function App() {
     const unsub = onSnapshot(doc(db, 'bookings', activeRealtimeBooking.id), (snapshot) => {
       if (snapshot.exists()) {
         const data = { id: snapshot.id, ...snapshot.data() } as Booking;
+        if (data.status === 'completed' && activeRealtimeBooking?.status !== 'completed' && !data.rating) {
+          setCompletedBooking(data);
+          setShowRatingModal(true);
+        }
+        
         setActiveRealtimeBooking(data);
 
         // If driver assigned, start tracking them
@@ -533,6 +541,9 @@ function App() {
       if (docSnap.exists()) {
         const profile = docSnap.data() as UserProfile;
         
+        let needsUpdate = false;
+        const updates: any = {};
+
         // If existing user has no membership number, assign one
         if (!profile.membershipNumber) {
           try {
@@ -547,10 +558,21 @@ function App() {
               
               transaction.update(userRef, { membershipNumber: nextNum });
               transaction.set(statsRef, { lastMembershipNumber: nextNum }, { merge: true });
+              profile.membershipNumber = nextNum;
             });
           } catch (e) {
             console.error("Error assigning membership number:", e);
           }
+        }
+        
+        // Generate referral code if missing
+        if (!profile.referralCode) {
+          updates.referralCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+          needsUpdate = true;
+        }
+        
+        if (needsUpdate) {
+          await updateDoc(userRef, updates);
         }
         
         setUserProfile(profile);
@@ -587,7 +609,8 @@ function App() {
               isVerified: false,
               verificationMessage: 'جاري مراجعة طلب اشتراكك من قبل الإدارة لتفعيل العضوية.',
               cashbackBalance: 0,
-              availableRewards: []
+              availableRewards: [],
+              referralCode: Math.random().toString(36).substring(2, 8).toUpperCase()
             };
 
             transaction.set(userRef, newProfile);
@@ -678,6 +701,12 @@ function App() {
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Trip));
         setCustomerTrips(data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
       }, (error) => handleFirestoreError(error, OperationType.GET, 'trips (customer)'));
+
+      const qRealtime = query(collection(db, 'bookings'), where('userId', '==', user.uid));
+      unsubscribeBookings = onSnapshot(qRealtime, (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Booking));
+        setUserRealtimeBookings(data);
+      }, (error) => handleFirestoreError(error, OperationType.GET, 'bookings (customer)'));
     }
 
     let unsubscribeUsers = () => {};
@@ -722,8 +751,18 @@ function App() {
         if (bookingData.carType === 'VIP') price += (siteSettings.vipSurcharge || 5);
         else if (bookingData.carType === 'Van') price += (siteSettings.vanSurcharge || 12);
         
-        if (bookingData.amount !== price) {
-          setBookingData(prev => ({ ...prev, amount: price }));
+        // Apply Promo Code
+        let discount = 0;
+        if (bookingData.promoCode) {
+          const promo = siteSettings.promoCodes?.find(p => p.code === bookingData.promoCode.toUpperCase());
+          if (promo) {
+            discount = (price * promo.discountPercent) / 100;
+            price -= discount;
+          }
+        }
+
+        if (bookingData.amount !== price || bookingData.discount !== discount) {
+          setBookingData(prev => ({ ...prev, amount: price, discount: discount }));
         }
       } else {
         if (bookingData.amount !== 0) {
@@ -2492,153 +2531,166 @@ function App() {
           </div>
         )}
       </AnimatePresence>
+    </>
+  )}
 
-      <AdminDashboard
-        isOpen={isDashboardOpen && isAdmin}
-        onClose={() => setIsDashboardOpen(false)}
-        siteSettings={siteSettings}
-        setSiteSettings={setSiteSettings}
-        trips={trips}
-        bookings={bookings}
-        users={users}
-        allDrivers={allDrivers}
-        services={services}
-        specializedServices={specializedServices}
-        fixedRoutes={fixedRoutes}
-        isUsersLoading={isUsersLoading}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab as any}
-        lang={lang}
-        isSuperAdmin={isSuperAdmin}
-        setEditingTrip={setEditingTrip}
-        setTripFormData={setTripFormData}
-        setIsTripFormOpen={setIsTripFormOpen}
-        setTripToDelete={setTripToDelete}
-        handleSaveSettings={handleSaveSettings}
-        handleImageUpload={handleImageUpload}
-        safeAddDoc={safeAddDoc}
-        safeUpdateDoc={safeUpdateDoc}
-        safeDeleteDoc={safeDeleteDoc}
-      />
+  <AdminDashboard
+    isOpen={isDashboardOpen && isAdmin}
+    onClose={() => setIsDashboardOpen(false)}
+    siteSettings={siteSettings}
+    setSiteSettings={setSiteSettings}
+    trips={trips}
+    bookings={bookings}
+    users={users}
+    allDrivers={allDrivers}
+    services={services}
+    specializedServices={specializedServices}
+    fixedRoutes={fixedRoutes}
+    isUsersLoading={isUsersLoading}
+    activeTab={activeTab}
+    setActiveTab={setActiveTab as any}
+    lang={lang}
+    isSuperAdmin={isSuperAdmin}
+    setEditingTrip={setEditingTrip}
+    setTripFormData={setTripFormData}
+    setIsTripFormOpen={setIsTripFormOpen}
+    setTripToDelete={setTripToDelete}
+    handleSaveSettings={handleSaveSettings}
+    handleImageUpload={handleImageUpload}
+    safeAddDoc={safeAddDoc}
+    safeUpdateDoc={safeUpdateDoc}
+    safeDeleteDoc={safeDeleteDoc}
+  />
 
-      {/* Payment Modal */}
-      <PaymentModal
-        isOpen={isPaymentOpen}
-        onClose={() => setIsPaymentOpen(false)}
-        siteSettings={siteSettings}
-        lang={lang}
-        t={t}
-      />
+  <PaymentModal
+    isOpen={isPaymentOpen}
+    onClose={() => setIsPaymentOpen(false)}
+    siteSettings={siteSettings}
+    lang={lang}
+    t={t}
+  />
 
-      {/* Customer Dashboard Modal */}
-      <CustomerDashboardModal
-        isOpen={isCustomerDashboardOpen}
-        onClose={() => setIsCustomerDashboardOpen(false)}
-        lang={lang}
-        t={t}
-        siteSettings={siteSettings}
-        userProfile={userProfile}
-        customerTrips={customerTrips}
-        customerTab={customerTab}
-        setCustomerTab={setCustomerTab}
-        onPayNow={(trip) => {
-          setPaymentTrip(trip);
-          setIsPaymentOpen(true);
-          setIsCustomerDashboardOpen(false);
-        }}
-      />
+  <CustomerDashboardModal
+    isOpen={isCustomerDashboardOpen}
+    onClose={() => setIsCustomerDashboardOpen(false)}
+    lang={lang}
+    t={t}
+    siteSettings={siteSettings}
+    userProfile={userProfile}
+    customerTrips={customerTrips}
+    realtimeBookings={userRealtimeBookings}
+    customerTab={customerTab}
+    setCustomerTab={setCustomerTab}
+    onPayNow={(trip) => {
+      setPaymentTrip(trip);
+      setIsPaymentOpen(true);
+      setIsCustomerDashboardOpen(false);
+    }}
+  />
 
+  <TripForm
+    isOpen={isTripFormOpen}
+    onClose={() => setIsTripFormOpen(false)}
+    editingTrip={editingTrip}
+    tripFormData={tripFormData}
+    setTripFormData={setTripFormData}
+    onSubmit={handleSaveTrip}
+    isSuperAdmin={isSuperAdmin}
+  />
+
+  <TripDeleteModal
+    trip={tripToDelete}
+    onClose={() => setTripToDelete(null)}
+    onConfirm={async () => {
+      if (tripToDelete) {
+        await safeDeleteDoc(doc(db, 'trips', tripToDelete.id));
+        setTripToDelete(null);
+      }
+    }}
+  />
+
+  {/* Rating Modal */}
+      <AnimatePresence>
+        {showRatingModal && completedBooking && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-dark/80 backdrop-blur-sm"
+              onClick={() => setShowRatingModal(false)}
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative bg-white w-full max-w-sm rounded-[32px] p-8 shadow-2xl space-y-6 text-center"
+            >
+              <div className="mx-auto w-16 h-16 bg-gold/10 rounded-full flex items-center justify-center">
+                <Star className="w-8 h-8 text-gold" fill="currentColor" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-dark mb-2">كيف كانت تجربتك؟</h3>
+                <p className="text-gray-500 text-sm">تقييمك يساعدنا على تحسين الخدمة</p>
+              </div>
               
-
-
-      {/* Trip Form Modal */}
-      <TripForm
-        isOpen={isTripFormOpen}
-        onClose={() => setIsTripFormOpen(false)}
-        editingTrip={editingTrip}
-        tripFormData={tripFormData}
-        setTripFormData={setTripFormData}
-        onSubmit={handleSaveTrip}
-        isSuperAdmin={isSuperAdmin}
-      />
-
-        </>
-      )}
-
-      {/* Modals & Dashboards */}
-      <AdminDashboard
-        isOpen={isDashboardOpen && isAdmin}
-        onClose={() => setIsDashboardOpen(false)}
-        siteSettings={siteSettings}
-        setSiteSettings={setSiteSettings}
-        trips={trips}
-        bookings={bookings}
-        users={users}
-        allDrivers={allDrivers}
-        services={services}
-        specializedServices={specializedServices}
-        fixedRoutes={fixedRoutes}
-        isUsersLoading={isUsersLoading}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab as any}
-        lang={lang}
-        isSuperAdmin={isSuperAdmin}
-        setEditingTrip={setEditingTrip}
-        setTripFormData={setTripFormData}
-        setIsTripFormOpen={setIsTripFormOpen}
-        setTripToDelete={setTripToDelete}
-        handleSaveSettings={handleSaveSettings}
-        handleImageUpload={handleImageUpload}
-        safeAddDoc={safeAddDoc}
-        safeUpdateDoc={safeUpdateDoc}
-        safeDeleteDoc={safeDeleteDoc}
-      />
-
-      <PaymentModal
-        isOpen={isPaymentOpen}
-        onClose={() => setIsPaymentOpen(false)}
-        siteSettings={siteSettings}
-        lang={lang}
-        t={t}
-      />
-
-      <CustomerDashboardModal
-        isOpen={isCustomerDashboardOpen}
-        onClose={() => setIsCustomerDashboardOpen(false)}
-        lang={lang}
-        t={t}
-        siteSettings={siteSettings}
-        userProfile={userProfile}
-        customerTrips={customerTrips}
-        customerTab={customerTab}
-        setCustomerTab={setCustomerTab}
-        onPayNow={(trip) => {
-          setPaymentTrip(trip);
-          setIsPaymentOpen(true);
-          setIsCustomerDashboardOpen(false);
-        }}
-      />
-
-      <TripForm
-        isOpen={isTripFormOpen}
-        onClose={() => setIsTripFormOpen(false)}
-        editingTrip={editingTrip}
-        tripFormData={tripFormData}
-        setTripFormData={setTripFormData}
-        onSubmit={handleSaveTrip}
-        isSuperAdmin={isSuperAdmin}
-      />
-
-      <TripDeleteModal
-        trip={tripToDelete}
-        onClose={() => setTripToDelete(null)}
-        onConfirm={async () => {
-          if (tripToDelete) {
-            await safeDeleteDoc(doc(db, 'trips', tripToDelete.id));
-            setTripToDelete(null);
-          }
-        }}
-      />
+              <div className="flex justify-center gap-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    onClick={() => {
+                      const updateTrip = async () => {
+                        if (!completedBooking.id || !completedBooking.assignedDriverId) return;
+                        
+                        try {
+                          // Update booking with rating
+                          await updateDoc(doc(db, 'bookings', completedBooking.id), {
+                            rating: star
+                          });
+                          
+                          // Update driver rating
+                          const driverRef = doc(db, 'drivers', completedBooking.assignedDriverId);
+                          const driverSnap = await getDoc(driverRef);
+                          if (driverSnap.exists()) {
+                             const d = driverSnap.data();
+                             const currentRating = d.rating || 5;
+                             const total = d.totalRatings || 0;
+                             const newRating = ((currentRating * total) + star) / (total + 1);
+                             await updateDoc(driverRef, {
+                               rating: parseFloat(newRating.toFixed(1)),
+                               totalRatings: total + 1
+                             });
+                          }
+                          
+                          setShowRatingModal(false);
+                          setCompletedBooking(null);
+                          alert(lang === 'ar' ? 'شكراً لتقييمك!' : 'Thank you for your rating!');
+                        } catch (err) {
+                           console.error('Error submitting rating:', err);
+                        }
+                      };
+                      updateTrip();
+                    }}
+                    className="p-2 hover:scale-110 transition-transform"
+                  >
+                    <Star className="w-8 h-8 text-gold" />
+                  </button>
+                ))}
+              </div>
+              
+              <button 
+                onClick={() => {
+                  setShowRatingModal(false);
+                  setCompletedBooking(null);
+                }}
+                className="text-gray-400 text-sm font-bold hover:text-dark transition-colors"
+              >
+                {lang === 'ar' ? 'تخطي الآن' : 'Skip now'}
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

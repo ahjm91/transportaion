@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapPin, Calendar, Clock, Users, ShoppingBag, Car, Star, ShieldCheck, Loader2, ArrowRight } from 'lucide-react';
+import { MapPin, Calendar, Clock, Users, ShoppingBag, Car, Star, ShieldCheck, Loader2, ArrowRight, Tag } from 'lucide-react';
 import { BookingData, SiteSettings } from '../../types';
 import { translations } from '../../translations';
 import { cn } from '../../lib/utils';
@@ -218,6 +218,25 @@ export const BookingForm = ({
                     <option value="VIP">VIP</option>
                     <option value="Van">Van</option>
                   </select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{lang === 'ar' ? 'كود الخصم (اختياري)' : 'Promo Code (Optional)'}</label>
+                <div className="relative">
+                  <Tag className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 w-4 h-4 pointer-events-none" />
+                  <input 
+                    type="text" 
+                    placeholder="PROMO2026"
+                    className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-10 pl-6 focus:ring-2 focus:ring-gold/20 transition-all font-black uppercase tracking-widest placeholder:text-gray-200"
+                    value={bookingData.promoCode || ''}
+                    onChange={e => setBookingData({ ...bookingData, promoCode: e.target.value.toUpperCase() })}
+                  />
+                  {bookingData.discount && bookingData.discount > 0 && (
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-green-500 font-bold text-xs">
+                      {lang === 'ar' ? 'تم تطبيق الخصم!' : 'Discount applied!'}
+                    </div>
+                  )}
                 </div>
               </div>
 

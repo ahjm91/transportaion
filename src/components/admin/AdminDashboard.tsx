@@ -3,7 +3,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Layout, Box, Globe, DollarSign, Users, PieChart, Star, 
-  Settings, LogOut, Search, Bell, Menu, Shield, Loader2
+  Settings, LogOut, Search, Bell, Menu, Shield, Loader2, Gift
 } from 'lucide-react';
 import { Trip, SiteSettings, Service, SpecializedService, UserProfile, FixedRoute, Booking, Driver } from '../../types';
 import { AccountingTab } from './AccountingTab';
@@ -11,6 +11,8 @@ import { ContentTab } from './ContentTab';
 import { BrandingTab } from './BrandingTab';
 import { PricingTab } from './PricingTab';
 import { UsersTab } from './UsersTab';
+import { PayoutsTab } from './PayoutsTab';
+import { PromoCodesTab } from './PromoCodesTab';
 import { cn } from '../../lib/utils';
 
 interface AdminDashboardProps {
@@ -57,8 +59,10 @@ export const AdminDashboard = ({
 
   const menuItems = [
     { id: 'accounting', name: 'المحاسبة والرحلات', icon: PieChart },
+    { id: 'payouts', name: 'طلبات السحب', icon: DollarSign },
+    { id: 'promos', name: 'أكواد الخصم', icon: Gift },
     { id: 'content', name: 'إدارة المحتوى', icon: Layout },
-    { id: 'pricing', name: 'التسعير والربط', icon: DollarSign },
+    { id: 'pricing', name: 'التسعير والربط', icon: Settings },
     { id: 'users', name: 'إدارة المستخدمين', icon: Users },
     { id: 'branding', name: 'الهوية البصرية', icon: Star },
   ];
@@ -193,6 +197,17 @@ export const AdminDashboard = ({
                   setTripFormData={setTripFormData}
                   setIsTripFormOpen={setIsTripFormOpen}
                   setTripToDelete={setTripToDelete}
+                />
+              )}
+
+              {activeTab === 'payouts' && (
+                <PayoutsTab />
+              )}
+
+              {activeTab === 'promos' && (
+                <PromoCodesTab 
+                  siteSettings={siteSettings}
+                  setSiteSettings={setSiteSettings}
                 />
               )}
 
