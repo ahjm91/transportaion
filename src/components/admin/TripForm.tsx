@@ -57,7 +57,13 @@ export const TripForm = ({
             </div>
 
             <form onSubmit={onSubmit} className="p-8 overflow-y-auto space-y-8">
-              <div className="grid md:grid-cols-4 gap-6">
+              <div className="grid md:grid-cols-5 gap-6">
+                <div className="space-y-2 flex flex-col justify-end">
+                  <label className="text-xs font-black text-gray-400 uppercase">رقم الحجز</label>
+                  <div className="bg-gray-100 border border-gray-200 rounded-2xl p-4 font-mono font-bold text-gold text-center">
+                    {tripFormData.bookingNumber || (editingTrip ? editingTrip.id.slice(-6).toUpperCase() : 'سيتولد تلقائياً')}
+                  </div>
+                </div>
                 <div className="space-y-2">
                   <label className="text-xs font-black text-gray-400 uppercase">نوع الحجز</label>
                   <select 

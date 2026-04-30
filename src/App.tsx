@@ -394,6 +394,7 @@ function App() {
     customerName: '',
     email: '',
     phone: '',
+    countryCode: '+973',
     confirmPhone: '',
     pickup: '',
     dropoff: '',
@@ -924,7 +925,7 @@ function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             customerName: bookingData.customerName,
-            phone: bookingData.phone,
+            phone: `${bookingData.countryCode || ''} ${bookingData.phone}`.trim(),
             pickupLocation: { lat: 26.22, lng: 50.58 }, // Demo coordinates, in real app would use geocoding
             dropoffLocation: { lat: 26.25, lng: 50.60 },
             pickupAddress: bookingData.pickup,
@@ -959,19 +960,52 @@ function App() {
       }
 
       console.log('Calculating price...');
-      // Determine if it's a custom booking or fixed
-      const isCustom = bookingMode === 'custom';
       
-      // Check for fixed price if not in custom mode
-      const matchedRoute = !isCustom ? fixedRoutes.find(r => 
-        r.pickup.trim().toLowerCase() === bookingData.pickup.trim().toLowerCase() && 
-        r.dropoff.trim().toLowerCase() === bookingData.dropoff.trim().toLowerCase()
-      ) : null;
-      
-      let finalAmount = matchedRoute ? matchedRoute.price : (bookingData.amount || 0);
+      // Generate Booking Number DD/MM/YYYY/N
+      const now = new Date();
+      const day = String(now.getDate()).padStart(2, '0');
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const year = now.getFullYear();
+      const monthKey = `${year}-${month}`;
+      let sequence = Math.floor(1000 + Math.random() * 9000); // More unique default
 
-      // Apply car type surcharge for fixed routes
-      if (matchedRoute) {
+      try {
+        await runTransaction(db, async (transaction) => {
+          const counterRef = doc(db, 'counters', `bookings_${monthKey}`);
+          const counterSnap = await transaction.get(counterRef);
+          if (counterSnap.exists()) {
+            const currentCount = counterSnap.data().count || 0;
+            sequence = currentCount + 1;
+            transaction.update(counterRef, { count: sequence });
+          } else {
+            sequence = 1;
+            transaction.set(counterRef, { count: 1 });
+          }
+        });
+      } catch (e) {
+        console.error("Error generating sequence:", e);
+      }
+
+      const bookingNumber = `${day}/${month}/${year}/${sequence}`;
+
+      // Determine if it's a custom booking or fixed
+      const isFixed = bookingMode === 'fixed';
+      
+      // Check for fixed price
+      let matchedRoute = null;
+      if (isFixed) {
+        matchedRoute = fixedRoutes.find(r => 
+          (r.pickup.trim().toLowerCase() === (bookingData.pickup || '').trim().toLowerCase() && 
+           r.dropoff.trim().toLowerCase() === (bookingData.dropoff || '').trim().toLowerCase()) ||
+          r.id === bookingData.promoCode // Fallback check if id was stored in promoCode during selection hack
+        );
+      }
+      
+      let finalAmount = bookingData.amount || (matchedRoute ? matchedRoute.price : 0);
+
+      // Final protective check for amount if it's still 0 but we have a matched route
+      if (!finalAmount && matchedRoute) {
+        finalAmount = matchedRoute.price;
         if (bookingData.carType === 'VIP') finalAmount += (siteSettings.vipSurcharge || 5);
         else if (bookingData.carType === 'Van') finalAmount += (siteSettings.vanSurcharge || 12);
       }
@@ -981,23 +1015,23 @@ function App() {
       // Save to Firestore first
       const tripData: Omit<Trip, 'id'> = {
         userId: user?.uid || null,
-        bookingType: bookingData.bookingType,
-        firstName: bookingData.firstName,
-        lastName: bookingData.lastName,
-        customerName: `${bookingData.firstName} ${bookingData.lastName}`.trim() || bookingData.customerName,
-        email: bookingData.email,
-        phone: bookingData.phone,
-        passengers: bookingData.passengers,
-        bags: bookingData.bags,
-        carType: bookingData.carType,
+        bookingType: bookingData.bookingType || 'transfer',
+        firstName: bookingData.firstName || '',
+        lastName: bookingData.lastName || '',
+        customerName: `${bookingData.firstName || ''} ${bookingData.lastName || ''}`.trim() || bookingData.customerName || 'عميل',
+        email: bookingData.email || '',
+        phone: `${bookingData.countryCode || ''} ${bookingData.phone}`.trim() || '',
+        passengers: bookingData.passengers || 1,
+        bags: bookingData.bags || 0,
+        carType: bookingData.carType || 'Standard',
         direction: bookingData.bookingType === 'hourly' 
           ? `${t('hourly')} (${bookingData.hours} ${t('hours')}) - ${bookingData.pickup}`
           : `${bookingData.pickup} ← ${bookingData.dropoff}`,
-        pickup: bookingData.pickup,
-        dropoff: bookingData.bookingType === 'hourly' ? `${bookingData.hours} ${t('hours')}` : bookingData.dropoff,
+        pickup: bookingData.pickup || '',
+        dropoff: bookingData.bookingType === 'hourly' ? `${bookingData.hours} ${t('hours')}` : (bookingData.dropoff || ''),
         distance: bookingData.distance || 0,
-        date: bookingData.date,
-        time: bookingData.time,
+        date: bookingData.date || new Date().toISOString().split('T')[0],
+        time: bookingData.time || '10:00',
         hours: bookingData.hours || 1,
         amount: Number(finalAmount) || 0,
         driverType: 'In',
@@ -1006,33 +1040,37 @@ function App() {
         profit: (Number(finalAmount) * (siteSettings.commissionRate || 10)) / 100,
         paymentStatus: 'Pending',
         status: Number(finalAmount) > 0 ? 'Confirmed' : 'Requested',
-        notes: isCustom ? 'طلب حجز مخصص' : (matchedRoute ? 'حجز تلقائي (سعر ثابت)' : 'حجز عبر الموقع'),
+        notes: !isFixed ? 'طلب حجز مخصص' : (matchedRoute ? 'حجز تلقائي (سعر ثابت)' : 'حجز عبر الموقع'),
         specialRequests: bookingData.specialRequests || '',
+        bookingNumber: bookingNumber,
         createdAt: new Date().toISOString()
       };
 
       console.log('Saving to Firestore...', tripData);
       const docRef = await safeAddDoc(collection(db, 'trips'), tripData);
       if (!docRef) {
-        throw new Error('Failed to save trip to database (safeAddDoc returned null)');
+        throw new Error('فشل حفظ البيانات في قاعدة البيانات');
       }
       console.log('Trip saved with ID:', docRef.id);
       
       const newTrip = { id: docRef.id, ...tripData } as Trip;
       
-      // Notify Admin via Email
-      console.log('Sending notification email...');
+      // Notify Admin via Email (Non-blocking)
+      console.log('Sending notification email in background...');
       fetch('/api/notify-booking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...newTrip, companyName: siteSettings.companyName })
-      }).catch(e => console.error('Notify error:', e));
+      }).catch(e => console.error('Background Notify error:', e));
 
       // WhatsApp Message Construction
+      const fullPhone = `${bookingData.countryCode || ''} ${bookingData.phone}`.trim();
+      
       const adminMessage = `👋 *طلب حجز جديد*\n\n` +
                            `مرحباً، أرغب في تأكيد الحجز التالي:\n\n` +
+                           `🎫 رقم الحجز: ${bookingNumber}\n` +
                            `👤 العميل: ${tripData.customerName}\n` +
-                           `📞 الهاتف: ${tripData.phone}\n` +
+                           `📞 الهاتف: ${fullPhone}\n` +
                            `📍 المسار: ${tripData.direction}\n` +
                            `📅 التاريخ: ${tripData.date}\n` +
                            `🕒 الوقت: ${tripData.time}\n` +
@@ -1040,36 +1078,59 @@ function App() {
                            `🚘 نوع السيارة: ${tripData.carType}\n` +
                            `💰 السعر: ${newTrip.amount > 0 ? newTrip.amount + ' BHD' : (lang === 'ar' ? 'بانتظار التسعير' : 'Pending Price')}`;
       
-      const adminWhatsapp = siteSettings.notificationWhatsapp || siteSettings.whatsapp || '97332325997';
-      const whatsappUrl = `https://wa.me/${adminWhatsapp}?text=${encodeURIComponent(adminMessage)}`;
+      const rawWhatsapp = siteSettings.notificationWhatsapp || siteSettings.whatsapp || '97332325997';
+      const cleanWhatsapp = rawWhatsapp.replace(/\D/g, '').replace(/^0+/, ''); 
+      // Ensure Bahrain numbers (8 digits) are prefixed with 973
+      const finalWhatsapp = cleanWhatsapp.length === 8 ? `973${cleanWhatsapp}` : (cleanWhatsapp || '97332325997');
+      const whatsappUrl = `https://wa.me/${finalWhatsapp}?text=${encodeURIComponent(adminMessage)}`;
 
-      // Redirect to WhatsApp directly as requested
-      console.log('Redirecting to WhatsApp...');
+      // Use window.open for better results in iframes
+      console.log('Opening WhatsApp:', whatsappUrl);
       
-      setBookingData({
-        customerName: '',
-        firstName: '',
-        lastName: '',
-        email: '',
-        phone: '',
-        confirmPhone: '',
-        pickup: '',
-        dropoff: '',
-        date: new Date().toISOString().split('T')[0],
-        time: '10:00',
-        passengers: 1,
-        bags: 0,
-        carType: 'Standard',
-        service: 'luxury',
-        bookingType: 'transfer',
-        hours: 1,
-        specialRequests: ''
-      });
+      const resetForm = () => {
+        setBookingData({
+          customerName: '',
+          firstName: '',
+          lastName: '',
+          email: '',
+          phone: '',
+          countryCode: '+973',
+          confirmPhone: '',
+          pickup: '',
+          dropoff: '',
+          date: new Date().toISOString().split('T')[0],
+          time: '10:00',
+          passengers: 1,
+          bags: 0,
+          carType: 'Standard',
+          service: 'luxury',
+          bookingType: 'transfer',
+          hours: 1,
+          specialRequests: ''
+        });
+      };
         
-      window.open(whatsappUrl, '_blank');
+      if (typeof window !== 'undefined') {
+        console.log('Redirecting to WhatsApp:', whatsappUrl);
+        
+        // Open WhatsApp FIRST (before alert) to bypass popup blockers
+        const win = window.open(whatsappUrl, '_blank');
+        if (!win || win.closed || typeof win.closed === 'undefined') {
+          // If popup is blocked, try redirection as fallback after alert
+          window.location.href = whatsappUrl;
+        }
+
+        const confirmMsg = lang === 'ar' 
+          ? 'تم تأكيد الحجز بنجاح! سيتم الآن تحويلك إلى واتساب لتأكيد التفاصيل.' 
+          : 'Booking confirmed successfully! You will now be redirected to WhatsApp.';
+        
+        alert(confirmMsg);
+        resetForm();
+      }
     } catch (error) {
       console.error('Booking failed:', error);
-      alert(lang === 'ar' ? 'فشل إرسال الطلب، يرجى المحاولة مرة أخرى.' : 'Booking failed, please try again.');
+      const errorMsg = lang === 'ar' ? 'فشل إرسال الطلب، يرجى المحاولة مرة أخرى.' : 'Booking failed, please try again.';
+      alert(errorMsg);
     } finally {
       setIsBooking(false);
     }
@@ -1362,12 +1423,40 @@ function App() {
     const amount = Number(tripFormData.amount) || 0;
     const driverCost = Number(tripFormData.driverCost) || 0;
     const profit = amount - driverCost;
+
+    let bookingNumber = tripFormData.bookingNumber;
+    if (!editingTrip && !bookingNumber) {
+      // Generate Booking Number DD/MM/YYYY/N
+      const now = new Date();
+      const day = String(now.getDate()).padStart(2, '0');
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const year = now.getFullYear();
+      const monthKey = `${year}-${month}`;
+      let sequence = 1;
+
+      try {
+        await runTransaction(db, async (transaction) => {
+          const counterRef = doc(db, 'counters', `bookings_${monthKey}`);
+          const counterSnap = await transaction.get(counterRef);
+          if (counterSnap.exists()) {
+            sequence = (counterSnap.data().count || 0) + 1;
+            transaction.update(counterRef, { count: sequence });
+          } else {
+            transaction.set(counterRef, { count: 1 });
+          }
+        });
+        bookingNumber = `${day}/${month}/${year}/${sequence}`;
+      } catch (e) {
+        console.error("Error generating sequence:", e);
+      }
+    }
     
     const data = {
       ...tripFormData,
       amount,
       driverCost,
       profit,
+      bookingNumber,
       createdAt: editingTrip ? editingTrip.createdAt : new Date().toISOString()
     };
 
@@ -1591,24 +1680,24 @@ function App() {
             style={{ backgroundImage: `url(${siteSettings.heroImage})` }}
           />
           <div className="absolute inset-0 bg-white/90 backdrop-blur-[2px] -z-10" />
-          <div className="absolute top-0 right-0 w-1/2 h-full bg-gold/5 -skew-x-12 transform translate-x-1/4 -z-10" />
           
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div className="flex flex-col gap-12">
               <motion.div
-                initial={{ opacity: 0, x: 50 }}
-                animate={{ opacity: 1, x: 0 }}
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6 }}
+                className="text-center"
               >
                 <h1 className="text-5xl lg:text-7xl font-bold leading-tight text-dark mb-6">
                   {lang === 'ar' ? siteSettings.heroTitle : (siteSettings.heroTitle_en || siteSettings.heroTitle)} <br />
                   <span className="text-gold">{lang === 'ar' ? siteSettings.heroSubtitle : (siteSettings.heroSubtitle_en || siteSettings.heroSubtitle)}</span>
                 </h1>
-                <p className="text-xl text-gray-600 mb-8 max-w-lg">
+                <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
                   {lang === 'ar' ? siteSettings.heroDescription : (siteSettings.heroDescription_en || siteSettings.heroDescription)}
                 </p>
                 
-                <div className="flex flex-wrap gap-4">
+                <div className="flex flex-wrap justify-center gap-4">
                   <div className="flex items-center gap-2 bg-white shadow-sm border border-gray-100 px-4 py-2 rounded-full">
                     <ShieldCheck className="text-green-500 w-5 h-5" />
                     <span className="text-sm font-medium">{t('safeTrips')}</span>
@@ -1626,7 +1715,7 @@ function App() {
                 initial={{ opacity: 0, y: 40 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.2 }}
-                className="bg-white rounded-[2.5rem] shadow-2xl shadow-dark/5 border border-gray-100 overflow-hidden"
+                className="bg-white rounded-[2.5rem] shadow-2xl shadow-dark/5 border border-gray-100 overflow-hidden w-full max-w-5xl mx-auto"
               >
                 {/* Tabs */}
                 <div className="flex border-b border-gray-100">
@@ -1822,13 +1911,43 @@ function App() {
                       </div>
                       <div className="space-y-2">
                         <label className="text-xs font-black text-gray-400 uppercase mr-1">{t('phone')} *</label>
-                        <input 
-                          type="tel" 
-                          required
-                          className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold"
-                          value={bookingData.phone}
-                          onChange={e => setBookingData({...bookingData, phone: e.target.value})}
-                        />
+                        <div className="flex gap-3">
+                          <div className="relative min-w-[120px]">
+                            <select
+                              className="w-full bg-gray-50/80 border-2 border-transparent rounded-2xl py-4 px-3 focus:bg-white focus:border-gold/30 focus:ring-0 transition-all font-bold text-center appearance-none cursor-pointer"
+                              value={bookingData.countryCode || '+973'}
+                              onChange={e => setBookingData({...bookingData, countryCode: e.target.value})}
+                            >
+                              <option value="+973">🇧🇭 +973</option>
+                              <option value="+966">🇸🇦 +966</option>
+                              <option value="+971">🇦🇪 +971</option>
+                              <option value="+965">🇰🇼 +965</option>
+                              <option value="+968">🇴🇲 +968</option>
+                              <option value="+974">🇶🇦 +974</option>
+                              <option value="+964">🇮🇶 +964</option>
+                              <option value="+92">🇵🇰 +92</option>
+                              <option value="+91">🇮🇳 +91</option>
+                              <option value="+20">🇪🇬 +20</option>
+                              <option value="+90">🇹🇷 +90</option>
+                            </select>
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-gold">
+                              <Settings className="w-3 h-3 opacity-30" />
+                            </div>
+                          </div>
+                          <input 
+                            type="tel" 
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            required
+                            placeholder="3232 5997"
+                            className="flex-1 bg-gray-50/80 border-2 border-transparent rounded-2xl py-4 px-6 focus:bg-white focus:border-gold/30 focus:ring-0 transition-all font-bold placeholder:text-gray-300"
+                            value={bookingData.phone}
+                            onChange={e => {
+                              const val = e.target.value.replace(/\D/g, '');
+                              setBookingData({...bookingData, phone: val});
+                            }}
+                          />
+                        </div>
                       </div>
                     </div>
 

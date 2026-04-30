@@ -68,6 +68,11 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Counters for booking numbers
+    match /counters/{counterId} {
+      allow read, write: if true;
+    }
+
     // Drivers collection
     match /drivers/{driverId} {
       allow read: if isAuthenticated();

@@ -188,45 +188,61 @@ async function startServer() {
         return res.json({ success: false, message: "Resend not configured" });
       }
 
-      const { customerName, email, phone, pickup, dropoff, date, time, passengers, amount, notes, companyName, carType, bookingType, hours } = req.body;
-      const displayCompanyName = companyName || 'GCC TAXI';
+      // Fetch dynamic settings from Firestore for admin emails
+      const settingsDoc = await adminDb.collection("settings").doc("site").get();
+      const settings = settingsDoc.data() || {};
+      
+      // Handle adminEmails robustly (ensure it's a non-empty array)
+      let adminEmails: string[] = ['ahjm91@gmail.com'];
+      if (Array.isArray(settings.adminEmails) && settings.adminEmails.length > 0) {
+        adminEmails = settings.adminEmails;
+      } else if (typeof settings.adminEmails === 'string' && settings.adminEmails.includes('@')) {
+        adminEmails = [settings.adminEmails];
+      }
+      
+      const displayCompanyName = settings.companyName || 'GCC TAXI';
+
+      const { customerName, email, phone, pickup, dropoff, date, time, passengers, amount, notes, carType, bookingType, hours } = req.body;
 
       // 1. Email to Admin
-      console.log(`Sending admin notification for booking from ${customerName}`);
-      const adminEmail = await resend.emails.send({
+      console.log(`[Email] Attempting to send notification to: ${adminEmails.join(', ')}`);
+      
+      const emailPayload = {
         from: `${displayCompanyName} <onboarding@resend.dev>`,
-        to: ['ahjm91@gmail.com'],
-        subject: `🔔 حجز جديد: ${customerName} - ${pickup}`,
+        to: adminEmails,
+        subject: `🔔 حجز جديد: ${customerName}`,
         html: `
-          <div dir="rtl" style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px; background-color: #f9f9f9;">
-            <h2 style="color: #D4AF37; text-align: center; border-bottom: 2px solid #D4AF37; padding-bottom: 10px;">إشعار حجز جديد</h2>
-            <div style="background: white; padding: 15px; border-radius: 8px; margin-top: 20px;">
-              <p><strong>العميل:</strong> ${customerName}</p>
-              <p><strong>الإيميل:</strong> ${email || 'غير متوفر'}</p>
-              <p><strong>الهاتف:</strong> ${phone}</p>
-              <p><strong>نوع الخدمة:</strong> ${bookingType === 'hourly' ? 'بالساعة' : 'توصيل'}</p>
-              <p><strong>المسار:</strong> ${pickup} ← ${dropoff}</p>
-              <p><strong>نوع السيارة:</strong> ${carType}</p>
-              <p><strong>التاريخ:</strong> ${date}</p>
-              <p><strong>الوقت:</strong> ${time}</p>
-              ${bookingType === 'hourly' ? `<p><strong>عدد الساعات:</strong> ${hours}</p>` : ''}
-              <p><strong>الركاب:</strong> ${passengers}</p>
-              <p><strong>الإجمالي:</strong> <span style="color: #D4AF37; font-weight: bold; font-size: 1.2em;">${amount > 0 ? `${amount} BHD` : 'بانتظار التسعير'}</span></p>
-              <p><strong>ملاحظات:</strong> ${notes || 'لا يوجد'}</p>
-            </div>
-            <hr style="margin-top: 30px; border: 0; border-top: 1px solid #ddd;" />
-            <p style="font-size: 12px; color: #666; text-align: center;">تم إرسال هذا التنبيه تلقائياً من نظام ${displayCompanyName}.</p>
+          <div dir="rtl" style="font-family: sans-serif; padding: 20px;">
+            <h2 style="color: #D4AF37;">إشعار حجز جديد</h2>
+            <p><strong>العميل:</strong> ${customerName}</p>
+            <p><strong>الهاتف:</strong> ${phone}</p>
+            <p><strong>المسار:</strong> ${pickup} ← ${dropoff}</p>
+            <p><strong>التاريخ:</strong> ${date}</p>
+            <p><strong>الوقت:</strong> ${time}</p>
+            <p><strong>الإجمالي:</strong> ${amount > 0 ? `${amount} BHD` : 'بانتظار التسعير'}</p>
           </div>
         `,
-      });
+      };
 
-      if (adminEmail.error) {
-        // Handle Resend restrictions gracefully
-        if (adminEmail.error.name === 'validation_error') {
-          console.warn("⚠️ Resend Validation Error: Check your 'from' email and 'to' permissions.");
+      try {
+        const adminEmail = await resend.emails.send(emailPayload);
+
+        if (adminEmail.error) {
+          console.error("🔴 [Email] Resend API Error:", adminEmail.error);
+          
+          // Critical fallback: try sending a plain text email to the primary admin only
+          console.log("[Email] Attempting plain text fallback to ahjm91@gmail.com...");
+          await resend.emails.send({
+            from: `Booking System <onboarding@resend.dev>`,
+            to: ['ahjm91@gmail.com'],
+            subject: `🔔 New Booking: ${customerName}`,
+            text: `New booking from ${customerName} (${phone}) for ${pickup} to ${dropoff} on ${date} at ${time}. Amount: ${amount} BHD.`,
+          }).catch(e => console.error("[Email] Final fallback failed:", e));
         } else {
-          console.error("🔴 Admin Email Error:", adminEmail.error);
+          console.log("🟢 [Email] Notification sent successfully:", adminEmail.data?.id);
         }
+      } catch (err) {
+        console.error("🔴 [Email] Unexpected error during send:", err);
       }
 
       // 2. Email to Customer (if email exists)

@@ -3,13 +3,27 @@
 
 @theme {
   --font-sans: "Inter", "Noto Sans Arabic", ui-sans-serif, system-ui, sans-serif;
-  --color-gold: var(--primary, #D4AF37);
-  --color-dark: var(--secondary, #0A0A0A);
+  --color-gold: #D4AF37;
+  --color-gold-light: #F1E5AC;
+  --color-gold-dark: #B8860B;
+  --color-dark: #0A0A0A;
+  --color-dark-soft: #1A1A1A;
+  
+  --shadow-luxury: 0 10px 30px -5px rgba(212, 175, 55, 0.15), 0 5px 15px -3px rgba(0, 0, 0, 0.05);
+  --shadow-gold: 0 0 20px rgba(212, 175, 55, 0.2);
 }
 
 @layer base {
   body {
-    @apply bg-white text-gray-900 antialiased;
+    @apply bg-white text-gray-900 antialiased selection:bg-gold/30;
     direction: rtl;
   }
+}
+
+.glass-card {
+  @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-luxury;
+}
+
+.gold-gradient {
+  background: linear-gradient(135deg, #D4AF37 0%, #B8860B 100%);
 }

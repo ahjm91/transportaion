@@ -161,15 +161,7 @@ export const AdminDashboard = ({
               <div className="text-lg font-black text-dark">{bookings.filter(b => !['completed', 'cancelled', 'no_driver_found'].includes(b.status)).length}</div>
             </div>
           </div>
-          <div className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4 shadow-sm group hover:shadow-md transition-all">
-            <div className="w-10 h-10 bg-orange-50 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Shield className="w-5 h-5 text-orange-500" />
-            </div>
-            <div>
-              <div className="text-[10px] text-gray-400 font-bold uppercase">وقت الوصول تقديراً</div>
-              <div className="text-lg font-black text-dark">8-12 د</div>
-            </div>
-          </div>
+
         </div>
 
         {/* Main Content Area */}

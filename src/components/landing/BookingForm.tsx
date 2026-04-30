@@ -115,14 +115,42 @@ export const BookingForm = ({
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{t('phone')}</label>
-                  <input 
-                    type="tel" 
-                    required
-                    placeholder="+973 1234 5678"
-                    className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold placeholder:text-gray-300"
-                    value={bookingData.phone}
-                    onChange={e => setBookingData({ ...bookingData, phone: e.target.value })}
-                  />
+                  <div className="flex gap-2">
+                    <select
+                      className="w-32 bg-gray-50 border-none rounded-2xl py-4 px-3 focus:ring-2 focus:ring-gold/20 transition-all font-bold text-center"
+                      value={bookingData.countryCode || '+973'}
+                      onChange={e => setBookingData({ ...bookingData, countryCode: e.target.value })}
+                    >
+                      <option value="+973">🇧🇭 +973</option>
+                      <option value="+966">🇸🇦 +966</option>
+                      <option value="+971">🇦🇪 +971</option>
+                      <option value="+965">🇰🇼 +965</option>
+                      <option value="+968">🇴🇲 +968</option>
+                      <option value="+974">🇶🇦 +974</option>
+                      <option value="+964">🇮🇶 +964</option>
+                      <option value="+962">🇯🇴 +962</option>
+                      <option value="+20">🇪🇬 +20</option>
+                      <option value="+90">🇹🇷 +90</option>
+                      <option value="+44">🇬🇧 +44</option>
+                      <option value="+1">🇺🇸 +1</option>
+                      <option value="+91">🇮🇳 +91</option>
+                      <option value="+92">🇵🇰 +92</option>
+                      <option value="+63">🇵🇭 +63</option>
+                    </select>
+                    <input 
+                      type="tel" 
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      required
+                      placeholder="3232 5997"
+                      className="flex-1 bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold placeholder:text-gray-300"
+                      value={bookingData.phone}
+                      onChange={e => {
+                        const val = e.target.value.replace(/\D/g, ''); // Keep only numbers
+                        setBookingData({ ...bookingData, phone: val });
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
 

@@ -8,6 +8,7 @@ export interface BookingData {
   customerName: string;
   email: string;
   phone: string;
+  countryCode?: string;
   confirmPhone: string;
   pickup: string;
   dropoff: string;
@@ -125,6 +126,13 @@ export interface UserProfile {
     carModel: string;
     plateNumber: string;
     experience: string;
+    fullName: string;
+    email: string;
+    phone: string;
+    dob: string;
+    profilePic?: string;
+    licensePic?: string;
+    licenseExpiry: string;
     appliedAt: string;
   };
 }
@@ -209,6 +217,7 @@ export interface Trip {
   notes: string;
   specialRequests?: string;
   membershipNumber?: number;
+  bookingNumber?: string;
   createdAt: string;
 }
 
