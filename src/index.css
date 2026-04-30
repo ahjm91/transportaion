@@ -33,3 +33,11 @@
 .gold-gradient {
   background: linear-gradient(135deg, var(--primary) 0%, #B8860B 100%);
 }
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

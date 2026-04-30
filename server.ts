@@ -71,6 +71,52 @@ async function startServer() {
     message: { error: "Too many requests, please try again later." }
   });
 
+  // Track Analytics Events
+  app.post("/api/analytics", async (req, res) => {
+    try {
+      const { event, category, label, value, metadata } = req.body;
+      await adminDb.collection("analytics_events").add({
+        event,
+        category,
+        label,
+        value,
+        metadata,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        ip: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Analytics Error:", error);
+      res.status(500).json({ error: "Failed to log event" });
+    }
+  });
+
+  // Endpoint to create a trip (Stage 1 & 2 Custom Bookings)
+  app.post("/api/trips", async (req, res, next) => {
+    try {
+      const tripData = req.body;
+      
+      // Basic validation
+      if (!tripData.customerName || !tripData.phone) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      // Add server-side metadata
+      const finalTripData = {
+        ...tripData,
+        source: 'web_api',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        status: tripData.status || 'Requested'
+      };
+
+      const docRef = await adminDb.collection("trips").add(finalTripData);
+      res.json({ success: true, id: docRef.id });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   // Apply rate limiter to sensitive endpoints
   app.use("/api/", apiLimiter);
 

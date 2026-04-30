@@ -98,19 +98,19 @@ export const AdminDashboard = ({
                 </div>
              </div>
              
-             <div className="hidden lg:flex items-center gap-3 bg-gray-50 p-1 rounded-2xl border border-gray-100">
+             <div className="hidden lg:flex items-center gap-2 bg-gray-50 p-1 rounded-2xl border border-gray-100 overflow-x-auto max-w-[60vw] no-scrollbar">
                {menuItems.map((item) => (
                  <button
                    key={item.id}
                    onClick={() => setActiveTab(item.id)}
                    className={cn(
-                     "px-6 py-3 rounded-xl text-xs font-black flex items-center gap-2 transition-all",
+                     "px-4 py-2.5 rounded-xl text-[10px] font-black flex items-center gap-2 transition-all whitespace-nowrap",
                      activeTab === item.id 
                        ? "bg-white text-gold shadow-lg shadow-gold/5" 
                        : "text-gray-400 hover:text-dark hover:bg-gray-100"
                    )}
                  >
-                   <item.icon className="w-4 h-4" />
+                   <item.icon className="w-3.5 h-3.5" />
                    {item.name}
                  </button>
                ))}
@@ -165,7 +165,7 @@ export const AdminDashboard = ({
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 overflow-y-auto p-8 lg:p-12 pt-4 lg:pt-4">
+        <div className="flex-1 overflow-y-auto p-8 lg:p-12 pt-4 lg:pt-4 pb-24 md:pb-8">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -247,6 +247,23 @@ export const AdminDashboard = ({
               )}
             </motion.div>
           </AnimatePresence>
+        </div>
+
+        {/* Mobile Bottom Nav */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-gray-100 p-2 flex items-center justify-around z-20">
+          {menuItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={cn(
+                "flex flex-col items-center gap-1 p-2 rounded-xl transition-all",
+                activeTab === item.id ? "text-gold" : "text-gray-400"
+              )}
+            >
+              <item.icon className="w-5 h-5" />
+              <span className="text-[8px] font-black uppercase">{item.name.split(' ')[0]}</span>
+            </button>
+          ))}
         </div>
 
         {/* Footer Info */}

@@ -19,6 +19,7 @@ import {
   Menu,
   X,
   ArrowLeft,
+  ArrowRight,
   Camera,
   ShoppingBag,
   Settings,
@@ -84,6 +85,7 @@ import {
   increment
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import confetti from 'canvas-confetti';
 import { translations } from './translations';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -160,6 +162,16 @@ function App() {
   const [lang, setLang] = useState<'ar' | 'en'>('ar');
   const t = (key: keyof typeof translations.ar) => translations[lang][key] || key;
 
+  const logAnalyticsEvent = (event: string, category: string, label?: string, metadata?: any) => {
+    try {
+      fetch('/api/analytics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event, category, label, metadata })
+      }).catch(() => {});
+    } catch (e) {}
+  };
+
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({
     companyName: 'GCC TAXI',
     companyName_en: 'GCC TAXI',
@@ -209,14 +221,20 @@ function App() {
   // Dynamic Theme Applier
   useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty('--primary', siteSettings.primaryColor);
-    root.style.setProperty('--secondary', siteSettings.secondaryColor);
-    root.style.setProperty('--accent', siteSettings.accentColor);
-    root.style.setProperty('--radius', siteSettings.borderRadius);
-    root.style.setProperty('--font-custom', siteSettings.fontFamily || '"Inter", "Noto Sans Arabic", sans-serif');
+    const primary = siteSettings.primaryColor || '#D4AF37';
+    const secondary = siteSettings.secondaryColor || '#1A1A1A';
+    const accent = siteSettings.accentColor || '#F5F5F5';
+    const radius = siteSettings.borderRadius || '1.5rem';
+    const font = siteSettings.fontFamily || '"Inter", "Noto Sans Arabic", sans-serif';
+
+    root.style.setProperty('--primary', primary);
+    root.style.setProperty('--secondary', secondary);
+    root.style.setProperty('--accent', accent);
+    root.style.setProperty('--radius', radius);
+    root.style.setProperty('--font-custom', font);
     
     // Apply button style
-    let btnRadius = siteSettings.borderRadius;
+    let btnRadius = radius;
     if (siteSettings.buttonStyle === 'sharp') btnRadius = '0px';
     if (siteSettings.buttonStyle === 'pill') btnRadius = '9999px';
     root.style.setProperty('--btn-radius', btnRadius);
@@ -235,6 +253,8 @@ function App() {
   }, [siteSettings]);
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isBookingSuccessOpen, setIsBookingSuccessOpen] = useState(false);
+  const [lastBookingInfo, setLastBookingInfo] = useState<Trip | null>(null);
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
@@ -687,7 +707,8 @@ function App() {
 
     const unsubscribeSettings = onSnapshot(doc(db, 'settings', 'site'), (snapshot) => {
       if (snapshot.exists()) {
-        setSiteSettings(snapshot.data() as SiteSettings);
+        const data = snapshot.data();
+        setSiteSettings(prev => ({ ...prev, ...data }));
       }
     });
 
@@ -1079,14 +1100,27 @@ function App() {
         createdAt: new Date().toISOString()
       };
 
-      console.log('Saving to Firestore...', tripData);
-      const docRef = await safeAddDoc(collection(db, 'trips'), tripData);
-      if (!docRef) {
+      console.log('Saving to server...', tripData);
+      const bookingResponse = await fetch('/api/trips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...tripData,
+          analytics: {
+            userAgent: navigator.userAgent,
+            language: navigator.language
+          }
+        })
+      });
+      
+      const result = await bookingResponse.json();
+      if (!result.success) {
         throw new Error('فشل حفظ البيانات في قاعدة البيانات');
       }
-      console.log('Trip saved with ID:', docRef.id);
       
-      const newTrip = { id: docRef.id, ...tripData } as Trip;
+      const newTrip = { id: result.id, ...tripData } as Trip;
+      
+      logAnalyticsEvent('booking_step_1_submit', 'booking', newTrip.bookingNumber, { amount: newTrip.amount });
       
       // Notify Admin via Email (Non-blocking)
       console.log('Sending notification email in background...');
@@ -1117,9 +1151,18 @@ function App() {
       const finalWhatsapp = cleanWhatsapp.length === 8 ? `973${cleanWhatsapp}` : (cleanWhatsapp || '97332325997');
       const whatsappUrl = `https://wa.me/${finalWhatsapp}?text=${encodeURIComponent(adminMessage)}`;
 
-      // Use window.open for better results in iframes
-      console.log('Opening WhatsApp:', whatsappUrl);
+      // Show success modal instead of direct redirect
+      setLastBookingInfo({ ...newTrip, notes: whatsappUrl }); 
+      setIsBookingSuccessOpen(true);
       
+      // Celebration!
+      confetti({
+        particleCount: 150,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: [siteSettings.primaryColor || '#D4AF37', '#ffffff', '#B8860B']
+      });
+
       const resetForm = () => {
         setBookingData({
           customerName: '',
@@ -1143,23 +1186,7 @@ function App() {
         });
       };
         
-      if (typeof window !== 'undefined') {
-        console.log('Redirecting to WhatsApp:', whatsappUrl);
-        
-        // Open WhatsApp FIRST (before alert) to bypass popup blockers
-        const win = window.open(whatsappUrl, '_blank');
-        if (!win || win.closed || typeof win.closed === 'undefined') {
-          // If popup is blocked, try redirection as fallback after alert
-          window.location.href = whatsappUrl;
-        }
-
-        const confirmMsg = lang === 'ar' 
-          ? 'تم تأكيد الحجز بنجاح! سيتم الآن تحويلك إلى واتساب لتأكيد التفاصيل.' 
-          : 'Booking confirmed successfully! You will now be redirected to WhatsApp.';
-        
-        alert(confirmMsg);
-        resetForm();
-      }
+      resetForm();
     } catch (error) {
       console.error('Booking failed:', error);
       const errorMsg = lang === 'ar' ? 'فشل إرسال الطلب، يرجى المحاولة مرة أخرى.' : 'Booking failed, please try again.';
@@ -2760,6 +2787,103 @@ function App() {
       }
     }}
   />
+
+  {/* Soft Confirmation Modal */}
+  <AnimatePresence>
+    {isBookingSuccessOpen && lastBookingInfo && (
+      <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+        <motion.div 
+          initial={{ opacity: 0 }} 
+          animate={{ opacity: 1 }} 
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 bg-dark/90 backdrop-blur-md"
+          onClick={() => setIsBookingSuccessOpen(false)}
+        />
+        <motion.div 
+          initial={{ scale: 0.9, opacity: 0, y: 30 }} 
+          animate={{ scale: 1, opacity: 1, y: 0 }} 
+          exit={{ scale: 0.9, opacity: 0, y: 30 }}
+          className="relative bg-white w-full max-w-lg rounded-[3.5rem] overflow-hidden shadow-2xl"
+        >
+          {/* Header */}
+          <div className="bg-gold p-8 text-center text-white relative">
+            <div className="absolute top-6 right-6">
+              <button 
+                onClick={() => setIsBookingSuccessOpen(false)}
+                className="p-2 hover:bg-white/20 rounded-full transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-white/30">
+              <Check className="w-10 h-10 text-white" />
+            </div>
+            <h2 className="text-2xl font-black mb-1">{lang === 'ar' ? 'تم تسجيل طلبك بنجاح!' : 'Booking Registered!'}</h2>
+            <p className="text-white/80 font-bold text-sm tracking-widest">{lastBookingInfo.bookingNumber}</p>
+          </div>
+
+          <div className="p-8 space-y-6">
+            <div className="bg-gray-50 rounded-[2rem] p-6 space-y-4">
+              <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('customerName')}</span>
+                <span className="font-bold text-dark">{lastBookingInfo.customerName}</span>
+              </div>
+              <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('pickup')}</span>
+                <span className="font-bold text-dark truncate max-w-[200px]">{lastBookingInfo.pickup}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('carType')}</span>
+                <span className="px-3 py-1 bg-gold/10 text-gold rounded-full text-[10px] font-black uppercase">
+                  {lastBookingInfo.carType}
+                </span>
+              </div>
+            </div>
+
+            <div className="text-center space-y-4">
+              <div className="bg-gold/5 text-gold p-5 rounded-[2rem] flex items-start gap-4 text-right border border-gold/10">
+                <div className="bg-gold/10 p-2 rounded-xl shrink-0">
+                  <MessageCircle className="w-5 h-5 text-gold" />
+                </div>
+                <p className="text-xs font-bold leading-relaxed">
+                  {lang === 'ar' 
+                    ? 'بقي خطوة أخيرة! لتأكيد الحجز وتنسيق السائق المتاح حالياً، يرجى الضغط على الزر أدناه لمتابعة المحادثة عبر واتساب.' 
+                    : 'One final step! To confirm your booking and coordinate with the driver, please click the button below to continue via WhatsApp.'}
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  logAnalyticsEvent('booking_step_2_whatsapp_click', 'booking', lastBookingInfo.bookingNumber);
+                  window.open(lastBookingInfo.notes, '_blank');
+                  setIsBookingSuccessOpen(false);
+                }}
+                className="w-full bg-green-500 hover:bg-green-600 text-white py-5 px-8 rounded-2xl font-black text-lg transition-all shadow-xl shadow-green-500/20 flex items-center justify-center gap-4 group active:scale-95"
+              >
+                <div className="bg-white/20 p-2 rounded-xl">
+                  <Phone className="w-5 h-5" />
+                </div>
+                <span>{lang === 'ar' ? 'تأكيد الحجز عبر واتساب' : 'Confirm via WhatsApp'}</span>
+                <motion.div
+                  animate={{ x: lang === 'ar' ? [0, -5, 0] : [0, 5, 0] }}
+                  transition={{ repeat: Infinity, duration: 1.5 }}
+                >
+                  <ArrowRight className="w-5 h-5 rtl:rotate-180" />
+                </motion.div>
+              </button>
+
+              <button 
+                onClick={() => setIsBookingSuccessOpen(false)}
+                className="text-gray-400 text-[10px] font-black hover:text-dark transition-colors uppercase tracking-widest"
+              >
+                {lang === 'ar' ? 'إغلاق، سأفعل ذلك لاحقاً' : 'Close, I will do it later'}
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    )}
+  </AnimatePresence>
 
   {/* Rating Modal */}
       <AnimatePresence>

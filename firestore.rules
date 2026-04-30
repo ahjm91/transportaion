@@ -6,21 +6,25 @@ service cloud.firestore {
       return request.auth != null;
     }
     
+    // Helpers
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+    
+    function isValidTrip(data) {
+      return data.customerName is string && data.customerName.size() <= 100 &&
+             data.phone is string && data.phone.size() <= 30 &&
+             data.amount is number &&
+             data.bookingNumber is string &&
+             data.createdAt is string;
+    }
+
     function isAdmin() {
-      return isAuthenticated() && (
+      return isSignedIn() && (
         request.auth.token.email == "ahjm91@gmail.com" || 
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
       );
-    }
-
-    function isDriver() {
-      return isAuthenticated() && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'driver';
-    }
-
-    function isValidId(id) { 
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
     }
 
     // Default deny
@@ -30,10 +34,10 @@ service cloud.firestore {
 
     // Users collection
     match /users/{userId} {
-      allow read: if (isAuthenticated() && request.auth.uid == userId) || isAdmin();
-      allow write: if (isAuthenticated() && request.auth.uid == userId && 
+      allow read: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
+      allow write: if (isSignedIn() && request.auth.uid == userId && 
                     (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isVerified', 'uid']))) || isAdmin();
-      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow create: if isSignedIn() && request.auth.uid == userId;
     }
 
     // Site settings
@@ -60,17 +64,24 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Trips (Accounting)
+    // Trips Collection - Secured (Server-only for creation ideally, but allowing update for admins)
     match /trips/{tripId} {
-      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
-      allow create: if true; 
-      allow update: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow read: if isAdmin() || (isSignedIn() && resource.data.get('userId', '') == request.auth.uid);
+      allow create: if isAdmin() || (isSignedIn() && isValidTrip(incoming())); 
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
-    // Counters for booking numbers
+    // Analytics Events - Write only (App logs events, only admin can read)
+    match /analytics_events/{eventId} {
+      allow create: if true; // Allow anyone to log (including guests)
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Counters - Restrict direct write
     match /counters/{counterId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
     // Drivers collection
