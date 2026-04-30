@@ -160,6 +160,80 @@ function App() {
   const [lang, setLang] = useState<'ar' | 'en'>('ar');
   const t = (key: keyof typeof translations.ar) => translations[lang][key] || key;
 
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>({
+    companyName: 'GCC TAXI',
+    companyName_en: 'GCC TAXI',
+    heroTitle: 'GCC TAXI',
+    heroSubtitle: 'فخامة التنقل',
+    heroDescription: 'نقدم لك أرقى خدمات التوصيل واللوميزين في مملكة البحرين وجميع دول الخليج.',
+    heroImage: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&q=80&w=1920',
+    phone: '+973 32325997',
+    whatsapp: '97332325997',
+    notificationWhatsapp: '97332325997',
+    footerAbout: 'نحن متخصصون في تقديم خدمات النقل العائلي والفاخر.',
+    footerAddress: 'مملكة البحرين وجميع دول الخليج',
+    instagram: '',
+    tiktok: '',
+    twitter: '',
+    telegram: '',
+    primaryColor: '#D4AF37',
+    secondaryColor: '#1A1A1A',
+    accentColor: '#F5F5F5',
+    borderRadius: '1.5rem',
+    glassmorphism: true,
+    shadowIntensity: 0.15,
+    fontFamily: '"Inter", "Noto Sans Arabic", sans-serif',
+    buttonStyle: 'rounded',
+    adminEmails: ['ahjm91@gmail.com'],
+    pricePerKm: 0.5,
+    baseFee: 2,
+    vipSurcharge: 5,
+    vanSurcharge: 12,
+    paymentGateway: 'WhatsApp',
+    myFatoorahIsSandbox: true,
+    tapSecretKey: '',
+    cryptoWalletAddress: '',
+    showHeaderSocials: false,
+    showFooterSocials: true,
+    showHeaderLogo: true,
+    showFooterLogo: true,
+    showHeroSection: true,
+    showServicesSection: true,
+    showSpecializedSection: true,
+    showAboutSection: true,
+    showBookingSection: true,
+    showCTASection: true,
+    commissionRate: 10
+  });
+
+  // Dynamic Theme Applier
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--primary', siteSettings.primaryColor);
+    root.style.setProperty('--secondary', siteSettings.secondaryColor);
+    root.style.setProperty('--accent', siteSettings.accentColor);
+    root.style.setProperty('--radius', siteSettings.borderRadius);
+    root.style.setProperty('--font-custom', siteSettings.fontFamily || '"Inter", "Noto Sans Arabic", sans-serif');
+    
+    // Apply button style
+    let btnRadius = siteSettings.borderRadius;
+    if (siteSettings.buttonStyle === 'sharp') btnRadius = '0px';
+    if (siteSettings.buttonStyle === 'pill') btnRadius = '9999px';
+    root.style.setProperty('--btn-radius', btnRadius);
+
+    // Apply shadow intensity
+    root.style.setProperty('--shadow-lux', `0 10px 30px -5px rgba(0,0,0, ${siteSettings.shadowIntensity || 0.1})`);
+    
+    // Glassmorphism effect
+    if (siteSettings.glassmorphism) {
+      root.style.setProperty('--glass-bg', 'rgba(255, 255, 255, 0.8)');
+      root.style.setProperty('--glass-blur', '10px');
+    } else {
+      root.style.setProperty('--glass-bg', '#ffffff');
+      root.style.setProperty('--glass-blur', '0px');
+    }
+  }, [siteSettings]);
+
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
@@ -274,6 +348,7 @@ function App() {
     return () => unsub();
   }, [activeDriver?.id, activeRealtimeBooking]);
 
+  // Dynamic Theme Applier
   const safeDeleteDoc = async (docRef: any) => {
     try {
       await deleteDoc(docRef);
@@ -321,48 +396,6 @@ function App() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [allDrivers, setAllDrivers] = useState<Driver[]>([]);
-  const [siteSettings, setSiteSettings] = useState<SiteSettings>({
-    companyName: 'GCC TAXI',
-    companyName_en: 'GCC TAXI',
-    heroTitle: 'GCC TAXI',
-    heroSubtitle: 'فخامة التنقل',
-    heroDescription: 'نقدم لك أرقى خدمات التوصيل واللوميزين في مملكة البحرين وجميع دول الخليج.',
-    heroImage: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&q=80&w=1920',
-    phone: '+973 32325997',
-    whatsapp: '97332325997',
-    notificationWhatsapp: '97332325997',
-    footerAbout: 'نحن متخصصون في تقديم خدمات النقل العائلي والفاخر.',
-    footerAddress: 'مملكة البحرين وجميع دول الخليج',
-    instagram: '',
-    tiktok: '',
-    twitter: '',
-    telegram: '',
-    primaryColor: '#D4AF37',
-    secondaryColor: '#1A1A1A',
-    accentColor: '#F5F5F5',
-    borderRadius: '1.5rem',
-    adminEmails: ['ahjm91@gmail.com'],
-    pricePerKm: 0.5,
-    baseFee: 2,
-    vipSurcharge: 5,
-    vanSurcharge: 12,
-    paymentGateway: 'WhatsApp',
-    myFatoorahIsSandbox: true,
-    tapSecretKey: '',
-    cryptoWalletAddress: '',
-    showHeaderSocials: false,
-    showFooterSocials: true,
-    showHeaderLogo: true,
-    showFooterLogo: true,
-    showHeroSection: true,
-    showServicesSection: true,
-    showSpecializedSection: true,
-    showAboutSection: true,
-    showBookingSection: true,
-    showCTASection: true,
-    commissionRate: 10
-  });
-
   // Handle payment redirect
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);

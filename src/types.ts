@@ -73,6 +73,10 @@ export interface SiteSettings {
   secondaryColor: string;
   accentColor: string;
   borderRadius: string;
+  glassmorphism?: boolean;
+  shadowIntensity?: number;
+  fontFamily?: string;
+  buttonStyle?: 'rounded' | 'sharp' | 'pill';
   footerAbout: string;
   footerAbout_en?: string;
   footerAddress: string;

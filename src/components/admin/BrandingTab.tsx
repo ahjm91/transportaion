@@ -71,6 +71,27 @@ export const BrandingTab = ({ siteSettings, setSiteSettings, handleImageUpload, 
           </div>
 
           <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm space-y-4">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">اللون الفاتح / الخلفيات (Accent Color)</label>
+            <div className="flex gap-4">
+              <input 
+                type="color" 
+                className="w-16 h-16 rounded-2xl cursor-pointer border-4 border-gray-50 shadow-inner"
+                value={siteSettings.accentColor}
+                onChange={e => updateSettings({ accentColor: e.target.value })}
+              />
+              <div className="flex-1 space-y-2">
+                <input 
+                  type="text" 
+                  className="w-full bg-gray-50 border-none rounded-xl p-3 font-mono text-xs font-bold"
+                  value={siteSettings.accentColor}
+                  onChange={e => updateSettings({ accentColor: e.target.value })}
+                />
+                <p className="text-[9px] text-gray-400 font-bold">لون الخلفيات الفاتحة والظلال الخفيفة.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm space-y-4">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">انحناء الحواف (Border Radius)</label>
             <select 
               className="w-full bg-gray-50 border-none rounded-xl p-4 font-black text-dark focus:ring-2 focus:ring-gold/20"
@@ -81,9 +102,77 @@ export const BrandingTab = ({ siteSettings, setSiteSettings, handleImageUpload, 
               <option value="0.5rem">Standard (8px)</option>
               <option value="1rem">Modern (16px)</option>
               <option value="1.5rem">Rounded (24px)</option>
+              <option value="2rem">Extra Rounded (32px)</option>
               <option value="2.5rem">Luxurious (40px)</option>
+              <option value="3.5rem">Ultra Rounded (56px)</option>
             </select>
-            <p className="text-[9px] text-gray-400 font-bold">يؤثر على جميع الكروت، الأزرار، وحقول الإدخال.</p>
+            <p className="text-[9px] text-gray-400 font-bold">يؤثر على جميع الكروت والحقول.</p>
+          </div>
+
+          <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm space-y-4">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">نمط الأزرار (Button Style)</label>
+            <div className="grid grid-cols-3 gap-2">
+              {(['rounded', 'sharp', 'pill'] as const).map((style) => (
+                <button
+                  key={style}
+                  onClick={() => updateSettings({ buttonStyle: style })}
+                  className={`py-2 px-3 rounded-xl text-[10px] font-black uppercase transition-all ${
+                    siteSettings.buttonStyle === style 
+                      ? 'bg-gold text-white shadow-lg shadow-gold/20' 
+                      : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
+                  }`}
+                >
+                  {style === 'rounded' ? 'مربع' : style === 'sharp' ? 'حـاد' : 'كبسولة'}
+                </button>
+              ))}
+            </div>
+            <p className="text-[9px] text-gray-400 font-bold">تحكم في شكل جميع أزرار الموقع.</p>
+          </div>
+
+          <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm space-y-4">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">قوة الظلال (Shadow Intensity)</label>
+            <input 
+              type="range"
+              min="0"
+              max="0.5"
+              step="0.01"
+              className="w-full h-1.5 bg-gray-100 rounded-lg appearance-none cursor-pointer accent-gold"
+              value={siteSettings.shadowIntensity || 0.15}
+              onChange={e => updateSettings({ shadowIntensity: parseFloat(e.target.value) })}
+            />
+            <div className="flex justify-between text-[8px] font-black text-gray-400 uppercase">
+              <span>هادئ</span>
+              <span>مركز</span>
+              <span>عميق</span>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">تأثير الزجاج (Glassmorphism)</label>
+              <button 
+                onClick={() => updateSettings({ glassmorphism: !siteSettings.glassmorphism })}
+                className={`w-12 h-6 rounded-full transition-all relative ${siteSettings.glassmorphism ? 'bg-gold' : 'bg-gray-200'}`}
+              >
+                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${siteSettings.glassmorphism ? 'left-7' : 'left-1'}`} />
+              </button>
+            </div>
+            <p className="text-[9px] text-gray-400 font-bold">تفعيل خلفيات شفافة ومموهة للكروت.</p>
+          </div>
+
+          <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm space-y-4">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">نوع الخط (Font Family)</label>
+            <select 
+              className="w-full bg-gray-50 border-none rounded-xl p-4 font-black text-dark focus:ring-2 focus:ring-gold/20"
+              value={siteSettings.fontFamily}
+              onChange={e => updateSettings({ fontFamily: e.target.value })}
+            >
+              <option value='"Inter", "Noto Sans Arabic", sans-serif'>Modern (Inter)</option>
+              <option value='"Cairo", sans-serif'>Corporate (Cairo)</option>
+              <option value='"Tajawal", sans-serif'>Clean (Tajawal)</option>
+              <option value='"Almarai", sans-serif'>Smooth (Almarai)</option>
+              <option value='system-ui, sans-serif'>System Default</option>
+            </select>
           </div>
         </div>
       </section>

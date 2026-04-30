@@ -2,28 +2,34 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", "Noto Sans Arabic", ui-sans-serif, system-ui, sans-serif;
-  --color-gold: #D4AF37;
+  --font-sans: var(--font-custom, "Inter", "Noto Sans Arabic", ui-sans-serif, system-ui, sans-serif);
+  --color-gold: var(--primary, #D4AF37);
   --color-gold-light: #F1E5AC;
   --color-gold-dark: #B8860B;
-  --color-dark: #0A0A0A;
+  --color-dark: var(--secondary, #0A0A0A);
   --color-dark-soft: #1A1A1A;
   
-  --shadow-luxury: 0 10px 30px -5px rgba(212, 175, 55, 0.15), 0 5px 15px -3px rgba(0, 0, 0, 0.05);
+  --shadow-luxury: var(--shadow-lux, 0 10px 30px -5px rgba(212, 175, 55, 0.15)), 0 5px 15px -3px rgba(0, 0, 0, 0.05);
   --shadow-gold: 0 0 20px rgba(212, 175, 55, 0.2);
+  --radius-custom: var(--radius, 1.5rem);
+  --radius-btn: var(--btn-radius, 1.5rem);
 }
 
 @layer base {
   body {
     @apply bg-white text-gray-900 antialiased selection:bg-gold/30;
     direction: rtl;
+    font-family: var(--font-custom);
   }
 }
 
 .glass-card {
-  @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-luxury;
+  background: var(--glass-bg, rgba(255, 255, 255, 0.8));
+  backdrop-filter: blur(var(--glass-blur, 10px));
+  @apply border border-white/20 shadow-luxury;
+  border-radius: var(--radius-custom);
 }
 
 .gold-gradient {
-  background: linear-gradient(135deg, #D4AF37 0%, #B8860B 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, #B8860B 100%);
 }
