@@ -3,7 +3,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Layout, Box, Globe, DollarSign, Users, PieChart, Star, 
-  Settings, LogOut, Search, Bell, Menu, Shield, Loader2, Gift
+  Settings, LogOut, Search, Bell, Menu, Shield, Loader2, Gift, Car
 } from 'lucide-react';
 import { Trip, SiteSettings, Service, SpecializedService, UserProfile, FixedRoute, Booking, Driver } from '../../types';
 import { AccountingTab } from './AccountingTab';
@@ -11,6 +11,7 @@ import { ContentTab } from './ContentTab';
 import { BrandingTab } from './BrandingTab';
 import { PricingTab } from './PricingTab';
 import { UsersTab } from './UsersTab';
+import { DriversTab } from './DriversTab';
 import { PayoutsTab } from './PayoutsTab';
 import { PromoCodesTab } from './PromoCodesTab';
 import { cn } from '../../lib/utils';
@@ -63,6 +64,7 @@ export const AdminDashboard = ({
     { id: 'promos', name: lang === 'ar' ? 'أكواد الخصم' : 'Promo Codes', icon: Gift },
     { id: 'content', name: lang === 'ar' ? 'إدارة المحتوى' : 'Content Management', icon: Layout },
     { id: 'pricing', name: lang === 'ar' ? 'التسعير والربط' : 'Pricing & Routes', icon: Settings },
+    { id: 'drivers', name: lang === 'ar' ? 'إدارة السائقين' : 'Driver Management', icon: Car },
     { id: 'users', name: lang === 'ar' ? 'إدارة المستخدمين' : 'User Management', icon: Users },
     { id: 'branding', name: lang === 'ar' ? 'الهوية البصرية' : 'Brand Identity', icon: Star },
   ];
@@ -161,6 +163,19 @@ export const AdminDashboard = ({
               <div className="text-lg font-black text-dark">{bookings.filter(b => !['completed', 'cancelled', 'no_driver_found'].includes(b.status)).length}</div>
             </div>
           </div>
+          <div className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4 shadow-sm group hover:shadow-md transition-all">
+            <div className="w-10 h-10 bg-gold/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Star className="w-5 h-5 text-gold fill-gold" />
+            </div>
+            <div>
+              <div className="text-[10px] text-gray-400 font-bold uppercase">{lang === 'ar' ? 'متوسط التقييم' : 'Avg Rating'}</div>
+              <div className="text-lg font-black text-dark">
+                {allDrivers.length > 0 
+                  ? (allDrivers.reduce((acc, d) => acc + (d.averageRating || 5), 0) / allDrivers.length).toFixed(1)
+                  : '5.0'}
+              </div>
+            </div>
+          </div>
 
         </div>
 
@@ -225,6 +240,15 @@ export const AdminDashboard = ({
                   safeAddDoc={safeAddDoc}
                   safeDeleteDoc={safeDeleteDoc}
                   userProfile={null} // Will be handled in App.tsx if needed
+                  lang={lang}
+                />
+              )}
+
+              {activeTab === 'drivers' && (
+                <DriversTab 
+                  allDrivers={allDrivers}
+                  users={users}
+                  safeUpdateDoc={safeUpdateDoc}
                   lang={lang}
                 />
               )}

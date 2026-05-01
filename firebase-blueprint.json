@@ -99,14 +99,21 @@
     },
     "Driver": {
       "title": "Driver",
-      "description": "A driver profile for real-time dispatch",
+      "description": "A driver profile with registration and rating details",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
         "name": { "type": "string" },
         "phone": { "type": "string" },
         "carType": { "type": "string", "enum": ["Standard", "VIP", "Van"] },
+        "plateNumber": { "type": "string" },
+        "registrationStatus": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "adminStatus": { "type": "string", "enum": ["active", "suspended"] },
         "status": { "type": "string", "enum": ["online", "offline", "busy"] },
+        "totalRating": { "type": "number" },
+        "ratingCount": { "type": "number" },
+        "averageRating": { "type": "number" },
         "location": {
           "type": "object",
           "properties": {
@@ -116,7 +123,22 @@
         },
         "lastUpdated": { "type": "string", "format": "date-time" }
       },
-      "required": ["name", "phone", "carType", "status"]
+      "required": ["uid", "name", "phone", "carType", "plateNumber", "registrationStatus"]
+    },
+    "Rating": {
+      "title": "Rating",
+      "description": "A user rating for a driver",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "bookingId": { "type": "string" },
+        "driverId": { "type": "string" },
+        "customerId": { "type": "string" },
+        "rating": { "type": "number", "minimum": 1, "maximum": 5 },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["bookingId", "driverId", "customerId", "rating"]
     },
     "Booking": {
       "title": "Booking",
@@ -200,6 +222,10 @@
     "/driver_requests/{id}": {
       "schema": "DriverRequest",
       "description": "Individual requests to drivers"
+    },
+    "/ratings/{ratingId}": {
+      "schema": "Rating",
+      "description": "Driver ratings collection"
     }
   }
 }

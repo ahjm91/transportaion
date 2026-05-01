@@ -169,11 +169,16 @@ export interface Driver {
   status: 'online' | 'offline' | 'busy';
   location: Location;
   lastUpdated: any;
+  uid?: string;
+  plateNumber?: string;
+  registrationStatus?: 'pending' | 'approved' | 'rejected';
+  adminStatus?: 'active' | 'suspended';
+  totalRating?: number;
+  ratingCount?: number;
+  averageRating?: number;
   wallet?: number;
   carImage?: string;
-  plateNumber?: string;
   rating?: number;
-  totalRatings?: number;
 }
 
 export interface Booking {
@@ -256,6 +261,16 @@ export interface PayoutRequest {
   amount: number;
   status: 'pending' | 'completed' | 'rejected';
   bankDetails?: string;
+  createdAt: any;
+}
+
+export interface Rating {
+  id: string;
+  bookingId: string;
+  driverId: string;
+  customerId: string;
+  rating: number;
+  comment?: string;
   createdAt: any;
 }
 

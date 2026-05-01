@@ -101,6 +101,9 @@ import { TripForm } from './components/admin/TripForm';
 import { TripDeleteModal } from './components/admin/TripDeleteModal';
 import { PaymentModal } from './components/modals/PaymentModal';
 import { CustomerDashboardModal } from './components/modals/CustomerDashboardModal';
+import { AuthModal } from './components/modals/AuthModal';
+import { RatingModal } from './components/modals/RatingModal';
+import { DriverRegistrationModal } from './components/modals/DriverRegistrationModal';
 import { TermsModal, PrivacyModal } from './components/common/Modals';
 import { handleFirestoreError as handleFirestoreErrorUtils } from './lib/firestoreUtils';
 import { BookingData, Service, SpecializedService, SiteSettings, UserProfile, Trip, FixedRoute, OperationType, Booking, Driver } from './types';
@@ -160,6 +163,9 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
 
 function App() {
   const [lang, setLang] = useState<'ar' | 'en'>('ar');
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isDriverRegistrationOpen, setIsDriverRegistrationOpen] = useState(false);
+  const authProcessedRef = React.useRef<string | null>(null);
   const t = (key: keyof typeof translations.ar) => translations[lang][key] || key;
 
   const logAnalyticsEvent = (event: string, category: string, label?: string, metadata?: any) => {
@@ -544,6 +550,21 @@ function App() {
         let needsUpdate = false;
         const updates: any = {};
 
+        // Auto-redirect to dashboard after login
+        if (authProcessedRef.current !== user.uid) {
+          authProcessedRef.current = user.uid;
+          
+          setTimeout(() => {
+            if (profile.role === 'admin') {
+              setIsDashboardOpen(true);
+            } else if (profile.role === 'driver') {
+              setIsDriverDashboardOpen(true);
+            } else {
+              setIsCustomerDashboardOpen(true);
+            }
+          }, 1000);
+        }
+
         // If existing user has no membership number, assign one
         if (!profile.membershipNumber) {
           try {
@@ -818,14 +839,7 @@ function App() {
     }
   }, [isAdmin, specializedServices]);
 
-  const handleLogin = async () => {
-    try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-    } catch (error) {
-      console.error('Login failed:', error);
-    }
-  };
+  const handleLogin = () => setIsAuthOpen(true);
 
   const handleLogout = () => signOut(auth);
 
@@ -2066,6 +2080,28 @@ function App() {
       setIsPaymentOpen(true);
       setIsCustomerDashboardOpen(false);
     }}
+  />
+
+  <AuthModal 
+    isOpen={isAuthOpen}
+    onClose={() => setIsAuthOpen(false)}
+    lang={lang}
+    siteSettings={siteSettings}
+  />
+
+  <RatingModal
+    isOpen={showRatingModal}
+    onClose={() => setShowRatingModal(false)}
+    booking={completedBooking}
+    lang={lang}
+    siteSettings={siteSettings}
+  />
+
+  <DriverRegistrationModal
+    isOpen={isDriverRegistrationOpen}
+    onClose={() => setIsDriverRegistrationOpen(false)}
+    lang={lang}
+    siteSettings={siteSettings}
   />
 
   <TripForm

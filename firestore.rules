@@ -106,7 +106,15 @@ service cloud.firestore {
     match /driver_requests/{requestId} {
       allow read: if isAuthenticated() && (resource.data.driverId == request.auth.uid || isAdmin());
       allow update: if isAuthenticated() && (resource.data.driverId == request.auth.uid || isAdmin());
-      allow read, write: if isAdmin();
+      allow create: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Ratings
+    match /ratings/{ratingId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid;
+      allow update, delete: if isAdmin();
     }
   }
 }

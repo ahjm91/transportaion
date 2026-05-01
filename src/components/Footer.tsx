@@ -107,8 +107,8 @@ export const Footer = ({ lang, siteSettings, userProfile, handleLogin }: FooterP
       <DriverRegistrationModal 
         isOpen={isDriverModalOpen}
         onClose={() => setIsDriverModalOpen(false)}
-        userProfile={userProfile}
         lang={lang}
+        siteSettings={siteSettings}
       />
     </footer>
   );
