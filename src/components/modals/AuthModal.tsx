@@ -41,7 +41,13 @@ export const AuthModal = ({ isOpen, onClose, lang, siteSettings }: AuthModalProp
       await signInWithPopup(auth, provider);
       onClose();
     } catch (err: any) {
-      setError(err.message);
+      if (err.code === 'auth/operation-not-allowed') {
+        setError(lang === 'ar' 
+          ? 'تسجيل الدخول عبر Google غير مفعل في إعدادات Firebase. يرجى تفعيله من لوحة التحكم.' 
+          : 'Google Sign-in is not enabled in Firebase Console.');
+      } else {
+        setError(err.message);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -59,8 +65,6 @@ export const AuthModal = ({ isOpen, onClose, lang, siteSettings }: AuthModalProp
         const { user } = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(user, { displayName: name });
         
-        // Initial profile creation is handled in App.tsx by onSnapshot listener if it doesn't exist
-        // But we want to ensure phone and name are saved immediately
         const userRef = doc(db, 'users', user.uid);
         await setDoc(userRef, {
           uid: user.uid,
@@ -69,7 +73,7 @@ export const AuthModal = ({ isOpen, onClose, lang, siteSettings }: AuthModalProp
           phone,
           role: 'customer',
           membershipStatus: 'Bronze',
-          membershipNumber: Math.floor(1000 + Math.random() * 9000), // Placeholder, App.tsx will fix with sequence
+          membershipNumber: Math.floor(1000 + Math.random() * 9000),
           createdAt: new Date().toISOString(),
           isVerified: false,
           cashbackBalance: 0,
@@ -79,7 +83,13 @@ export const AuthModal = ({ isOpen, onClose, lang, siteSettings }: AuthModalProp
       }
       onClose();
     } catch (err: any) {
-      setError(err.message);
+      if (err.code === 'auth/operation-not-allowed') {
+        setError(lang === 'ar' 
+          ? 'خيار التسجيل عبر البريد الإلكتروني غير مفعل في Firebase. يرجى تفعيله من "Sign-in method" في لوحة تحكم Firebase.' 
+          : 'Email/Password auth is not enabled in Firebase Console.');
+      } else {
+        setError(err.message);
+      }
     } finally {
       setIsLoading(false);
     }
