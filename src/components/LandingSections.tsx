@@ -2,7 +2,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { ShieldCheck, Clock3, Star, MapPin, ChevronRight, Users, Bus, Clock, DollarSign, Loader2, ArrowUp, ArrowDown, Phone } from 'lucide-react';
-import { SiteSettings, Service, SpecializedService } from '../types';
+import { SiteSettings, Service, SpecializedService, FixedRoute, BookingData } from '../types';
 import { translations } from '../translations';
 import { cn } from '../lib/utils';
 
@@ -22,15 +22,15 @@ export const Hero = ({
   lang: 'ar' | 'en', 
   siteSettings: SiteSettings, 
   t: any,
-  bookingMode: 'fixed' | 'custom',
-  setBookingMode: (mode: 'fixed' | 'custom') => void,
-  fixedRoutes: any[],
-  bookingData: any,
-  setBookingData: (data: any) => void,
+  bookingMode: 'fixed' | 'custom' | 'realtime',
+  setBookingMode: (mode: 'fixed' | 'custom' | 'realtime') => void,
+  fixedRoutes: FixedRoute[],
+  bookingData: BookingData,
+  setBookingData: (data: BookingData) => void,
   handleBookingSubmit: (e: React.FormEvent) => void,
   isBooking: boolean
 }) => (
-  <section id="hero" className="relative pt-32 pb-44 overflow-hidden">
+  <section id="hero" className="relative pt-32 pb-44 overflow-hidden min-h-[90vh] flex items-center">
     {/* Main Background Image */}
     <div className="absolute inset-0 z-0">
       <img 
@@ -47,17 +47,23 @@ export const Hero = ({
           }
         }}
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-dark/60 via-dark/40 to-white" />
+      <div className="absolute inset-0 bg-gradient-to-b from-dark/70 via-dark/40 to-white" />
     </div>
 
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-      <div className="grid lg:grid-cols-2 gap-16 items-center">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full">
+      <div className={cn(
+        "grid gap-16 items-center",
+        siteSettings.layoutDensity === 'compact' ? "lg:grid-cols-2" : "grid-cols-1 text-center"
+      )}>
         {/* Text Side */}
         <motion.div
-          initial={{ opacity: 0, x: lang === 'ar' ? 50 : -50 }}
-          animate={{ opacity: 1, x: 0 }}
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
-          className={cn("text-white space-y-6", lang === 'ar' ? "text-right" : "text-left")}
+          className={cn(
+            "text-white space-y-8", 
+            siteSettings.layoutDensity === 'compact' ? (lang === 'ar' ? "text-right" : "text-left") : "max-w-4xl mx-auto"
+          )}
         >
           <div className="inline-flex items-center gap-2 bg-gold/20 backdrop-blur-md px-4 py-2 rounded-full border border-gold/30 text-gold mb-4">
             <Star className="w-4 h-4 fill-gold" />
@@ -73,7 +79,10 @@ export const Hero = ({
             {lang === 'ar' ? siteSettings.heroDescription : (siteSettings.heroDescription_en || siteSettings.heroDescription)}
           </p>
           
-          <div className="flex flex-wrap gap-4 pt-8">
+          <div className={cn(
+            "flex flex-wrap gap-4 pt-8",
+            siteSettings.layoutDensity === 'compact' ? "" : "justify-center"
+          )}>
             <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20">
               <ShieldCheck className="text-green-400 w-5 h-5" />
               <span className="text-sm font-medium">{t('safeTrips')}</span>
@@ -91,7 +100,10 @@ export const Hero = ({
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="bg-white rounded-[2.5rem] shadow-2xl shadow-dark/5 border border-gray-100 overflow-hidden w-full max-w-5xl mx-auto"
+          className={cn(
+            "bg-white rounded-[2.5rem] shadow-3xl shadow-dark/10 border border-gray-100 overflow-hidden w-full mx-auto transition-all",
+            siteSettings.layoutDensity === 'compact' ? "max-w-xl" : (siteSettings.layoutDensity === 'comfortable' ? "max-w-5xl" : "max-w-7xl")
+          )}
         >
           {/* Tabs */}
           <div className="flex border-b border-gray-100">
@@ -119,22 +131,26 @@ export const Hero = ({
 
           <form 
             onSubmit={handleBookingSubmit}
-            className="p-8 lg:p-10 space-y-8 text-right"
+            className="p-8 lg:p-10 space-y-6 text-right"
             dir={lang === 'ar' ? 'rtl' : 'ltr'}
           >
-            {/* Same form content as App.tsx ... simplified for now to keep the file small or moved to BookingForm component */}
-            <div className="grid grid-cols-1 gap-6">
-               {/* This is a placeholder for the full form to avoid token limit in this tool call, I will add the full form in the next step or use BookingForm component */}
+            <div className="space-y-4">
                {bookingMode === 'fixed' ? (
-                 <div className="space-y-4">
-                   <label className="text-xs font-black text-gray-400 uppercase">{t('selectDropoff')} *</label>
+                 <div className="space-y-2">
+                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{t('selectDropoff')} *</label>
                    <select 
                       required
-                      className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 font-bold"
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 font-bold text-dark appearance-none"
                       onChange={e => {
                         const route = fixedRoutes.find(r => r.id === e.target.value);
                         if (route) {
-                          setBookingData({ ...bookingData, pickup: route.pickup, dropoff: route.dropoff, amount: route.price });
+                          setBookingData({ 
+                            ...bookingData, 
+                            pickup: route.pickup, 
+                            dropoff: route.dropoff, 
+                            amount: route.price,
+                            bookingType: 'transfer'
+                          });
                         }
                       }}
                    >
@@ -144,27 +160,163 @@ export const Hero = ({
                  </div>
                ) : (
                  <div className="grid md:grid-cols-2 gap-4">
-                    <input placeholder={t('pickupLocation')} className="bg-gray-50 p-4 rounded-2xl font-bold" value={bookingData.pickup} onChange={e => setBookingData({...bookingData, pickup: e.target.value})} />
-                    <input placeholder={t('dropoffLocation')} className="bg-gray-50 p-4 rounded-2xl font-bold" value={bookingData.dropoff} onChange={e => setBookingData({...bookingData, dropoff: e.target.value})} />
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{t('pickupLocation')} *</label>
+                      <input 
+                        required
+                        placeholder={t('pickupLocation')} 
+                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 font-bold" 
+                        value={bookingData.pickup} 
+                        onChange={e => setBookingData({...bookingData, pickup: e.target.value})} 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{t('dropoffLocation')} *</label>
+                      <input 
+                        required
+                        placeholder={t('dropoffLocation')} 
+                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 font-bold" 
+                        value={bookingData.dropoff} 
+                        onChange={e => setBookingData({...bookingData, dropoff: e.target.value})} 
+                      />
+                    </div>
                  </div>
                )}
                
                <div className="grid md:grid-cols-2 gap-4">
-                 <input placeholder={t('firstName')} required className="bg-gray-50 p-4 rounded-2xl font-bold" value={bookingData.firstName} onChange={e => setBookingData({...bookingData, firstName: e.target.value})} />
-                 <input placeholder={t('lastName')} required className="bg-gray-50 p-4 rounded-2xl font-bold" value={bookingData.lastName} onChange={e => setBookingData({...bookingData, lastName: e.target.value})} />
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{t('firstName')} *</label>
+                    <input 
+                      required 
+                      placeholder={t('firstName')} 
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 font-bold" 
+                      value={bookingData.firstName} 
+                      onChange={e => {
+                        const val = e.target.value;
+                        const newFirstName = val;
+                        const newLastName = bookingData.lastName || '';
+                        setBookingData({
+                          ...bookingData, 
+                          firstName: newFirstName, 
+                          customerName: `${newFirstName} ${newLastName}`.trim()
+                        });
+                      }} 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{t('lastName')} *</label>
+                    <input 
+                      required 
+                      placeholder={t('lastName')} 
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 font-bold" 
+                      value={bookingData.lastName} 
+                      onChange={e => {
+                        const val = e.target.value;
+                        const newFirstName = bookingData.firstName || '';
+                        const newLastName = val;
+                        setBookingData({
+                          ...bookingData, 
+                          lastName: newLastName, 
+                          customerName: `${newFirstName} ${newLastName}`.trim()
+                        });
+                      }} 
+                    />
+                  </div>
                </div>
 
                <div className="grid md:grid-cols-2 gap-4">
-                 <input type="email" placeholder={t('emailAddress')} required className="bg-gray-50 p-4 rounded-2xl font-bold" value={bookingData.email} onChange={e => setBookingData({...bookingData, email: e.target.value})} />
-                 <input type="tel" placeholder={t('phone')} required className="bg-gray-50 p-4 rounded-2xl font-bold" value={bookingData.phone} onChange={e => setBookingData({...bookingData, phone: e.target.value})} />
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{t('emailAddress')} *</label>
+                    <input 
+                      type="email" 
+                      required
+                      placeholder="email@example.com" 
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 font-bold" 
+                      value={bookingData.email} 
+                      onChange={e => setBookingData({...bookingData, email: e.target.value})} 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{t('phone')} *</label>
+                    <div className="flex gap-2">
+                      <select 
+                        className="bg-gray-50 border border-gray-100 rounded-2xl px-2 font-bold text-xs"
+                        value={bookingData.countryCode}
+                        onChange={e => setBookingData({...bookingData, countryCode: e.target.value})}
+                      >
+                        <option value="+973">+973</option>
+                        <option value="+966">+966</option>
+                        <option value="+971">+971</option>
+                        <option value="+965">+965</option>
+                        <option value="+968">+968</option>
+                        <option value="+974">+974</option>
+                      </select>
+                      <input 
+                        type="tel" 
+                        required
+                        placeholder="3232xxxx" 
+                        className="flex-1 bg-gray-50 border border-gray-100 rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 font-bold" 
+                        value={bookingData.phone} 
+                        onChange={e => setBookingData({...bookingData, phone: e.target.value})} 
+                      />
+                    </div>
+                  </div>
+               </div>
+
+               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{t('date')} *</label>
+                    <input 
+                      type="date"
+                      required
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 px-4 focus:ring-2 focus:ring-gold/20 font-bold text-sm" 
+                      value={bookingData.date} 
+                      onChange={e => setBookingData({...bookingData, date: e.target.value})} 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{t('time')} *</label>
+                    <input 
+                      type="time"
+                      required
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 px-4 focus:ring-2 focus:ring-gold/20 font-bold text-sm" 
+                      value={bookingData.time} 
+                      onChange={e => setBookingData({...bookingData, time: e.target.value})} 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{t('carType')} *</label>
+                    <select 
+                      required
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 px-4 focus:ring-2 focus:ring-gold/20 font-bold text-sm" 
+                      value={bookingData.carType} 
+                      onChange={e => setBookingData({...bookingData, carType: e.target.value as any})} 
+                    >
+                      <option value="Standard">{t('standard')}</option>
+                      <option value="VIP">{t('vip')}</option>
+                      <option value="Van">{t('van')}</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{t('passengers')} *</label>
+                    <input 
+                      type="number"
+                      min="1"
+                      max="7"
+                      required
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 px-4 focus:ring-2 focus:ring-gold/20 font-bold text-sm" 
+                      value={bookingData.passengers} 
+                      onChange={e => setBookingData({...bookingData, passengers: parseInt(e.target.value)})} 
+                    />
+                  </div>
                </div>
 
                <button 
                 type="submit"
                 disabled={isBooking}
-                className="w-full bg-dark text-white py-6 rounded-[2rem] font-black text-xl hover:bg-gray-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                className="w-full bg-dark text-white py-6 rounded-[2rem] font-black text-xl hover:bg-gray-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50 mt-4 shadow-xl shadow-dark/10 group active:scale-95"
               >
-                {isBooking ? <Loader2 className="animate-spin w-6 h-6 text-gold" /> : <Star className="w-6 h-6 text-gold" />}
+                {isBooking ? <Loader2 className="animate-spin w-6 h-6 text-gold" /> : <Star className="w-6 h-6 text-gold group-hover:rotate-45 transition-transform" />}
                 {isBooking ? (lang === 'ar' ? 'جاري الحفظ...' : 'Booking...') : (bookingMode === 'fixed' ? t('confirmBooking') : t('sendRequest'))}
               </button>
             </div>

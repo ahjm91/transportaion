@@ -217,7 +217,7 @@ function App() {
     showCTASection: true,
     commissionRate: 10,
     spacingFactor: 1.0,
-    layoutDensity: 'comfortable',
+    layoutDensity: 'spacious',
     sectionOrder: ['hero', 'booking', 'services', 'specialized', 'about', 'cta'],
     siteTitle: 'GCC TAXI | فخامة التنقل',
     siteTitle_en: 'GCC TAXI | Luxury Travel',
@@ -2047,6 +2047,7 @@ function App() {
     siteSettings={siteSettings}
     lang={lang}
     t={t}
+    initialTrip={paymentTrip}
   />
 
   <CustomerDashboardModal
@@ -2165,7 +2166,7 @@ function App() {
                 <div className="bg-white/20 p-2 rounded-xl">
                   <Phone className="w-5 h-5" />
                 </div>
-                <span>{lang === 'ar' ? 'تأكيد الحجز عبر واتساب' : 'Confirm via WhatsApp'}</span>
+                <span>{lang === 'ar' ? 'تأكيد عبر واتساب' : 'Confirm via WhatsApp'}</span>
                 <motion.div
                   animate={{ x: lang === 'ar' ? [0, -5, 0] : [0, 5, 0] }}
                   transition={{ repeat: Infinity, duration: 1.5 }}
@@ -2173,6 +2174,22 @@ function App() {
                   <ArrowRight className="w-5 h-5 rtl:rotate-180" />
                 </motion.div>
               </button>
+
+              {lastBookingInfo.amount > 0 && siteSettings.paymentGateway !== 'WhatsApp' && (
+                <button
+                  onClick={() => {
+                    setPaymentTrip(lastBookingInfo);
+                    setIsPaymentOpen(true);
+                    setIsBookingSuccessOpen(false);
+                  }}
+                  className="w-full bg-gold text-white py-5 px-8 rounded-2xl font-black text-lg transition-all shadow-xl shadow-gold/20 flex items-center justify-center gap-4 group active:scale-95 border-2 border-gold hover:bg-white hover:text-gold"
+                >
+                  <div className="bg-white/20 group-hover:bg-gold/10 p-2 rounded-xl transition-colors">
+                    <DollarSign className="w-5 h-5" />
+                  </div>
+                  <span>{lang === 'ar' ? 'الدفع الآن بالبطاقة' : 'Pay Now via Card'}</span>
+                </button>
+              )}
 
               <button 
                 onClick={() => setIsBookingSuccessOpen(false)}
