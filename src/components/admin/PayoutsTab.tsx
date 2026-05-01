@@ -6,7 +6,7 @@ import { PayoutRequest } from '../../types';
 import { Check, X, Clock, Wallet, ArrowUpRight } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
-export const PayoutsTab = () => {
+export const PayoutsTab = ({ lang }: { lang: 'ar' | 'en' }) => {
   const [requests, setRequests] = useState<PayoutRequest[]>([]);
 
   useEffect(() => {
@@ -21,14 +21,14 @@ export const PayoutsTab = () => {
     try {
       await updateDoc(doc(db, 'payout_requests', req.id), { status: newStatus });
       
-      // If completed, double check wallet and maybe deduct if not already done?
-      // Actually per driver balance logic, deduction should happen on completion of request.
       if (newStatus === 'completed') {
         const driverRef = doc(db, 'drivers', req.driverId);
         await updateDoc(driverRef, { wallet: increment(-req.amount) });
       }
       
-      alert(newStatus === 'completed' ? 'تم تأكيد التحويل بنجاح' : 'تم رفض الطلب');
+      alert(newStatus === 'completed' 
+        ? (lang === 'ar' ? 'تم تأكيد التحويل بنجاح' : 'Bank transfer confirmed successfully') 
+        : (lang === 'ar' ? 'تم رفض الطلب' : 'Request rejected'));
     } catch (err) {
       console.error('Error updating payout:', err);
     }
@@ -37,30 +37,30 @@ export const PayoutsTab = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-8">
-        <div>
-          <h3 className="text-2xl font-black text-dark">طلبات سحب الرصيد</h3>
-          <p className="text-sm text-gray-500 mt-1">إدارة مستحقات السائقين وتحويلاتهم البنكية</p>
+        <div dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+          <h3 className="text-2xl font-black text-dark">{lang === 'ar' ? 'طلبات سحب الرصيد' : 'Payout Requests'}</h3>
+          <p className="text-sm text-gray-500 mt-1">{lang === 'ar' ? 'إدارة مستحقات السائقين وتحويلاتهم البنكية' : 'Manage driver payouts and bank transfers'}</p>
         </div>
         <div className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4">
           <div className="w-10 h-10 bg-gold/10 rounded-2xl flex items-center justify-center">
             <Clock className="w-5 h-5 text-gold" />
           </div>
           <div>
-            <p className="text-[10px] text-gray-400 font-bold uppercase">بانتظار المراجعة</p>
+            <p className="text-[10px] text-gray-400 font-bold uppercase">{lang === 'ar' ? 'بانتظار المراجعة' : 'Pending Review'}</p>
             <p className="text-lg font-black text-dark">{requests.filter(r => r.status === 'pending').length}</p>
           </div>
         </div>
       </div>
 
       <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm">
-        <table className="w-full text-right">
+        <table className={cn("w-full", lang === 'ar' ? "text-right" : "text-left")}>
           <thead className="bg-gray-50 border-b border-gray-100">
-            <tr>
-              <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">السائق</th>
-              <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">المبلغ</th>
-              <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">تفاصيل البنك</th>
-              <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">الحالة</th>
-              <th className="p-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">إجراءات</th>
+            <tr className="uppercase tracking-widest text-[10px] font-black text-gray-400">
+              <th className="p-6">{lang === 'ar' ? 'السائق' : 'Driver'}</th>
+              <th className="p-6 text-center">{lang === 'ar' ? 'المبلغ' : 'Amount'}</th>
+              <th className="p-6">{lang === 'ar' ? 'تفاصيل البنك' : 'Bank Details'}</th>
+              <th className="p-6 text-center">{lang === 'ar' ? 'الحالة' : 'Status'}</th>
+              <th className="p-6 text-center">{lang === 'ar' ? 'إجراءات' : 'Actions'}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -73,20 +73,22 @@ export const PayoutsTab = () => {
                     </div>
                     <div>
                       <p className="font-bold text-dark">{req.driverName}</p>
-                      <p className="text-[10px] text-gray-400">{req.createdAt?.seconds ? new Date(req.createdAt.seconds * 1000).toLocaleString('ar-BH') : '---'}</p>
+                      <p className="text-[10px] text-gray-400">{req.createdAt?.seconds ? new Date(req.createdAt.seconds * 1000).toLocaleString(lang === 'ar' ? 'ar-BH' : 'en-US') : '---'}</p>
                     </div>
                   </div>
                 </td>
                 <td className="p-6 text-center font-black text-dark text-lg">{req.amount} BHD</td>
                 <td className="p-6">
-                  <p className="text-xs text-gray-500 whitespace-pre-wrap max-w-xs">{req.bankDetails || 'لا يوجد تفاصيل'}</p>
+                  <p className="text-xs text-gray-500 whitespace-pre-wrap max-w-xs">{req.bankDetails || (lang === 'ar' ? 'لا يوجد تفاصيل' : 'No details')}</p>
                 </td>
                 <td className="p-6 text-center">
                   <span className={cn(
                     "px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest",
                     req.status === 'completed' ? "bg-green-100 text-green-600" : (req.status === 'rejected' ? "bg-red-100 text-red-600" : "bg-orange-100 text-orange-600")
                   )}>
-                    {req.status === 'pending' ? 'بانتظار المراجعة' : (req.status === 'completed' ? 'تم اكتمال التحويل' : 'طلب مرفوض')}
+                    {req.status === 'pending' ? (lang === 'ar' ? 'بانتظار المراجعة' : 'Pending') : 
+                     (req.status === 'completed' ? (lang === 'ar' ? 'تم اكتمال التحويل' : 'Completed') : 
+                     (lang === 'ar' ? 'طلب مرفوض' : 'Rejected'))}
                   </span>
                 </td>
                 <td className="p-6">
@@ -95,14 +97,14 @@ export const PayoutsTab = () => {
                        <button 
                          onClick={() => handleStatusUpdate(req, 'completed')}
                          className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-600 hover:text-white transition-all shadow-sm"
-                         title="تأكيد التحويل"
+                         title={lang === 'ar' ? "تأكيد التحويل" : "Confirm Payout"}
                        >
                          <Check className="w-4 h-4" />
                        </button>
                        <button 
                          onClick={() => handleStatusUpdate(req, 'rejected')}
                          className="p-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm"
-                         title="رفض الطلب"
+                         title={lang === 'ar' ? "رفض الطلب" : "Reject Request"}
                        >
                          <X className="w-4 h-4" />
                        </button>
@@ -116,7 +118,7 @@ export const PayoutsTab = () => {
             ))}
             {requests.length === 0 && (
               <tr>
-                <td colSpan={5} className="p-12 text-center text-gray-400 font-bold">لا توجد طلبات سحب حالياً</td>
+                <td colSpan={5} className="p-12 text-center text-gray-400 font-bold">{lang === 'ar' ? 'لا توجد طلبات سحب حالياً' : 'No payout requests at the moment'}</td>
               </tr>
             )}
           </tbody>

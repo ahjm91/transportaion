@@ -144,13 +144,21 @@ export const PaymentModal = ({
                   <button 
                     onClick={() => {
                       const adminWhatsapp = siteSettings.notificationWhatsapp || siteSettings.whatsapp || '97332325997';
-                      const message = `👋 *طلب دفع رحلة*\n\n` +
-                                     `👤 العميل: ${paymentTrip.customerName}\n` +
-                                     `📍 المسار: ${paymentTrip.direction}\n` +
-                                     `📅 التاريخ: ${paymentTrip.date}\n` +
-                                     `💰 السعر: ${paymentTrip.amount} BHD\n` +
-                                     `🆔 رقم الحجز: ${paymentTrip.id.slice(-6).toUpperCase()}\n\n` +
-                                     `أرغب في تأكيد الدفع لهذه الرحلة.`;
+                      const message = lang === 'ar' 
+                        ? `👋 *طلب دفع رحلة*\n\n` +
+                          `👤 العميل: ${paymentTrip.customerName}\n` +
+                          `📍 المسار: ${paymentTrip.direction}\n` +
+                          `📅 التاريخ: ${paymentTrip.date}\n` +
+                          `💰 السعر: ${paymentTrip.amount} BHD\n` +
+                          `🆔 رقم الحجز: ${paymentTrip.id.slice(-6).toUpperCase()}\n\n` +
+                          `أرغب في تأكيد الدفع لهذه الرحلة.`
+                        : `👋 *Trip Payment Request*\n\n` +
+                          `👤 Customer: ${paymentTrip.customerName}\n` +
+                          `📍 Route: ${paymentTrip.direction}\n` +
+                          `📅 Date: ${paymentTrip.date}\n` +
+                          `💰 Price: ${paymentTrip.amount} BHD\n` +
+                          `🆔 Booking ID: ${paymentTrip.id.slice(-6).toUpperCase()}\n\n` +
+                          `I would like to confirm the payment for this trip.`;
                       
                       window.open(`https://wa.me/${adminWhatsapp}?text=${encodeURIComponent(message)}`, '_blank');
                     }}

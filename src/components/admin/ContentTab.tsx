@@ -12,10 +12,11 @@ interface ContentTabProps {
   safeUpdateDoc: (ref: any, data: any) => Promise<void>;
   safeDeleteDoc: (ref: any) => Promise<void>;
   handleImageUpload: (file: File, collectionName: string, docId: string, fieldName: string) => Promise<void>;
+  lang: 'ar' | 'en';
 }
 
 export const ContentTab = ({
-  services, specializedServices, safeAddDoc, safeUpdateDoc, safeDeleteDoc, handleImageUpload
+  services, specializedServices, safeAddDoc, safeUpdateDoc, safeDeleteDoc, handleImageUpload, lang
 }: ContentTabProps) => {
   const [activeSubTab, setActiveSubTab] = React.useState<'main' | 'specialized'>('main');
 
@@ -28,7 +29,7 @@ export const ContentTab = ({
             activeSubTab === 'main' ? 'bg-gold text-white shadow-xl shadow-gold/20' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
           }`}
         >
-          الخدمات الرئيسية
+          {lang === 'ar' ? 'الخدمات الرئيسية' : 'Main Services'}
         </button>
         <button 
           onClick={() => setActiveSubTab('specialized')}
@@ -36,7 +37,7 @@ export const ContentTab = ({
             activeSubTab === 'specialized' ? 'bg-gold text-white shadow-xl shadow-gold/20' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
           }`}
         >
-          الخدمات المتخصصة
+          {lang === 'ar' ? 'الخدمات المتخصصة' : 'Specialized Services'}
         </button>
       </div>
 
@@ -45,8 +46,8 @@ export const ContentTab = ({
            {/* Add New Service Card */}
            <button 
             onClick={() => {
-              const name = prompt('عنوان الخدمة (AR):');
-              const name_en = prompt('Service Title (EN):');
+              const name = prompt(lang === 'ar' ? 'عنوان الخدمة (AR):' : 'Service Title (AR):');
+              const name_en = prompt(lang === 'ar' ? 'Service Title (EN):' : 'Service Title (EN):');
               if (name) {
                 safeAddDoc(collection(db, 'services'), {
                   name, name_en, description: '', description_en: '', icon: 'Car', image: 'https://images.unsplash.com/photo-1449965024614-23b7a491bc60?auto=format&fit=crop&q=80&w=800'
@@ -58,7 +59,9 @@ export const ContentTab = ({
               <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-gray-300 group-hover:text-gold group-hover:scale-110 transition-all shadow-sm">
                 <Plus className="w-8 h-8" />
               </div>
-              <span className="font-black text-gray-400 uppercase tracking-widest text-xs">إضافة خدمة جديدة</span>
+              <span className="font-black text-gray-400 uppercase tracking-widest text-xs">
+                {lang === 'ar' ? 'إضافة خدمة جديدة' : 'Add New Service'}
+              </span>
            </button>
 
             {services.map(service => (
@@ -97,6 +100,12 @@ export const ContentTab = ({
                     value={service.description}
                     onChange={e => safeUpdateDoc(doc(db, 'services', service.id), { description: e.target.value })}
                   />
+                  <textarea 
+                    className="w-full bg-blue-50/30 border-none rounded-xl p-3 text-xs font-bold h-20 focus:ring-1 focus:ring-blue-500/20"
+                    placeholder="Service Description (EN)"
+                    value={service.description_en || ''}
+                    onChange={e => safeUpdateDoc(doc(db, 'services', service.id), { description_en: e.target.value })}
+                  />
                 </div>
              </div>
            ))}
@@ -105,8 +114,8 @@ export const ContentTab = ({
         <div className="grid md:grid-cols-2 gap-8">
            <button 
             onClick={() => {
-              const title = prompt('عنوان الخدمة المتخصصة (AR):');
-              const title_en = prompt('Specialized Title (EN):');
+              const title = prompt(lang === 'ar' ? 'عنوان الخدمة المتخصصة (AR):' : 'Specialized Title (AR):');
+              const title_en = prompt(lang === 'ar' ? 'Specialized Title (EN):' : 'Specialized Title (EN):');
               if (title) {
                 safeAddDoc(collection(db, 'specialized_services'), {
                   title, title_en, description: '', description_en: '', image: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=800', price: '0', price_en: 'Starting from 0'
@@ -118,7 +127,9 @@ export const ContentTab = ({
               <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-gray-300 group-hover:text-gold group-hover:scale-110 transition-all shadow-sm">
                 <Plus className="w-8 h-8" />
               </div>
-              <span className="font-black text-gray-400 uppercase tracking-widest text-xs">إضافة خدمة متخصصة</span>
+              <span className="font-black text-gray-400 uppercase tracking-widest text-xs">
+                {lang === 'ar' ? 'إضافة خدمة متخصصة' : 'Add Specialized Service'}
+              </span>
            </button>
 
            {specializedServices.map(service => (

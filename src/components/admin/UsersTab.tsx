@@ -81,21 +81,21 @@ export const UsersTab = ({ users, allDrivers, isUsersLoading, safeUpdateDoc, lan
       <div className="flex flex-wrap justify-between items-center gap-4">
         <h4 className="text-xl font-black text-dark flex items-center gap-2">
           <Users className="text-gold w-6 h-6" />
-          إدارة الأعضاء والولاء
+          {lang === 'ar' ? 'إدارة الأعضاء والولاء' : 'Member & Loyalty Management'}
         </h4>
         <div className="flex items-center gap-4">
           <div className="relative">
-            <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className={cn("absolute top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400", lang === 'ar' ? "right-4" : "left-4")} />
             <input 
               type="text" 
-              placeholder="بحث في الأعضاء..."
-              className="bg-gray-50 border-gray-100 rounded-xl py-2 pr-10 pl-4 text-xs font-bold focus:ring-2 focus:ring-gold/20 transition-all w-64"
+              placeholder={lang === 'ar' ? "بحث في الأعضاء..." : "Search members..."}
+              className={cn("bg-gray-50 border-gray-100 rounded-xl py-2 text-xs font-bold focus:ring-2 focus:ring-gold/20 transition-all w-64", lang === 'ar' ? "pr-10 pl-4" : "pl-10 pr-4")}
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
             />
           </div>
           <div className="text-[10px] text-gray-400 bg-gray-100 px-3 py-1.5 rounded-full font-black uppercase tracking-wider">
-            الإجمالي: {users.length}
+            {lang === 'ar' ? 'الإجمالي' : 'Total'}: {users.length}
           </div>
         </div>
       </div>
@@ -103,20 +103,20 @@ export const UsersTab = ({ users, allDrivers, isUsersLoading, safeUpdateDoc, lan
       {isUsersLoading ? (
         <div className="flex flex-col items-center justify-center p-32 space-y-4">
           <Loader2 className="w-12 h-12 text-gold animate-spin" />
-          <p className="text-gray-400 text-xs font-black uppercase tracking-widest">جاري تحميل قائمة الأعضاء...</p>
+          <p className="text-gray-400 text-xs font-black uppercase tracking-widest">{lang === 'ar' ? 'جاري تحميل قائمة الأعضاء...' : 'Loading members list...'}</p>
         </div>
       ) : (
         <div className="bg-white border border-gray-100 rounded-[2.5rem] shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="bg-gray-50 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                  <th className="p-5 border-b">المستخدم</th>
-                  <th className="p-5 border-b">العضوية</th>
-                  <th className="p-5 border-b">المحفظة (Wallet)</th>
-                  <th className="p-5 border-b">التفعيل</th>
-                  <th className="p-5 border-b">الكاش باك (BHD)</th>
-                  <th className="p-5 border-b">الجوائز والخصومات</th>
+                <tr className={cn("bg-gray-50 text-[10px] font-black text-gray-400 uppercase tracking-widest", lang === 'ar' ? "text-right" : "text-left")}>
+                  <th className="p-5 border-b">{lang === 'ar' ? 'المستخدم' : 'User'}</th>
+                  <th className="p-5 border-b">{lang === 'ar' ? 'العضوية' : 'Membership'}</th>
+                  <th className="p-5 border-b">{lang === 'ar' ? 'المحفظة (Wallet)' : 'Wallet balance'}</th>
+                  <th className="p-5 border-b">{lang === 'ar' ? 'التفعيل' : 'Status'}</th>
+                  <th className="p-5 border-b">{lang === 'ar' ? 'الكاش باك (BHD)' : 'Cashback (BHD)'}</th>
+                  <th className="p-5 border-b">{lang === 'ar' ? 'الجوائز والخصومات' : 'Rewards & Discounts'}</th>
                 </tr>
               </thead>
               <tbody>
@@ -229,7 +229,9 @@ export const UsersTab = ({ users, allDrivers, isUsersLoading, safeUpdateDoc, lan
                       <button 
                         onClick={() => safeUpdateDoc(doc(db, 'users', u.uid), { 
                           isVerified: !u.isVerified, 
-                          verificationMessage: !u.isVerified ? 'تم تفعيل حسابك بنجاح! استمتع برحلاتك.' : 'جاري مراجعة طلب اشتراكك.' 
+                          verificationMessage: !u.isVerified 
+                            ? (lang === 'ar' ? 'تم تفعيل حسابك بنجاح! استمتع برحلاتك.' : 'Account activated successfully! Enjoy your trips.')
+                            : (lang === 'ar' ? 'جاري مراجعة طلب اشتراكك.' : 'Your account is under review.')
                         })}
                         className={cn(
                           "px-4 py-2 rounded-xl text-[10px] font-black text-white flex items-center gap-2 transition-all",
@@ -237,7 +239,9 @@ export const UsersTab = ({ users, allDrivers, isUsersLoading, safeUpdateDoc, lan
                         )}
                       >
                         <ShieldCheck className="w-3.5 h-3.5" />
-                        {u.isVerified ? 'عضو مفعل' : 'بانتظار التفعيل'}
+                        {u.isVerified 
+                          ? (lang === 'ar' ? 'عضو مفعل' : 'Verified Member') 
+                          : (lang === 'ar' ? 'بانتظار التفعيل' : 'Pending Verification')}
                       </button>
                     </td>
                     <td className="p-5">
@@ -258,14 +262,14 @@ export const UsersTab = ({ users, allDrivers, isUsersLoading, safeUpdateDoc, lan
                       <div className="flex flex-wrap gap-2">
                         <button 
                           onClick={() => {
-                            const prize = prompt('أدخل اسم الجائزة الجديدة (مثال: رحلة مجانية للمطار):');
+                            const prize = prompt(lang === 'ar' ? 'أدخل اسم الجائزة الجديدة (مثال: رحلة مجانية للمطار):' : 'Enter new prize name (e.g. Free airport trip):');
                             if (prize) {
                               const current = u.availableRewards || [];
                               safeUpdateDoc(doc(db, 'users', u.uid), { availableRewards: [...current, prize] });
                             }
                           }}
                           className="bg-gold/10 text-gold hover:bg-gold/20 p-2 rounded-xl transition-all"
-                          title="إضافة جائزة"
+                          title={lang === 'ar' ? "إضافة جائزة" : "Add reward"}
                         >
                           <Plus className="w-4 h-4" />
                         </button>
@@ -275,7 +279,7 @@ export const UsersTab = ({ users, allDrivers, isUsersLoading, safeUpdateDoc, lan
                             <X 
                               className="w-3 h-3 cursor-pointer opacity-40 hover:opacity-100" 
                               onClick={() => {
-                                if (confirm('حذف هذه الجائزة من حساب العميل؟')) {
+                                if (confirm(lang === 'ar' ? 'حذف هذه الجائزة من حساب العميل؟' : 'Delete this reward from customer account?')) {
                                   const filtered = u.availableRewards?.filter((_, idx) => idx !== rid);
                                   safeUpdateDoc(doc(db, 'users', u.uid), { availableRewards: filtered });
                                 }

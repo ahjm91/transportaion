@@ -112,7 +112,10 @@ export const CustomerDashboardModal = ({
                                    trip.status === 'Completed' || trip.status === 'completed' ? "bg-green-100 text-green-600" : 
                                    (trip.status === 'Cancelled' || trip.status === 'cancelled' ? "bg-red-100 text-red-600" : "bg-orange-100 text-orange-600")
                                  )}>
-                                   {trip.status}
+                                   {trip.status === 'Requested' || trip.status === 'requested' ? (lang === 'ar' ? 'طلب جديد' : 'Requested') :
+                                    trip.status === 'Confirmed' || trip.status === 'confirmed' ? (lang === 'ar' ? 'مؤكد' : 'Confirmed') :
+                                    trip.status === 'Completed' || trip.status === 'completed' ? (lang === 'ar' ? 'مكتمل' : 'Completed') :
+                                    (lang === 'ar' ? 'ملغي' : 'Cancelled')}
                                  </span>
                                  <span className="text-[10px] text-gray-400 font-bold">
                                    {isRealtime ? (lang === 'ar' ? 'حجز فوري' : 'Live Booking') : (lang === 'ar' ? 'حجز مسبق' : 'Scheduled')}
@@ -139,14 +142,17 @@ export const CustomerDashboardModal = ({
                      <div className="absolute top-0 right-0 w-64 h-64 bg-gold/10 rounded-full -mr-32 -mt-32 blur-3xl" />
                      <div className="relative flex flex-col md:flex-row justify-between items-center gap-8">
                         <div className="text-center md:text-right">
-                           <p className="text-gold text-[10px] font-black uppercase tracking-widest mb-2">Member Tier</p>
+                           <p className="text-gold text-[10px] font-black uppercase tracking-widest mb-2">{lang === 'ar' ? 'فئة العضوية' : 'Member Tier'}</p>
                            <h4 className="text-4xl font-black flex items-center gap-4">
                              <Star className="w-10 h-10 fill-gold text-gold" />
-                             {userProfile?.membershipStatus || 'Bronze'}
+                             {userProfile?.membershipStatus === 'Bronze' ? (lang === 'ar' ? 'برونزي' : 'Bronze') :
+                              userProfile?.membershipStatus === 'Silver' ? (lang === 'ar' ? 'فضي' : 'Silver') :
+                              userProfile?.membershipStatus === 'Gold' ? (lang === 'ar' ? 'ذهبي' : 'Gold') :
+                              (userProfile?.membershipStatus || (lang === 'ar' ? 'برونزي' : 'Bronze'))}
                            </h4>
                         </div>
                         <div className="bg-white/5 border border-white/10 backdrop-blur-md p-6 rounded-3xl text-center">
-                           <p className="text-white/40 text-[10px] font-black uppercase mb-1">Cashback Balance</p>
+                           <p className="text-white/40 text-[10px] font-black uppercase mb-1">{lang === 'ar' ? 'رصيد الكاش باك' : 'Cashback Balance'}</p>
                            <p className="text-3xl font-black text-gold">{userProfile?.cashbackBalance || '0.00'} <span className="text-xs">BHD</span></p>
                         </div>
                      </div>
@@ -178,10 +184,14 @@ export const CustomerDashboardModal = ({
                          {lang === 'ar' ? 'مميزات العضوية' : 'Benefits'}
                        </h5>
                        <ul className="space-y-4">
-                          {['أولوية الحجز', 'كاش باك تصاعدي', 'ترقية مجانية'].map((benefit, i) => (
+                          {[
+                            { ar: 'أولوية الحجز', en: 'Priority Booking' },
+                            { ar: 'كاش باك تصاعدي', en: 'Progressive Cashback' },
+                            { ar: 'ترقية مجانية', en: 'Free Upgrades' }
+                          ].map((benefit, i) => (
                             <li key={i} className="flex items-center gap-3 text-sm font-bold text-dark">
                                <Check className="w-4 h-4 text-green-500" />
-                               {benefit}
+                               {lang === 'ar' ? benefit.ar : benefit.en}
                             </li>
                           ))}
                        </ul>

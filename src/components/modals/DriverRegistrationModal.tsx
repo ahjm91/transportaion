@@ -308,16 +308,20 @@ export const DriverRegistrationModal: React.FC<Props> = ({ isOpen, onClose, user
                     <CheckCircle className="w-16 h-16" />
                   </div>
                   <div>
-                    <h2 className="text-3xl font-black text-dark">تم استلام طلبك بنجاح!</h2>
+                    <h2 className="text-3xl font-black text-dark">
+                      {lang === 'ar' ? 'تم استلام طلبك بنجاح!' : 'Application Received!'}
+                    </h2>
                     <p className="text-gray-500 mt-4 font-medium leading-relaxed">
-                      شكراً لرغبتك في الانضمام إلينا. سيقوم فريقنا بمراجعة بياناتك والتواصل معك عبر الهاتف خلال 48 ساعة لتفعيل حسابك.
+                      {lang === 'ar' 
+                        ? 'شكراً لرغبتك في الانضمام إلينا. سيقوم فريقنا بمراجعة بياناتك والتواصل معك عبر الهاتف خلال 48 ساعة لتفعيل حسابك.' 
+                        : 'Thank you for your interest. Our team will review your application and contact you within 48 hours to activate your account.'}
                     </p>
                   </div>
                   <button 
                     onClick={onClose}
                     className="bg-dark text-white px-12 py-4 rounded-2xl font-black hover:bg-gold hover:text-dark transition-all"
                   >
-                    إغلاق
+                    {lang === 'ar' ? 'إغلاق' : 'Close'}
                   </button>
                 </div>
               )}

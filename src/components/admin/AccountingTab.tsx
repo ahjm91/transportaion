@@ -76,21 +76,21 @@ export const AccountingTab = ({
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-gold/5 p-6 rounded-3xl border border-gold/10">
-          <p className="text-xs font-black text-gold uppercase mb-1">إجمالي الإيرادات</p>
+          <p className="text-xs font-black text-gold uppercase mb-1">{lang === 'ar' ? 'إجمالي الإيرادات' : 'Total Revenue'}</p>
           <h4 className="text-2xl font-black text-dark">{totalAmount.toFixed(2)} BHD</h4>
         </div>
         {isSuperAdmin && (
           <div className="bg-green-50 p-6 rounded-3xl border border-green-100">
-            <p className="text-xs font-black text-green-600 uppercase mb-1">إجمالي العمولات</p>
+            <p className="text-xs font-black text-green-600 uppercase mb-1">{lang === 'ar' ? 'إجمالي العمولات' : 'Total Commissions'}</p>
             <h4 className="text-2xl font-black text-dark">{totalCommission.toFixed(2)} BHD</h4>
           </div>
         )}
         <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100">
-          <p className="text-xs font-black text-blue-600 uppercase mb-1">إجمالي الرحلات</p>
+          <p className="text-xs font-black text-blue-600 uppercase mb-1">{lang === 'ar' ? 'إجمالي الرحلات' : 'Total Trips'}</p>
           <h4 className="text-2xl font-black text-dark">{trips.length}</h4>
         </div>
         <div className="bg-orange-50 p-6 rounded-3xl border border-orange-100">
-          <p className="text-xs font-black text-orange-600 uppercase mb-1">بانتظار التحصيل</p>
+          <p className="text-xs font-black text-orange-600 uppercase mb-1">{lang === 'ar' ? 'بانتظار التحصيل' : 'Pending Collection'}</p>
           <h4 className="text-2xl font-black text-dark">
             {trips.filter(t => t.paymentStatus !== 'Paid').reduce((acc, t) => acc + (t.amount || 0), 0).toFixed(2)} BHD
           </h4>
@@ -105,15 +105,15 @@ export const AccountingTab = ({
                 key={f}
                 onClick={() => setTripFilter(f as any)}
                 className={cn(
-                  "px-4 py-2 rounded-xl text-xs font-bold transition-all",
+                  "px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap",
                   tripFilter === f ? "bg-dark text-white shadow-lg" : "bg-gray-100 text-gray-400 hover:bg-gray-200"
                 )}
               >
-                {f === 'all' && 'الكل'}
-                {f === 'requested' && 'طلبات جديدة'}
-                {f === 'pending_price' && 'بانتظار السعر'}
-                {f === 'unpaid' && 'غير مدفوع'}
-                {f === 'paid' && 'مدفوع'}
+                {f === 'all' && (lang === 'ar' ? 'الكل' : 'All')}
+                {f === 'requested' && (lang === 'ar' ? 'طلبات جديدة' : 'New Requests')}
+                {f === 'pending_price' && (lang === 'ar' ? 'بانتظار السعر' : 'Pending Price')}
+                {f === 'unpaid' && (lang === 'ar' ? 'غير مدفوع' : 'Unpaid')}
+                {f === 'paid' && (lang === 'ar' ? 'مدفوع' : 'Paid')}
               </button>
             ))}
           </div>
@@ -124,20 +124,15 @@ export const AccountingTab = ({
               animate={{ opacity: 1, scale: 1 }}
               className="flex items-center gap-2 bg-gold text-white px-4 py-2 rounded-xl text-xs font-black"
             >
-              <span>تم تحديد {selectedIds.length}</span>
+              <span>{lang === 'ar' ? `تم تحديد ${selectedIds.length}` : `Selected ${selectedIds.length}`}</span>
               <button 
                 onClick={async () => {
                   if (confirm(lang === 'ar' ? 'هل أنت متأكد من حذف هذه الرحلات؟' : 'Are you sure you want to delete these trips?')) {
-                    for (const id of selectedIds) {
-                       // Logic to delete would be here, but we need safeDeleteDoc from props
-                       // Since it's passed from AdminDashboard, we need to pass it down or handle it here
-                       // For now we'll just alert that a bulk action is available
-                    }
                     alert(lang === 'ar' ? 'هذه الميزة ستتوفر قريباً' : 'Bulk delete coming soon');
                   }
                 }}
                 className="bg-white/20 hover:bg-white/30 p-1.5 rounded-lg transition-colors"
-                title="حذف المحدد"
+                title={lang === 'ar' ? "حذف المحدد" : "Delete Selected"}
               >
                 <Trash2 className="w-3 h-3" />
               </button>
@@ -156,7 +151,7 @@ export const AccountingTab = ({
           className="bg-gold/10 text-gold px-6 py-2 rounded-xl text-xs font-black flex items-center gap-2 hover:bg-gold/20 transition-all"
         >
           <Calendar className="w-4 h-4" />
-          {isAdminScheduleView ? 'عرض الجدول المحاسبي' : 'عرض جدول المواعيد'}
+          {isAdminScheduleView ? (lang === 'ar' ? 'عرض الجدول المحاسبي' : 'Show Accounting Table') : (lang === 'ar' ? 'عرض جدول المواعيد' : 'Show Schedule View')}
         </button>
       </div>
 
@@ -165,7 +160,7 @@ export const AccountingTab = ({
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="bg-gray-50 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                <tr className={cn("bg-gray-50 text-[10px] font-black text-gray-400 uppercase tracking-widest", lang === 'ar' ? "text-right" : "text-left")}>
                   <th className="p-4 border-b w-10">
                     <input 
                       type="checkbox" 
@@ -180,16 +175,16 @@ export const AccountingTab = ({
                       }}
                     />
                   </th>
-                  <th className="p-4 border-b">رقم الحجز / التاريخ</th>
-                  <th className="p-4 border-b">العميل</th>
-                  <th className="p-4 border-b">المسار</th>
-                  <th className="p-4 border-b">السيارة</th>
-                  <th className="p-4 border-b">السائق</th>
-                  <th className="p-4 border-b text-center">الحالة</th>
-                  <th className="p-4 border-b text-center">الدفع</th>
-                  <th className="p-4 border-b text-center">المبلغ</th>
-                  {isSuperAdmin && <th className="p-4 border-b text-center">العمولة</th>}
-                  <th className="p-4 border-b text-center">إجراءات</th>
+                  <th className="p-4 border-b">{lang === 'ar' ? 'رقم الحجز / التاريخ' : 'Booking ID / Date'}</th>
+                  <th className="p-4 border-b">{lang === 'ar' ? 'العميل' : 'Customer'}</th>
+                  <th className="p-4 border-b">{lang === 'ar' ? 'المسار' : 'Route'}</th>
+                  <th className="p-4 border-b">{lang === 'ar' ? 'السيارة' : 'Vehicle'}</th>
+                  <th className="p-4 border-b">{lang === 'ar' ? 'السائق' : 'Driver'}</th>
+                  <th className="p-4 border-b text-center">{lang === 'ar' ? 'الحالة' : 'Status'}</th>
+                  <th className="p-4 border-b text-center">{lang === 'ar' ? 'الدفع' : 'Payment'}</th>
+                  <th className="p-4 border-b text-center">{lang === 'ar' ? 'المبلغ' : 'Amount'}</th>
+                  {isSuperAdmin && <th className="p-4 border-b text-center">{lang === 'ar' ? 'العمولة' : 'Commission'}</th>}
+                  <th className="p-4 border-b text-center">{lang === 'ar' ? 'إجراءات' : 'Actions'}</th>
                 </tr>
               </thead>
               <tbody>
@@ -249,7 +244,9 @@ export const AccountingTab = ({
                         trip.status === 'Requested' ? "bg-orange-100 text-orange-600" :
                         trip.status === 'Completed' ? "bg-blue-100 text-blue-600" : "bg-red-100 text-red-600"
                       )}>
-                        {trip.status === 'Requested' ? 'طلب جديد' : trip.status}
+                        {trip.status === 'Requested' ? (lang === 'ar' ? 'طلب جديد' : 'New Request') : 
+                         trip.status === 'Confirmed' ? (lang === 'ar' ? 'مؤكد' : 'Confirmed') :
+                         trip.status === 'Completed' ? (lang === 'ar' ? 'مكتمل' : 'Completed') : (lang === 'ar' ? 'ملغي' : 'Cancelled')}
                       </span>
                     </td>
                     <td className="p-4 text-center">
@@ -257,7 +254,7 @@ export const AccountingTab = ({
                         "px-2 py-1 rounded-lg text-[9px]",
                         trip.paymentStatus === 'Paid' ? "bg-green-100 text-green-600" : "bg-orange-100 text-orange-600"
                       )}>
-                        {trip.paymentStatus}
+                        {trip.paymentStatus === 'Paid' ? (lang === 'ar' ? 'مدفوع' : 'Paid') : (lang === 'ar' ? 'غير مدفوع' : 'Unpaid')}
                       </span>
                     </td>
                     <td className="p-4 text-center text-dark">{trip.amount}</td>
@@ -329,7 +326,7 @@ export const AccountingTab = ({
             <div key={date} className="space-y-4">
               <h5 className="font-black text-dark flex items-center gap-2">
                 <div className="w-2 h-8 bg-gold rounded-full" />
-                {date === new Date().toISOString().split('T')[0] ? 'اليوم' : date}
+                {date === new Date().toISOString().split('T')[0] ? (lang === 'ar' ? 'اليوم' : 'Today') : date}
               </h5>
               <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {dateTrips.map(trip => (

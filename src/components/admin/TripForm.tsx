@@ -12,6 +12,7 @@ interface TripFormProps {
   setTripFormData: (data: any) => void;
   onSubmit: (e: React.FormEvent) => void;
   isSuperAdmin: boolean;
+  lang: 'ar' | 'en';
 }
 
 export const TripForm = ({
@@ -21,7 +22,8 @@ export const TripForm = ({
   tripFormData,
   setTripFormData,
   onSubmit,
-  isSuperAdmin
+  isSuperAdmin,
+  lang
 }: TripFormProps) => {
   return (
     <AnimatePresence>
@@ -39,14 +41,18 @@ export const TripForm = ({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className="relative bg-white w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-            dir="rtl"
+            dir={lang === 'ar' ? 'rtl' : 'ltr'}
           >
             <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50">
               <div>
                 <h3 className="text-2xl font-black text-dark">
-                  {editingTrip ? 'تعديل بيانات الرحلة' : 'إضافة رحلة جديدة'}
+                  {editingTrip 
+                    ? (lang === 'ar' ? 'تعديل بيانات الرحلة' : 'Edit Trip Details') 
+                    : (lang === 'ar' ? 'إضافة رحلة جديدة' : 'Add New Trip')}
                 </h3>
-                <p className="text-gray-500 text-sm font-bold">أدخل تفاصيل الرحلة والبيانات المالية</p>
+                <p className="text-gray-500 text-sm font-bold">
+                  {lang === 'ar' ? 'أدخل تفاصيل الرحلة والبيانات المالية' : 'Enter trip details and financial data'}
+                </p>
               </div>
               <button 
                 onClick={onClose}
@@ -59,24 +65,24 @@ export const TripForm = ({
             <form onSubmit={onSubmit} className="p-8 overflow-y-auto space-y-8">
               <div className="grid md:grid-cols-5 gap-6">
                 <div className="space-y-2 flex flex-col justify-end">
-                  <label className="text-xs font-black text-gray-400 uppercase">رقم الحجز</label>
+                  <label className="text-xs font-black text-gray-400 uppercase">{lang === 'ar' ? 'رقم الحجز' : 'Booking ID'}</label>
                   <div className="bg-gray-100 border border-gray-200 rounded-2xl p-4 font-mono font-bold text-gold text-center">
-                    {tripFormData.bookingNumber || (editingTrip ? editingTrip.id.slice(-6).toUpperCase() : 'سيتولد تلقائياً')}
+                    {tripFormData.bookingNumber || (editingTrip ? editingTrip.id.slice(-6).toUpperCase() : (lang === 'ar' ? 'سيتولد تلقائياً' : 'Auto-generated'))}
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase">نوع الحجز</label>
+                  <label className="text-xs font-black text-gray-400 uppercase">{lang === 'ar' ? 'نوع الحجز' : 'Booking Type'}</label>
                   <select 
                     className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
                     value={tripFormData.bookingType}
                     onChange={e => setTripFormData({ ...tripFormData, bookingType: e.target.value as any })}
                   >
-                    <option value="transfer">توصيل</option>
-                    <option value="hourly">بالساعة</option>
+                    <option value="transfer">{lang === 'ar' ? 'توصيل' : 'Transfer'}</option>
+                    <option value="hourly">{lang === 'ar' ? 'بالساعة' : 'Hourly'}</option>
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase">الاسم الأول</label>
+                  <label className="text-xs font-black text-gray-400 uppercase">{lang === 'ar' ? 'الاسم الأول' : 'First Name'}</label>
                   <input 
                     type="text" 
                     className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
@@ -85,7 +91,7 @@ export const TripForm = ({
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase">الاسم الأخير</label>
+                  <label className="text-xs font-black text-gray-400 uppercase">{lang === 'ar' ? 'الاسم الأخير' : 'Last Name'}</label>
                   <input 
                     type="text" 
                     className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
@@ -94,7 +100,7 @@ export const TripForm = ({
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase">البريد الإلكتروني</label>
+                  <label className="text-xs font-black text-gray-400 uppercase">{lang === 'ar' ? 'البريد الإلكتروني' : 'Email'}</label>
                   <input 
                     type="email" 
                     className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
@@ -106,7 +112,7 @@ export const TripForm = ({
 
               <div className="grid md:grid-cols-3 gap-6">
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase">اسم العميل</label>
+                  <label className="text-xs font-black text-gray-400 uppercase">{lang === 'ar' ? 'اسم العميل' : 'Customer Name'}</label>
                   <input 
                     type="text" 
                     className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
@@ -115,7 +121,7 @@ export const TripForm = ({
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase">رقم الهاتف</label>
+                  <label className="text-xs font-black text-gray-400 uppercase">{lang === 'ar' ? 'رقم الهاتف' : 'Phone Number'}</label>
                   <input 
                     type="text" 
                     className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
@@ -124,10 +130,10 @@ export const TripForm = ({
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase">رقم العميل (UID)</label>
+                  <label className="text-xs font-black text-gray-400 uppercase">{lang === 'ar' ? 'رقم العميل (UID)' : 'Customer UID'}</label>
                   <input 
                     type="text" 
-                    placeholder="لربط الرحلة بحساب العميل"
+                    placeholder={lang === 'ar' ? "لربط الرحلة بحساب العميل" : "To link trip to account"}
                     className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
                     value={tripFormData.userId || ''}
                     onChange={e => setTripFormData({ ...tripFormData, userId: e.target.value })}
@@ -137,7 +143,7 @@ export const TripForm = ({
 
               <div className="grid md:grid-cols-4 gap-6">
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase">الركاب</label>
+                  <label className="text-xs font-black text-gray-400 uppercase">{lang === 'ar' ? 'الركاب' : 'Passengers'}</label>
                   <input 
                     type="number" 
                     className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
@@ -146,7 +152,7 @@ export const TripForm = ({
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase">الحقائب</label>
+                  <label className="text-xs font-black text-gray-400 uppercase">{lang === 'ar' ? 'الحقائب' : 'Bags'}</label>
                   <input 
                     type="number" 
                     className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
@@ -155,7 +161,7 @@ export const TripForm = ({
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase">نوع السيارة</label>
+                  <label className="text-xs font-black text-gray-400 uppercase">{lang === 'ar' ? 'نوع السيارة' : 'Car Type'}</label>
                   <select 
                     className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
                     value={tripFormData.carType}
@@ -167,7 +173,7 @@ export const TripForm = ({
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase">المسافة / الساعات</label>
+                  <label className="text-xs font-black text-gray-400 uppercase">{lang === 'ar' ? 'المسافة / الساعات' : 'Distance / Hours'}</label>
                   <input 
                     type="number" 
                     step="0.1"
@@ -187,17 +193,17 @@ export const TripForm = ({
 
               <div className="grid md:grid-cols-3 gap-6">
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase">مسار الرحلة</label>
+                  <label className="text-xs font-black text-gray-400 uppercase">{lang === 'ar' ? 'مسار الرحلة' : 'Trip Route'}</label>
                   <input 
                     type="text" 
-                    placeholder="مثال: المطار ← الفندق"
+                    placeholder={lang === 'ar' ? "مثال: المطار ← الفندق" : "e.g. Airport ← Hotel"}
                     className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
                     value={tripFormData.direction}
                     onChange={e => setTripFormData({ ...tripFormData, direction: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase">نقطة الاستلام</label>
+                  <label className="text-xs font-black text-gray-400 uppercase">{lang === 'ar' ? 'نقطة الاستلام' : 'Pickup Point'}</label>
                   <input 
                     type="text" 
                     className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
@@ -206,7 +212,7 @@ export const TripForm = ({
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase">نقطة التوصيل</label>
+                  <label className="text-xs font-black text-gray-400 uppercase">{lang === 'ar' ? 'نقطة التوصيل' : 'Dropoff Point'}</label>
                   <input 
                     type="text" 
                     className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
@@ -218,7 +224,7 @@ export const TripForm = ({
 
               <div className="grid md:grid-cols-3 gap-6">
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase">التاريخ</label>
+                  <label className="text-xs font-black text-gray-400 uppercase">{lang === 'ar' ? 'التاريخ' : 'Date'}</label>
                   <input 
                     type="date" 
                     className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
@@ -227,7 +233,7 @@ export const TripForm = ({
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase">الوقت</label>
+                  <label className="text-xs font-black text-gray-400 uppercase">{lang === 'ar' ? 'الوقت' : 'Time'}</label>
                   <input 
                     type="time" 
                     className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
@@ -236,7 +242,7 @@ export const TripForm = ({
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase">مبلغ الرحلة (BHD)</label>
+                  <label className="text-xs font-black text-gray-400 uppercase">{lang === 'ar' ? 'مبلغ الرحلة (BHD)' : 'Trip Amount (BHD)'}</label>
                   <input 
                     type="number" 
                     step="0.01"
@@ -249,7 +255,7 @@ export const TripForm = ({
 
               <div className="bg-gray-50 p-8 rounded-[2.5rem] border border-gray-100 grid md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase">اسم السائق</label>
+                  <label className="text-xs font-black text-gray-400 uppercase">{lang === 'ar' ? 'اسم السائق' : 'Driver Name'}</label>
                   <input 
                     type="text" 
                     className="w-full bg-white border-gray-200 rounded-2xl p-4 font-bold"
@@ -259,7 +265,7 @@ export const TripForm = ({
                 </div>
                 {isSuperAdmin && (
                   <div className="space-y-2">
-                    <label className="text-xs font-black text-gray-400 uppercase">تكلفة السائق (BHD)</label>
+                    <label className="text-xs font-black text-gray-400 uppercase">{lang === 'ar' ? 'تكلفة السائق (BHD)' : 'Driver Cost (BHD)'}</label>
                     <input 
                       type="number" 
                       step="0.01"
@@ -276,32 +282,32 @@ export const TripForm = ({
 
               <div className="grid md:grid-cols-3 gap-6">
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase">حالة الرحلة</label>
+                  <label className="text-xs font-black text-gray-400 uppercase">{lang === 'ar' ? 'حالة الرحلة' : 'Trip Status'}</label>
                   <select 
                     className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
                     value={tripFormData.status}
                     onChange={e => setTripFormData({ ...tripFormData, status: e.target.value as any })}
                   >
-                    <option value="Requested">طلب جديد</option>
-                    <option value="Confirmed">مؤكدة</option>
-                    <option value="Completed">مكتملة</option>
-                    <option value="Cancelled">ملغاة</option>
+                    <option value="Requested">{lang === 'ar' ? 'طلب جديد' : 'New Request'}</option>
+                    <option value="Confirmed">{lang === 'ar' ? 'مؤكدة' : 'Confirmed'}</option>
+                    <option value="Completed">{lang === 'ar' ? 'مكتملة' : 'Completed'}</option>
+                    <option value="Cancelled">{lang === 'ar' ? 'ملغاة' : 'Cancelled'}</option>
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase">حالة الدفع</label>
+                  <label className="text-xs font-black text-gray-400 uppercase">{lang === 'ar' ? 'حالة الدفع' : 'Payment Status'}</label>
                   <select 
                     className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold"
                     value={tripFormData.paymentStatus}
                     onChange={e => setTripFormData({ ...tripFormData, paymentStatus: e.target.value as any })}
                   >
-                    <option value="Pending">معلق</option>
-                    <option value="Paid">مدفوع</option>
-                    <option value="Unpaid">غير مدفوع</option>
+                    <option value="Pending">{lang === 'ar' ? 'معلق' : 'Pending'}</option>
+                    <option value="Paid">{lang === 'ar' ? 'مدفوع' : 'Paid'}</option>
+                    <option value="Unpaid">{lang === 'ar' ? 'غير مدفوع' : 'Unpaid'}</option>
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase">ملاحظات / طلبات خاصة</label>
+                  <label className="text-xs font-black text-gray-400 uppercase">{lang === 'ar' ? 'ملاحظات / طلبات خاصة' : 'Notes / Special Requests'}</label>
                   <textarea 
                     rows={1}
                     className="w-full bg-gray-50 border-gray-200 rounded-2xl p-4 font-bold resize-none"
@@ -315,7 +321,9 @@ export const TripForm = ({
                 type="submit"
                 className="w-full bg-gold text-white py-5 rounded-[2rem] font-black text-lg shadow-xl shadow-gold/20 hover:bg-dark hover:shadow-dark/10 transition-all transform hover:-translate-y-1"
               >
-                {editingTrip ? 'تحديث بيانات الرحلة' : 'تأكيد وإضافة الرحلة'}
+                {editingTrip 
+                  ? (lang === 'ar' ? 'تحديث بيانات الرحلة' : 'Update Trip Details') 
+                  : (lang === 'ar' ? 'تأكيد وإضافة الرحلة' : 'Confirm & Add Trip')}
               </button>
             </form>
           </motion.div>

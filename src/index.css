@@ -16,10 +16,20 @@
 }
 
 @layer base {
+  :root {
+    --spacing-factor: 1.0;
+    --density-factor: 1.0;
+  }
+
   body {
     @apply bg-white text-gray-900 antialiased selection:bg-gold/30;
     direction: rtl;
     font-family: var(--font-custom);
+  }
+
+  section {
+    padding-top: calc(5rem * var(--spacing-factor) * var(--density-factor));
+    padding-bottom: calc(5rem * var(--spacing-factor) * var(--density-factor));
   }
 }
 

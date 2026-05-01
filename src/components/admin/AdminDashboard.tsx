@@ -58,19 +58,19 @@ export const AdminDashboard = ({
   const [tripFilter, setTripFilter] = React.useState<'all' | 'requested' | 'pending_price' | 'unpaid' | 'paid'>('all');
 
   const menuItems = [
-    { id: 'accounting', name: 'المحاسبة والرحلات', icon: PieChart },
-    { id: 'payouts', name: 'طلبات السحب', icon: DollarSign },
-    { id: 'promos', name: 'أكواد الخصم', icon: Gift },
-    { id: 'content', name: 'إدارة المحتوى', icon: Layout },
-    { id: 'pricing', name: 'التسعير والربط', icon: Settings },
-    { id: 'users', name: 'إدارة المستخدمين', icon: Users },
-    { id: 'branding', name: 'الهوية البصرية', icon: Star },
+    { id: 'accounting', name: lang === 'ar' ? 'المحاسبة والرحلات' : 'Accounting & Trips', icon: PieChart },
+    { id: 'payouts', name: lang === 'ar' ? 'طلبات السحب' : 'Payout Requests', icon: DollarSign },
+    { id: 'promos', name: lang === 'ar' ? 'أكواد الخصم' : 'Promo Codes', icon: Gift },
+    { id: 'content', name: lang === 'ar' ? 'إدارة المحتوى' : 'Content Management', icon: Layout },
+    { id: 'pricing', name: lang === 'ar' ? 'التسعير والربط' : 'Pricing & Routes', icon: Settings },
+    { id: 'users', name: lang === 'ar' ? 'إدارة المستخدمين' : 'User Management', icon: Users },
+    { id: 'branding', name: lang === 'ar' ? 'الهوية البصرية' : 'Brand Identity', icon: Star },
   ];
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center p-0 md:p-6" dir="rtl">
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-0 md:p-6" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -93,7 +93,7 @@ export const AdminDashboard = ({
                   <Box className="w-7 h-7 text-gold" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-black text-dark leading-none">لوحة التحكم</h2>
+                  <h2 className="text-xl font-black text-dark leading-none">{lang === 'ar' ? 'لوحة التحكم' : 'Control Panel'}</h2>
                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1.5">Admin Management System</p>
                 </div>
              </div>
@@ -139,7 +139,7 @@ export const AdminDashboard = ({
               <PieChart className="w-5 h-5 text-gold" />
             </div>
             <div>
-              <div className="text-[10px] text-gray-400 font-bold uppercase">إجمالي الرحلات</div>
+              <div className="text-[10px] text-gray-400 font-bold uppercase">{lang === 'ar' ? 'إجمالي الرحلات' : 'Total Trips'}</div>
               <div className="text-lg font-black text-dark">{trips.length + bookings.filter(b => b.status === 'completed').length}</div>
             </div>
           </div>
@@ -148,7 +148,7 @@ export const AdminDashboard = ({
               <Users className="w-5 h-5 text-green-500" />
             </div>
             <div>
-              <div className="text-[10px] text-gray-400 font-bold uppercase">سائقين متصلين</div>
+              <div className="text-[10px] text-gray-400 font-bold uppercase">{lang === 'ar' ? 'سائقين متصلين' : 'Online Drivers'}</div>
               <div className="text-lg font-black text-dark">{allDrivers.filter(d => d.status === 'online').length}</div>
             </div>
           </div>
@@ -157,7 +157,7 @@ export const AdminDashboard = ({
               <Star className="w-5 h-5 text-blue-500" />
             </div>
             <div>
-              <div className="text-[10px] text-gray-400 font-bold uppercase">رحلات نشطة</div>
+              <div className="text-[10px] text-gray-400 font-bold uppercase">{lang === 'ar' ? 'رحلات نشطة' : 'Active Trips'}</div>
               <div className="text-lg font-black text-dark">{bookings.filter(b => !['completed', 'cancelled', 'no_driver_found'].includes(b.status)).length}</div>
             </div>
           </div>
@@ -193,13 +193,14 @@ export const AdminDashboard = ({
               )}
 
               {activeTab === 'payouts' && (
-                <PayoutsTab />
+                <PayoutsTab lang={lang} />
               )}
 
               {activeTab === 'promos' && (
                 <PromoCodesTab 
                   siteSettings={siteSettings}
                   setSiteSettings={setSiteSettings}
+                  lang={lang}
                 />
               )}
 
@@ -211,6 +212,7 @@ export const AdminDashboard = ({
                   safeUpdateDoc={safeUpdateDoc}
                   safeDeleteDoc={safeDeleteDoc}
                   handleImageUpload={handleImageUpload}
+                  lang={lang}
                 />
               )}
 
@@ -243,6 +245,7 @@ export const AdminDashboard = ({
                   setSiteSettings={setSiteSettings}
                   handleImageUpload={handleImageUpload}
                   safeUpdateDoc={safeUpdateDoc}
+                  lang={lang}
                 />
               )}
             </motion.div>
@@ -274,12 +277,12 @@ export const AdminDashboard = ({
               </div>
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">System Status: All Systems Operational</p>
            </div>
-           <button 
-             onClick={onClose}
-             className="bg-dark text-white px-10 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-gold transition-all shadow-xl shadow-dark/10"
-           >
-             خروج وحفظ الإعدادات
-           </button>
+             <button 
+               onClick={onClose}
+               className="bg-dark text-white px-10 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-gold transition-all shadow-xl shadow-dark/10"
+             >
+               {lang === 'ar' ? 'خروج وحفظ الإعدادات' : 'Exit & Save Settings'}
+             </button>
         </div>
       </motion.div>
     </div>

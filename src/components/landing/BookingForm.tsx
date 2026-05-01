@@ -2,7 +2,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapPin, Calendar, Clock, Users, ShoppingBag, Car, Star, ShieldCheck, Loader2, ArrowRight, Tag } from 'lucide-react';
-import { BookingData, SiteSettings } from '../../types';
+import { BookingData, SiteSettings, FixedRoute } from '../../types';
 import { translations } from '../../translations';
 import { cn } from '../../lib/utils';
 
@@ -15,10 +15,11 @@ interface BookingFormProps {
   setBookingMode: (mode: 'fixed' | 'custom' | 'realtime') => void;
   handleBooking: (e: React.FormEvent) => void;
   isBooking: boolean;
+  fixedRoutes: FixedRoute[];
 }
 
 export const BookingForm = ({
-  lang, siteSettings, bookingData, setBookingData, bookingMode, setBookingMode, handleBooking, isBooking
+  lang, siteSettings, bookingData, setBookingData, bookingMode, setBookingMode, handleBooking, isBooking, fixedRoutes
 }: BookingFormProps) => {
   const t = (key: string) => (translations[lang] as any)[key] || key;
 
@@ -154,36 +155,66 @@ export const BookingForm = ({
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-6">
+              {bookingMode === 'fixed' ? (
                 <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{t('pickup')}</label>
-                  <div className="relative">
-                    <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-gold w-5 h-5 pointer-events-none" />
-                    <input 
-                      type="text" 
-                      required
-                      placeholder="Manama, Bahrain"
-                      className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold placeholder:text-gray-300"
-                      value={bookingData.pickup}
-                      onChange={e => setBookingData({ ...bookingData, pickup: e.target.value })}
-                    />
+                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{lang === 'ar' ? 'اختر الوجهة الثابتة' : 'Select Fixed Route'}</label>
+                  <select 
+                    className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold cursor-pointer"
+                    onChange={e => {
+                      const route = fixedRoutes.find(r => r.id === e.target.value);
+                      if (route) {
+                        setBookingData({ 
+                          ...bookingData, 
+                          pickup: route.pickup, 
+                          dropoff: route.dropoff,
+                          amount: route.price
+                        });
+                      }
+                    }}
+                  >
+                    <option value="">{lang === 'ar' ? '--- اختر المسار ---' : '--- Select Route ---'}</option>
+                    {fixedRoutes.map(route => (
+                      <option key={route.id} value={route.id}>
+                        {lang === 'ar' 
+                          ? `${route.pickup} ← ${route.dropoff} (${route.price} BHD)` 
+                          : `${route.pickup_en || route.pickup} ← ${route.dropoff_en || route.dropoff} (${route.price} BHD)`
+                        }
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{t('pickup')}</label>
+                    <div className="relative">
+                      <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-gold w-5 h-5 pointer-events-none" />
+                      <input 
+                        type="text" 
+                        required
+                        placeholder="Manama, Bahrain"
+                        className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold placeholder:text-gray-300"
+                        value={bookingData.pickup}
+                        onChange={e => setBookingData({ ...bookingData, pickup: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{t('dropoff')}</label>
+                    <div className="relative">
+                      <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 w-5 h-5 pointer-events-none" />
+                      <input 
+                        type="text" 
+                        required
+                        placeholder="Dammam, KSA"
+                        className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold placeholder:text-gray-300"
+                        value={bookingData.dropoff}
+                        onChange={e => setBookingData({ ...bookingData, dropoff: e.target.value })}
+                      />
+                    </div>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{t('dropoff')}</label>
-                  <div className="relative">
-                    <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 w-5 h-5 pointer-events-none" />
-                    <input 
-                      type="text" 
-                      required
-                      placeholder="Dammam, KSA"
-                      className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold placeholder:text-gray-300"
-                      value={bookingData.dropoff}
-                      onChange={e => setBookingData({ ...bookingData, dropoff: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
+              )}
 
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">

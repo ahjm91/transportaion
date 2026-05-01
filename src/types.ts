@@ -103,6 +103,21 @@ export interface SiteSettings {
   showCTASection: boolean;
   commissionRate: number;
   promoCodes?: { code: string; discountPercent: number; maxUsage?: number }[];
+  
+  // Layout & Spacing
+  spacingFactor?: number; // 0.5 to 2.0
+  layoutDensity?: 'compact' | 'comfortable' | 'spacious';
+  sectionOrder?: string[];
+  
+  // Custom SEO & Headers
+  siteTitle?: string;
+  siteTitle_en?: string;
+  siteDescription?: string;
+  siteDescription_en?: string;
+  
+  // CTAs
+  bookingButtonText?: string;
+  bookingButtonText_en?: string;
 }
 
 export interface UserProfile {
@@ -228,7 +243,9 @@ export interface Trip {
 export interface FixedRoute {
   id: string;
   pickup: string;
+  pickup_en?: string;
   dropoff: string;
+  dropoff_en?: string;
   price: number;
 }
 
