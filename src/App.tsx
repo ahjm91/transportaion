@@ -107,6 +107,7 @@ import { DriverRegistrationModal } from './components/modals/DriverRegistrationM
 import { TermsModal, PrivacyModal } from './components/common/Modals';
 import { handleFirestoreError as handleFirestoreErrorUtils } from './lib/firestoreUtils';
 import { BookingData, Service, SpecializedService, SiteSettings, UserProfile, Trip, FixedRoute, OperationType, Booking, Driver } from './types';
+import { sendAdminNotification, NotificationType } from './services/notificationService';
 
 // Types
 type ServiceType = 'luxury';
@@ -610,13 +611,13 @@ function App() {
         setUserProfile(profile);
         
         // Recalculate admin status based on profile role or email
-        const primaryAdmin = 'ahjm91@gmail.com';
-        const isEmailMatch = user.email?.toLowerCase() === primaryAdmin.toLowerCase() || (siteSettings.adminEmails?.map(e => e.toLowerCase()).includes(user.email?.toLowerCase() || ''));
+        const primaryAdmins = ['ahjm91@gmail.com', 'ali@gcctaxi.net'];
+        const isEmailMatch = primaryAdmins.some(admin => user.email?.toLowerCase() === admin.toLowerCase()) || (siteSettings.adminEmails?.map(e => e.toLowerCase()).includes(user.email?.toLowerCase() || ''));
         const isUserAdmin = (isEmailMatch) || profile.role === 'admin';
         setIsAdmin(isUserAdmin);
       } else {
-        const primaryAdmin = 'ahjm91@gmail.com';
-        const isEmailMatch = user.email?.toLowerCase() === primaryAdmin.toLowerCase() || (siteSettings.adminEmails?.map(e => e.toLowerCase()).includes(user.email?.toLowerCase() || ''));
+        const primaryAdmins = ['ahjm91@gmail.com', 'ali@gcctaxi.net'];
+        const isEmailMatch = primaryAdmins.some(admin => user.email?.toLowerCase() === admin.toLowerCase()) || (siteSettings.adminEmails?.map(e => e.toLowerCase()).includes(user.email?.toLowerCase() || ''));
         const isUserAdmin = (isEmailMatch);
 
         try {
@@ -649,6 +650,13 @@ function App() {
             transaction.set(statsRef, { lastMembershipNumber: nextNum }, { merge: true });
             setUserProfile(newProfile);
             setIsAdmin(isUserAdmin);
+            
+            // Notify Admin of new registration
+            sendAdminNotification(NotificationType.NEW_CUSTOMER, {
+              uid: user.uid,
+              name: newProfile.name,
+              email: newProfile.email
+            });
           });
         } catch (e) {
           console.error("Error creating profile with membership number:", e);
@@ -1093,7 +1101,16 @@ function App() {
       
       logAnalyticsEvent('booking_step_1_submit', 'booking', newTrip.bookingNumber, { amount: newTrip.amount });
       
-      // Notify Admin via Email (Non-blocking)
+      // Notify Admin via our Notification Service
+      sendAdminNotification(NotificationType.NEW_TRIP, {
+        bookingNumber,
+        customer: tripData.customerName,
+        phone: tripData.phone,
+        route: tripData.direction,
+        amount: newTrip.amount
+      });
+      
+      // Secondary background notify via API
       console.log('Sending notification email in background...');
       fetch('/api/notify-booking', {
         method: 'POST',

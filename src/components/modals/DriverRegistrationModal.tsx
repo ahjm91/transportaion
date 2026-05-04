@@ -7,6 +7,7 @@ import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { SiteSettings } from '../../types';
 import { translations } from '../../translations';
+import { sendAdminNotification, NotificationType } from '../../services/notificationService';
 
 interface DriverRegistrationModalProps {
   isOpen: boolean;
@@ -74,6 +75,15 @@ export const DriverRegistrationModal = ({ isOpen, onClose, lang, siteSettings }:
         driverApplicationStatus: 'pending',
         driverApplicationData: applicationData,
         role: 'customer' // Keep as customer until approved
+      });
+
+      // Notify Admin
+      sendAdminNotification(NotificationType.NEW_DRIVER, {
+        uid: auth.currentUser.uid,
+        name: formData.fullName,
+        phone: formData.phone,
+        carType: formData.carType,
+        carModel: formData.carModel
       });
 
       setIsSuccess(true);
