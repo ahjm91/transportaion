@@ -69,6 +69,18 @@ export const DriversTab = ({ allDrivers, users, safeUpdateDoc, lang }: DriversTa
     }
   };
 
+  const handleVerifyDriver = async (driverId: string, isVerified: boolean, message?: string) => {
+    try {
+      await updateDoc(doc(db, 'drivers', driverId), { 
+        isVerified, 
+        verificationMessage: message || '' 
+      });
+      alert(lang === 'ar' ? 'تم تحديث حالة التوثيق!' : 'Verification status updated!');
+    } catch (error) {
+      console.error('Error verifying driver:', error);
+    }
+  };
+
   const handleApproveDriver = async (user: UserProfile) => {
     if (!user.driverApplicationData) return;
     setIsApproving(true);
@@ -247,6 +259,63 @@ export const DriversTab = ({ allDrivers, users, safeUpdateDoc, lang }: DriversTa
                 </button>
               </div>
 
+              <div className="flex gap-2 mt-2">
+                <button 
+                  onClick={() => {
+                    const message = prompt(lang === 'ar' ? 'رسالة التوثيق (اختياري):' : 'Verification message (optional):');
+                    handleVerifyDriver(driver.id, true, message || undefined);
+                  }}
+                  className={cn(
+                    "flex-1 p-2 rounded-xl font-black text-[9px] uppercase transition-all flex items-center justify-center gap-1 border",
+                    driver.isVerified ? "bg-green-500 text-white border-green-500" : "bg-white text-gray-400 border-gray-100 hover:border-gold hover:text-gold"
+                  )}
+                >
+                  <CheckCircle2 className="w-3 h-3" />
+                  {driver.isVerified ? (lang === 'ar' ? 'موثق' : 'Verified') : (lang === 'ar' ? 'توثيق' : 'Verify')}
+                </button>
+                <button 
+                  onClick={() => {
+                    const message = prompt(lang === 'ar' ? 'سبب الرفض:' : 'Rejection reason:');
+                    if (message) handleVerifyDriver(driver.id, false, message);
+                  }}
+                  className="flex-1 p-2 bg-white text-gray-400 border border-gray-100 rounded-xl font-black text-[9px] uppercase hover:border-red-500 hover:text-red-500 transition-all flex items-center justify-center gap-1"
+                >
+                  <XCircle className="w-3 h-3" />
+                  {lang === 'ar' ? 'رفض' : 'Reject'}
+                </button>
+              </div>
+
+              {/* View Docs Button */}
+              {(driver.licenseImage || driver.idCardImage) && (
+                <button 
+                  onClick={() => {
+                    // Quick modal to view docs
+                    const docsHtml = `
+                      <div class="space-y-4 p-4 text-right" dir="rtl">
+                        <h4 class="font-black text-lg mb-4">مستندات السائق: ${driver.name}</h4>
+                        ${driver.profileImage ? `<div><p class="text-[10px] font-black text-gray-400 uppercase">الصورة الشخصية</p><img src="${driver.profileImage}" class="w-full rounded-2xl border" /></div>` : ''}
+                        ${driver.licenseImage ? `<div class="mt-4"><p class="text-[10px] font-black text-gray-400 uppercase">رخصة القيادة</p><img src="${driver.licenseImage}" class="w-full rounded-2xl border" /></div>` : ''}
+                        ${driver.idCardImage ? `<div class="mt-4"><p class="text-[10px] font-black text-gray-400 uppercase">الهوية</p><img src="${driver.idCardImage}" class="w-full rounded-2xl border" /></div>` : ''}
+                        ${driver.carImage ? `<div class="mt-4"><p class="text-[10px] font-black text-gray-400 uppercase">صورة السيارة</p><img src="${driver.carImage}" class="w-full rounded-2xl border" /></div>` : ''}
+                      </div>
+                    `;
+                    const w = window.open('', '_blank');
+                    w?.document.write(`
+                      <html>
+                        <head>
+                          <title>Driver Docs</title>
+                          <script src="https://cdn.tailwindcss.com"></script>
+                        </head>
+                        <body class="bg-gray-50 p-8">${docsHtml}</body>
+                      </html>
+                    `);
+                  }}
+                  className="w-full mt-4 p-3 bg-blue-50 text-blue-600 rounded-2xl font-black text-[10px] uppercase hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center gap-2"
+                >
+                  <Eye className="w-4 h-4" />
+                  {lang === 'ar' ? 'عرض المستندات المرفقة' : 'View Documents'}
+                </button>
+              )}
               {/* Special Badges for Promoted/Demoted */}
               <div className="mt-4 flex flex-wrap gap-2">
                 {(driver.averageRating || 5) >= 4.5 && (

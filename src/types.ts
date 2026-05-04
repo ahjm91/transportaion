@@ -179,6 +179,13 @@ export interface Driver {
   wallet?: number;
   carImage?: string;
   rating?: number;
+  profileImage?: string;
+  licenseImage?: string;
+  idCardImage?: string;
+  carModel?: string;
+  carYear?: string;
+  isVerified?: boolean;
+  verificationMessage?: string;
 }
 
 export interface Report {
