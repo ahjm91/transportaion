@@ -3,7 +3,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Layout, Box, Globe, DollarSign, Users, PieChart, Star, 
-  Settings, LogOut, Search, Bell, Menu, Shield, Loader2, Gift, Car, BarChart3
+  Settings, LogOut, Search, Bell, Menu, Shield, Loader2, Gift, Car, BarChart3, Truck
 } from 'lucide-react';
 import { Trip, SiteSettings, Service, SpecializedService, UserProfile, FixedRoute, Booking, Driver } from '../../types';
 import { AccountingTab } from './AccountingTab';
@@ -16,6 +16,7 @@ import { PayoutsTab } from './PayoutsTab';
 import { PromoCodesTab } from './PromoCodesTab';
 import { ReportsTab } from './ReportsTab';
 import { AuditLogsTab } from './AuditLogsTab';
+import { ManualDispatchTab } from './ManualDispatchTab';
 import { FileText } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -62,6 +63,7 @@ export const AdminDashboard = ({
   const [tripFilter, setTripFilter] = React.useState<'all' | 'requested' | 'pending_price' | 'unpaid' | 'paid'>('all');
 
   const menuItems = [
+    { id: 'dispatch', name: lang === 'ar' ? 'توزيع الطلبات' : 'Manual Dispatch', icon: Truck },
     { id: 'accounting', name: lang === 'ar' ? 'المحاسبة والرحلات' : 'Accounting & Trips', icon: PieChart },
     { id: 'reports', name: lang === 'ar' ? 'التقارير والإغلاق' : 'Reports & Closure', icon: BarChart3 },
     { id: 'payouts', name: lang === 'ar' ? 'طلبات السحب' : 'Payout Requests', icon: DollarSign },
@@ -194,6 +196,14 @@ export const AdminDashboard = ({
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
             >
+              {activeTab === 'dispatch' && (
+                <ManualDispatchTab 
+                  bookings={bookings}
+                  allDrivers={allDrivers}
+                  lang={lang}
+                />
+              )}
+
               {activeTab === 'accounting' && (
                 <AccountingTab 
                   trips={trips}

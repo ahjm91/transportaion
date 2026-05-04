@@ -166,7 +166,7 @@ async function startServer() {
     try {
       const bookingData = {
         ...req.body,
-        status: 'searching_driver',
+        status: 'pending',
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       };
       const docRef = await db.collection("bookings").add(bookingData);

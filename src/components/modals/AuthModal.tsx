@@ -13,6 +13,7 @@ import { auth, db } from '../../firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { SiteSettings } from '../../types';
 import { translations } from '../../translations';
+import { cn } from '../../lib/utils';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -30,27 +31,42 @@ export const AuthModal = ({ isOpen, onClose, lang, siteSettings }: AuthModalProp
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [successInfo, setSuccessInfo] = useState<string | null>(null);
 
   const t = (key: string) => translations[lang][key] || key;
+
+  const formatPhoneNumber = (value: string) => {
+    return value.replace(/\D/g, '').slice(0, 15);
+  };
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     setError(null);
+    setSuccessInfo(null);
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
       onClose();
     } catch (err: any) {
+      console.error("Google Auth error:", err);
+      let errorMessage = err.message || String(err);
+      if (errorMessage.includes('Firebase: Error')) {
+        errorMessage = errorMessage.split('): ')[1] || errorMessage.split(': ')[1] || errorMessage;
+      }
+
       if (err.code === 'auth/operation-not-allowed') {
         setError(lang === 'ar' 
-          ? 'تسجيل الدخول عبر Google غير مفعل في إعدادات Firebase. يرجى تفعيله من لوحة التحكم.' 
-          : 'Google Sign-in is not enabled in Firebase Console.');
+          ? 'تسجيل الدخول عبر Google غير مفعل.' 
+          : 'Google Sign-in is not enabled.');
       } else if (err.code === 'auth/email-already-in-use') {
         setError(lang === 'ar' 
-          ? 'هذا البريد الإلكتروني مسجل بالفعل. يرجى تسجيل الدخول بدلاً من ذلك.' 
-          : 'This email is already in use. Please sign in instead.');
+          ? 'هذا البريد مسجل مسبقاً ببيانات مختلفة. يرجى الدخول بالبريد وكلمة المرور.' 
+          : 'This email is already in use with different credentials. Please use email/password.');
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        // Just clear loading, don't show error if they closed it
+        setError(null);
       } else {
-        setError(err.message);
+        setError(errorMessage);
       }
     } finally {
       setIsLoading(false);
@@ -61,19 +77,23 @@ export const AuthModal = ({ isOpen, onClose, lang, siteSettings }: AuthModalProp
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    setSuccessInfo(null);
 
     try {
+      const cleanEmail = email.toLowerCase().trim();
       if (mode === 'login') {
-        await signInWithEmailAndPassword(auth, email, password);
+        await signInWithEmailAndPassword(auth, cleanEmail, password);
       } else {
-        const { user } = await createUserWithEmailAndPassword(auth, email, password);
+        if (phone.length < 8) throw new Error(lang === 'ar' ? 'رقم الهاتف غير مكتمل' : 'Phone number too short');
+        
+        const { user } = await createUserWithEmailAndPassword(auth, cleanEmail, password);
         await updateProfile(user, { displayName: name });
         
         const userRef = doc(db, 'users', user.uid);
         await setDoc(userRef, {
           uid: user.uid,
           name,
-          email,
+          email: cleanEmail,
           phone,
           role: 'customer',
           membershipStatus: 'Bronze',
@@ -84,35 +104,45 @@ export const AuthModal = ({ isOpen, onClose, lang, siteSettings }: AuthModalProp
           availableRewards: [],
           referralCode: Math.random().toString(36).substring(2, 8).toUpperCase()
         }, { merge: true });
+
+        setSuccessInfo(lang === 'ar' ? 'تم إنشاء الحساب بنجاح! جاري التوجيه...' : 'Account created successfully! Redirecting...');
+        setTimeout(onClose, 1500);
+        return;
       }
       onClose();
     } catch (err: any) {
       console.error("Auth error:", err);
+      let errorMessage = err.message || String(err);
+      
+      // Clean up Firebase: Error (auth/...) prefix if it exists
+      if (errorMessage.includes('Firebase: Error')) {
+        errorMessage = errorMessage.split('): ')[1] || errorMessage.split(': ')[1] || errorMessage;
+      }
+
       const errorCode = err.code || '';
       
       if (errorCode === 'auth/operation-not-allowed') {
         setError(lang === 'ar' 
-          ? 'خيار التسجيل عبر البريد الإلكتروني غير مفعل في Firebase. يرجى تفعيله من "Sign-in method" في لوحة تحكم Firebase.' 
-          : 'Email/Password auth is not enabled in Firebase Console.');
+          ? 'خيار التسجيل عبر البريد الإلكتروني غير مفعل في Firebase.' 
+          : 'Email settings are not enabled in Firebase.');
       } else if (errorCode === 'auth/email-already-in-use') {
         setError(lang === 'ar' 
-          ? 'هذا البريد الإلكتروني مسجل بالفعل. هل ترغب في تسجيل الدخول بدلاً من ذلك؟' 
-          : 'This email is already in use. Would you like to login instead?');
-        // Optionally suggest switching mode
+          ? 'هذا البريد الإلكتروني مسجل مسبقاً. هل ترغب في الدخول لحسابك؟' 
+          : 'Email already registered. Would you like to login instead?');
         setTimeout(() => {
-          if (window.confirm(lang === 'ar' ? 'هذا البريد مسجل بالفعل، هل تريد الانتقال لصفحة تسجيل الدخول؟' : 'Email exists. Switch to login?')) {
+          if (window.confirm(lang === 'ar' ? 'البريد مسجل بالفعل، الانتقال لصفحة الدخول؟' : 'Email exists. Switch to login?')) {
             setMode('login');
             setError(null);
           }
-        }, 500);
+        }, 300);
       } else if (errorCode === 'auth/weak-password') {
-        setError(lang === 'ar' ? 'كلمة المرور ضعيفة جداً.' : 'Password is too weak.');
+        setError(lang === 'ar' ? 'كلمة المرور يجب أن تكون 6 أحرف على الأقل.' : 'Password must be at least 6 characters.');
       } else if (errorCode === 'auth/invalid-email') {
-        setError(lang === 'ar' ? 'البريد الإلكتروني غير صالح.' : 'Invalid email format.');
-      } else if (errorCode === 'auth/user-not-found' || errorCode === 'auth/wrong-password') {
-        setError(lang === 'ar' ? 'البريد الإلكتروني أو كلمة المرور غير صحيحة.' : 'Incorrect email or password.');
+        setError(lang === 'ar' ? 'صيغة البريد الإلكتروني غير صحيحة.' : 'Invalid email format.');
+      } else if (errorCode === 'auth/user-not-found' || errorCode === 'auth/wrong-password' || errorCode === 'auth/invalid-credential') {
+        setError(lang === 'ar' ? 'بيانات الدخول غير صحيحة. يرجى التأكد من البريد وكلمة المرور.' : 'Invalid login credentials. Please check your email and password.');
       } else {
-        setError(err.message || String(err));
+        setError(errorMessage);
       }
     } finally {
       setIsLoading(false);
@@ -161,71 +191,106 @@ export const AuthModal = ({ isOpen, onClose, lang, siteSettings }: AuthModalProp
           <AnimatePresence mode="wait">
             {error && (
               <motion.div 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-red-50 text-red-600 p-4 rounded-2xl text-sm font-bold border border-red-100"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-red-50 text-red-600 p-4 rounded-2xl text-[11px] font-bold border border-red-100 flex items-center gap-3"
               >
+                <div className="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center shrink-0">
+                  <X className="w-3 h-3" />
+                </div>
                 {error}
+              </motion.div>
+            )}
+
+            {successInfo && (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-green-50 text-green-600 p-4 rounded-2xl text-[11px] font-bold border border-green-100 flex items-center gap-3"
+              >
+                <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center shrink-0">
+                  <Star className="w-3 h-3 fill-green-600" />
+                </div>
+                {successInfo}
               </motion.div>
             )}
           </AnimatePresence>
 
-          {mode === 'register' && (
-            <>
-              <div className="relative">
-                <User className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  required
-                  type="text"
-                  placeholder={t('firstName') + ' ' + t('lastName')}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 px-12 focus:ring-2 focus:ring-gold/20 font-bold"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                />
-              </div>
-              <div className="relative">
-                <Phone className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  required
-                  type="tel"
-                  placeholder={t('phone')}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 px-12 focus:ring-2 focus:ring-gold/20 font-bold"
-                  value={phone}
-                  onChange={e => setPhone(e.target.value)}
-                />
-              </div>
-            </>
-          )}
+          <div className="space-y-4">
+            {mode === 'register' && (
+              <>
+                <div className="relative group">
+                  <User className={cn("absolute top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 transition-colors group-focus-within:text-gold", lang === 'ar' ? 'right-4' : 'left-4')} />
+                  <input
+                    required
+                    type="text"
+                    placeholder={lang === 'ar' ? 'الاسم كاملاً' : 'Full Name'}
+                    className={cn(
+                      "w-full bg-gray-50 border-2 border-transparent rounded-2xl py-4 focus:ring-4 focus:ring-gold/10 focus:bg-white focus:border-gold/20 transition-all font-bold text-sm",
+                      lang === 'ar' ? 'pr-12 pl-4' : 'pl-12 pr-4'
+                    )}
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                  />
+                </div>
+                <div className="relative group">
+                  <Phone className={cn("absolute top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 transition-colors group-focus-within:text-gold", lang === 'ar' ? 'right-4' : 'left-4')} />
+                  <input
+                    required
+                    type="tel"
+                    placeholder={lang === 'ar' ? 'رقم الهاتف' : 'Phone Number'}
+                    className={cn(
+                      "w-full bg-gray-50 border-2 border-transparent rounded-2xl py-4 focus:ring-4 focus:ring-gold/10 focus:bg-white focus:border-gold/20 transition-all font-bold text-sm",
+                      lang === 'ar' ? 'pr-12 pl-4' : 'pl-12 pr-4'
+                    )}
+                    value={phone}
+                    onChange={e => setPhone(formatPhoneNumber(e.target.value))}
+                  />
+                </div>
+              </>
+            )}
 
-          <div className="relative">
-            <Mail className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              required
-              type="email"
-              placeholder={t('emailAddress')}
-              className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 px-12 focus:ring-2 focus:ring-gold/20 font-bold"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-            />
-          </div>
+            <div className="relative group">
+              <Mail className={cn("absolute top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 transition-colors group-focus-within:text-gold", lang === 'ar' ? 'right-4' : 'left-4')} />
+              <input
+                required
+                type="email"
+                placeholder={lang === 'ar' ? 'البريد الإلكتروني' : 'Email Address'}
+                className={cn(
+                  "w-full bg-gray-50 border-2 border-transparent rounded-2xl py-4 focus:ring-4 focus:ring-gold/10 focus:bg-white focus:border-gold/20 transition-all font-bold text-sm",
+                  lang === 'ar' ? 'pr-12 pl-4' : 'pl-12 pr-4'
+                )}
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+              />
+            </div>
 
-          <div className="relative">
-            <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              required
-              type="password"
-              placeholder={lang === 'ar' ? 'كلمة المرور' : 'Password'}
-              className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 px-12 focus:ring-2 focus:ring-gold/20 font-bold"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-            />
+            <div className="relative group">
+              <Lock className={cn("absolute top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 transition-colors group-focus-within:text-gold", lang === 'ar' ? 'right-4' : 'left-4')} />
+              <input
+                required
+                type="password"
+                placeholder={lang === 'ar' ? 'كلمة المرور' : 'Password'}
+                className={cn(
+                  "w-full bg-gray-50 border-2 border-transparent rounded-2xl py-4 focus:ring-4 focus:ring-gold/10 focus:bg-white focus:border-gold/20 transition-all font-bold text-sm",
+                  lang === 'ar' ? 'pr-12 pl-4' : 'pl-12 pr-4'
+                )}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+              />
+              {mode === 'register' && password.length > 0 && password.length < 6 && (
+                <div className={cn("absolute bottom-2 text-[8px] font-black text-red-400 transition-all", lang === 'ar' ? 'right-12' : 'left-12')}>
+                  {lang === 'ar' ? 'كلمة المرور قصيرة' : 'Password too short'}
+                </div>
+              )}
+            </div>
           </div>
 
           <button
-            disabled={isLoading}
-            className="w-full bg-dark text-white py-5 rounded-2xl font-black text-lg hover:bg-gray-800 transition-all flex items-center justify-center gap-3 shadow-xl shadow-dark/10 disabled:opacity-50"
+            disabled={isLoading || !!successInfo}
+            className="w-full bg-dark text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-gold hover:text-dark transition-all flex items-center justify-center gap-3 shadow-xl shadow-dark/10 disabled:opacity-50"
           >
-            {isLoading ? <Loader2 className="w-6 h-6 animate-spin text-gold" /> : (mode === 'login' ? <LogIn className="w-6 h-6" /> : <UserPlus className="w-6 h-6" />)}
+            {isLoading ? <Loader2 className="w-5 h-5 animate-spin text-gold" /> : (mode === 'login' ? <LogIn className="w-5 h-5" /> : <UserPlus className="w-5 h-5" />)}
             {mode === 'login' ? t('login') : t('register')}
           </button>
 

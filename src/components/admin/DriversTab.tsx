@@ -96,7 +96,7 @@ export const DriversTab = ({ allDrivers, users, safeUpdateDoc, lang }: DriversTa
         adminStatus: 'active',
         registrationStatus: 'approved',
         carImage: user.driverApplicationData.profilePic || '',
-        wallet: 0,
+        wallet: { balance: 0, totalEarnings: 0, pendingPayouts: 0 },
         averageRating: 5.0,
         ratingCount: 0,
         totalRating: 0,
@@ -221,7 +221,7 @@ export const DriversTab = ({ allDrivers, users, safeUpdateDoc, lang }: DriversTa
                 </div>
                 <div className="bg-gray-50 p-4 rounded-2xl text-center">
                   <div className="text-[10px] text-gray-400 font-black uppercase mb-1">{lang === 'ar' ? 'المحفظة' : 'Wallet'}</div>
-                  <div className="text-lg font-black text-gold">{(driver.wallet || 0).toFixed(1)} <span className="text-[10px]">BHD</span></div>
+                  <div className="text-lg font-black text-gold">{(driver.wallet?.balance || 0).toFixed(1)} <span className="text-[10px]">BHD</span></div>
                 </div>
               </div>
 

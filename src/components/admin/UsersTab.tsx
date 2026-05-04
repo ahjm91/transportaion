@@ -139,21 +139,25 @@ export const UsersTab = ({ users, allDrivers, isUsersLoading, safeUpdateDoc, lan
                                 {u.role === 'driver' && <Car className="w-3 h-3 text-gold" />}
                               </div>
                               <div className="text-[10px] text-gray-300 font-mono mt-0.5">{u.email}</div>
-                              {u.driverApplicationStatus === 'pending' && (
-                                <div className="mt-1 flex flex-col gap-2">
-                                  <div className="flex items-center gap-1 text-orange-500 font-bold uppercase tracking-tighter" style={{ fontSize: '8px' }}>
-                                    <ShieldCheck className="w-2 h-2" />
-                                    {lang === 'ar' ? 'طلب سائق معلق' : 'Driver App Pending'}
-                                  </div>
+                              <div className="mt-1 flex items-center gap-2">
+                                {u.driverApplicationStatus === 'pending' ? (
                                   <button 
                                     onClick={() => setViewingApp(u)}
-                                    className="flex items-center gap-1 px-2 py-1 bg-gold/10 text-gold rounded-lg hover:bg-gold/20 transition-all text-[8px] font-black uppercase w-fit"
+                                    className="flex items-center gap-1 px-2 py-1 bg-gold/10 text-gold rounded-lg hover:bg-gold/20 transition-all text-[8px] font-black uppercase"
                                   >
-                                    <Eye className="w-2 h-2" />
+                                    <ShieldCheck className="w-2 h-2" />
                                     {lang === 'ar' ? 'مراجعة الطلب' : 'Review App'}
                                   </button>
-                                </div>
-                              )}
+                                ) : (
+                                  <button 
+                                    onClick={() => setViewingApp(u)}
+                                    className="flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-500 rounded-lg hover:bg-gray-200 transition-all text-[8px] font-black uppercase"
+                                  >
+                                    <FileText className="w-2.5 h-2.5" />
+                                    {lang === 'ar' ? 'عرض المستندات' : 'View Documents'}
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -318,19 +322,25 @@ export const UsersTab = ({ users, allDrivers, isUsersLoading, safeUpdateDoc, lan
         </div>
       )}
 
-      {/* Application Review Modal */}
-      {viewingApp && viewingApp.driverApplicationData && (
+      {/* Application & Document Review Modal */}
+      {viewingApp && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-dark/60 backdrop-blur-sm animate-in fade-in duration-300">
            <div className="bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-              <div className="p-8 md:p-12 space-y-8">
+              <div className="p-8 md:p-12 space-y-8 overflow-y-auto max-h-[90vh]">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 bg-gold/10 rounded-2xl flex items-center justify-center">
                       <Car className="w-8 h-8 text-gold" />
                     </div>
                     <div>
-                      <h3 className="text-2xl font-black text-dark">{lang === 'ar' ? 'مراجعة طلب انضمام سائق' : 'Review Driver Application'}</h3>
-                      <p className="text-gray-400 text-xs font-bold">{lang === 'ar' ? 'يرجى مراجعة البيانات التالية بعناية قبل الموافقة' : 'Please review below info carefully before approval'}</p>
+                      <h3 className="text-2xl font-black text-dark">
+                        {viewingApp.driverApplicationStatus === 'pending' 
+                          ? (lang === 'ar' ? 'مراجعة طلب الانضمام' : 'Review Driver Application')
+                          : (lang === 'ar' ? 'مستندات العضو' : 'Member Documents')}
+                      </h3>
+                      <p className="text-gray-400 text-xs font-bold">
+                        {viewingApp.name} - {viewingApp.email}
+                      </p>
                     </div>
                   </div>
                   <button onClick={() => setViewingApp(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
@@ -338,136 +348,186 @@ export const UsersTab = ({ users, allDrivers, isUsersLoading, safeUpdateDoc, lan
                   </button>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-6">
-                  {/* Driver Photo */}
+                {/* Document Grid */}
+                <div className="grid md:grid-cols-3 gap-6">
+                  {/* Profile Photo */}
                   <div className="space-y-3">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
                        <Camera className="w-3 h-3" />
                        {lang === 'ar' ? 'الصورة الشخصية' : 'Profile Photo'}
                     </label>
-                    <div className="aspect-square rounded-3xl bg-gray-50 overflow-hidden border-4 border-white shadow-xl">
-                       {viewingApp.driverApplicationData.profilePic ? (
-                         <img src={viewingApp.driverApplicationData.profilePic} className="w-full h-full object-cover" alt="Driver" />
+                    <div className="aspect-square rounded-3xl bg-gray-50 overflow-hidden border-4 border-white shadow-lg relative group">
+                       {(viewingApp.driverApplicationData?.profilePic || viewingApp.photoURL || allDrivers.find(d => d.id === viewingApp.uid)?.profileImage) ? (
+                         <>
+                           <img 
+                            src={viewingApp.driverApplicationData?.profilePic || viewingApp.photoURL || allDrivers.find(d => d.id === viewingApp.uid)?.profileImage} 
+                            className="w-full h-full object-cover" 
+                            alt="Profile" 
+                           />
+                           <div className="absolute inset-0 bg-dark/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                             <button 
+                               onClick={() => window.open(viewingApp.driverApplicationData?.profilePic || viewingApp.photoURL || allDrivers.find(d => d.id === viewingApp.uid)?.profileImage)}
+                               className="bg-white text-dark px-3 py-1 rounded-lg text-[8px] font-black uppercase"
+                             >
+                               {lang === 'ar' ? 'فتح' : 'Open'}
+                             </button>
+                           </div>
+                         </>
                        ) : (
-                         <div className="w-full h-full flex items-center justify-center text-gray-300">
-                           <Users className="w-12 h-12" />
+                         <div className="w-full h-full flex flex-col items-center justify-center text-gray-300 font-bold p-4 text-center">
+                           <Camera className="w-6 h-6 mb-2" />
+                           <span className="text-[8px]">{lang === 'ar' ? 'لا توجد صورة' : 'No Photo'}</span>
                          </div>
                        )}
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <div className="bg-gray-50 p-4 rounded-2xl space-y-1">
-                      <label className="text-[9px] font-black text-gray-400 uppercase flex items-center gap-1">
-                        <Users className="w-2.5 h-2.5" /> {lang === 'ar' ? 'الاسم' : 'Name'}
-                      </label>
-                      <p className="text-xs font-black text-dark">{viewingApp.driverApplicationData.fullName}</p>
-                    </div>
-                    <div className="bg-gray-50 p-4 rounded-2xl space-y-1">
-                      <label className="text-[9px] font-black text-gray-400 uppercase flex items-center gap-1">
-                        <Calendar className="w-2.5 h-2.5" /> {lang === 'ar' ? 'تاريخ الميلاد' : 'DOB'}
-                      </label>
-                      <p className="text-xs font-black text-dark">{viewingApp.driverApplicationData.dob}</p>
-                    </div>
-                    <div className="bg-gray-50 p-4 rounded-2xl space-y-1">
-                      <label className="text-[9px] font-black text-gray-400 uppercase flex items-center gap-1">
-                        <Mail className="w-2.5 h-2.5" /> {lang === 'ar' ? 'البريد' : 'Email'}
-                      </label>
-                      <p className="text-xs font-black text-dark">{viewingApp.driverApplicationData.email}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-6">
                   {/* License Photo */}
                   <div className="space-y-3">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
                        <FileText className="w-3 h-3 text-gold" />
                        {lang === 'ar' ? 'رخصة السياقة' : 'Driving License'}
                     </label>
-                    <div className="aspect-[3/2] rounded-3xl bg-gray-50 overflow-hidden border-4 border-white shadow-xl relative group">
-                       {viewingApp.driverApplicationData.licensePic ? (
+                    <div className="aspect-square rounded-3xl bg-gray-50 overflow-hidden border-4 border-white shadow-lg relative group">
+                       {(viewingApp.driverApplicationData?.licensePic || allDrivers.find(d => d.id === viewingApp.uid)?.licenseImage) ? (
                          <>
-                           <img src={viewingApp.driverApplicationData.licensePic} className="w-full h-full object-cover" alt="License" />
+                           <img 
+                            src={viewingApp.driverApplicationData?.licensePic || allDrivers.find(d => d.id === viewingApp.uid)?.licenseImage} 
+                            className="w-full h-full object-cover" 
+                            alt="License" 
+                           />
                            <div className="absolute inset-0 bg-dark/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                              <button 
-                               onClick={() => window.open(viewingApp.driverApplicationData?.licensePic)}
-                               className="bg-white text-dark px-4 py-2 rounded-xl text-[10px] font-black uppercase"
+                               onClick={() => window.open(viewingApp.driverApplicationData?.licensePic || allDrivers.find(d => d.id === viewingApp.uid)?.licenseImage)}
+                               className="bg-white text-dark px-3 py-1 rounded-lg text-[8px] font-black uppercase"
                              >
-                               {lang === 'ar' ? 'عرض بالحجم الكامل' : 'View Full Size'}
+                               {lang === 'ar' ? 'فتح' : 'Open'}
                              </button>
                            </div>
                          </>
                        ) : (
-                         <div className="w-full h-full flex items-center justify-center text-gray-300">
-                           <FileText className="w-12 h-12" />
+                         <div className="w-full h-full flex flex-col items-center justify-center text-gray-300 font-bold p-4 text-center">
+                           <FileText className="w-6 h-6 mb-2" />
+                           <span className="text-[8px]">{lang === 'ar' ? 'لا يوجدمستند' : 'No Document'}</span>
                          </div>
                        )}
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <div className="bg-gray-50 p-6 rounded-3xl border-2 border-gold/10 space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                        <Calendar className="w-3 h-3 text-gold" />
-                        {lang === 'ar' ? 'صلاحية الرخصة' : 'License Validity'}
-                      </label>
-                      <div className="flex flex-col gap-1">
-                         <p className="text-sm font-black text-dark">{viewingApp.driverApplicationData.licenseExpiry}</p>
-                         {new Date(viewingApp.driverApplicationData.licenseExpiry) < new Date() ? (
-                           <span className="text-[10px] font-black text-red-500 uppercase bg-red-50 px-2 py-1 rounded-lg w-fit">
-                             {lang === 'ar' ? 'منتهية الصلاحية' : 'Expired'}
-                           </span>
-                         ) : (
-                           <span className="text-[10px] font-black text-green-500 uppercase bg-green-50 px-2 py-1 rounded-lg w-fit">
-                             {lang === 'ar' ? 'سارية المفعول' : 'Active / Valid'}
-                           </span>
-                         )}
-                      </div>
+                  {/* ID Card / CPR */}
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                       <ShieldCheck className="w-3 h-3 text-blue-500" />
+                       {lang === 'ar' ? 'البطاقة السكانية' : 'ID Card / CPR'}
+                    </label>
+                    <div className="aspect-square rounded-3xl bg-gray-50 overflow-hidden border-4 border-white shadow-lg relative group">
+                       {(allDrivers.find(d => d.id === viewingApp.uid)?.idCardImage) ? (
+                         <>
+                           <img 
+                            src={allDrivers.find(d => d.id === viewingApp.uid)?.idCardImage} 
+                            className="w-full h-full object-cover" 
+                            alt="ID Card" 
+                           />
+                           <div className="absolute inset-0 bg-dark/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                             <button 
+                               onClick={() => window.open(allDrivers.find(d => d.id === viewingApp.uid)?.idCardImage)}
+                               className="bg-white text-dark px-3 py-1 rounded-lg text-[8px] font-black uppercase"
+                             >
+                               {lang === 'ar' ? 'فتح' : 'Open'}
+                             </button>
+                           </div>
+                         </>
+                       ) : (
+                         <div className="w-full h-full flex flex-col items-center justify-center text-gray-300 font-bold p-4 text-center">
+                           <ShieldCheck className="w-6 h-6 mb-2" />
+                           <span className="text-[8px]">{lang === 'ar' ? 'لا يوجدمستند' : 'No Document'}</span>
+                         </div>
+                       )}
                     </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gray-50 p-4 rounded-2xl space-y-1">
-                      <label className="text-[9px] font-black text-gray-400 uppercase flex items-center gap-1">
-                        <Phone className="w-2.5 h-2.5" /> {lang === 'ar' ? 'الهاتف' : 'Phone'}
-                      </label>
-                      <p className="text-xs font-black text-dark" dir="ltr">{viewingApp.driverApplicationData.phone}</p>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-2xl space-y-1">
-                      <label className="text-[9px] font-black text-gray-400 uppercase flex items-center gap-1">
-                        <Car className="w-2.5 h-2.5" /> {lang === 'ar' ? 'السيارة' : 'Car'}
-                      </label>
-                      <p className="text-xs font-black text-dark">{viewingApp.driverApplicationData.carType} - {viewingApp.driverApplicationData.carModel}</p>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-2xl space-y-1">
-                      <label className="text-[9px] font-black text-gray-400 uppercase flex items-center gap-1">
-                        <Briefcase className="w-2.5 h-2.5" /> {lang === 'ar' ? 'الخبرة' : 'Exp'}
-                      </label>
-                      <p className="text-xs font-black text-dark">{viewingApp.driverApplicationData.experience} {lang === 'ar' ? 'سنة' : 'Years'}</p>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-2xl space-y-1">
-                      <label className="text-[9px] font-black text-gray-400 uppercase flex items-center gap-1">
-                        <ShieldCheck className="w-2.5 h-2.5" /> {lang === 'ar' ? 'اللوحة' : 'Plate'}
-                      </label>
-                      <p className="text-xs font-black text-dark">{viewingApp.driverApplicationData.plateNumber}</p>
+                {/* Edit Links (If documents missing) */}
+                <div className="bg-blue-50/50 p-6 rounded-3xl border border-blue-100 space-y-4">
+                  <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{lang === 'ar' ? 'إدارة روابط المستندات' : 'Manage Document Links'}</h4>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black text-gray-400">رابط الرخصة</label>
+                      <input 
+                        type="text" 
+                        placeholder="https://..."
+                        className="w-full bg-white border-none rounded-lg p-2 text-[10px] font-bold"
+                        value={viewingApp.driverApplicationData?.licensePic || allDrivers.find(d => d.id === viewingApp.uid)?.licenseImage || ''}
+                        onChange={async (e) => {
+                          const val = e.target.value;
+                          const driverRef = doc(db, 'drivers', viewingApp.uid);
+                          await updateDoc(driverRef, { licenseImage: val });
+                          await updateDoc(doc(db, 'users', viewingApp.uid), { "driverApplicationData.licensePic": val });
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black text-gray-400">رابط الهوية</label>
+                      <input 
+                        type="text" 
+                        placeholder="https://..."
+                        className="w-full bg-white border-none rounded-lg p-2 text-[10px] font-bold"
+                        value={allDrivers.find(d => d.id === viewingApp.uid)?.idCardImage || ''}
+                        onChange={async (e) => {
+                          const val = e.target.value;
+                          const driverRef = doc(db, 'drivers', viewingApp.uid);
+                          await updateDoc(driverRef, { idCardImage: val });
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex gap-4 pt-4">
-                  <button 
-                    onClick={() => handleRejectDriver(viewingApp)}
-                    className="flex-1 py-4 bg-red-50 text-red-500 rounded-2xl font-black text-xs hover:bg-red-500 hover:text-white transition-all shadow-xl shadow-red-500/5"
-                  >
-                    {lang === 'ar' ? 'رفض الطلب' : 'Reject Application'}
-                  </button>
-                  <button 
-                    onClick={() => handleApproveDriver(viewingApp)}
-                    className="flex-1 py-4 bg-dark text-white rounded-2xl font-black text-xs hover:bg-gold hover:text-dark transition-all shadow-xl shadow-dark/10"
-                  >
-                    {lang === 'ar' ? 'الموافقة والتعيين' : 'Approve & Assign'}
-                  </button>
+                {/* Additional Info */}
+                <div className="bg-gray-50 rounded-3xl p-6 grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase">{lang === 'ar' ? 'الاسم كاملاً' : 'Full Name'}</label>
+                    <p className="text-xs font-black text-dark">{viewingApp.driverApplicationData?.fullName || viewingApp.name}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase">{lang === 'ar' ? 'رقم الهاتف' : 'Phone'}</label>
+                    <p className="text-xs font-black text-dark" dir="ltr">{viewingApp.driverApplicationData?.phone || viewingApp.phone}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase">{lang === 'ar' ? 'رقم اللوحة' : 'Plate Number'}</label>
+                    <p className="text-xs font-black text-dark">{viewingApp.driverApplicationData?.plateNumber || allDrivers.find(d => d.id === viewingApp.uid)?.plateNumber || 'N/A'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase">{lang === 'ar' ? 'نوع السيارة' : 'Car Type'}</label>
+                    <p className="text-xs font-black text-dark">{viewingApp.driverApplicationData?.carType || allDrivers.find(d => d.id === viewingApp.uid)?.carType || 'Standard'}</p>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-4">
+                  {viewingApp.driverApplicationStatus === 'pending' ? (
+                    <>
+                      <button 
+                        onClick={() => handleRejectDriver(viewingApp)}
+                        className="flex-1 py-4 bg-red-50 text-red-500 rounded-2xl font-black text-xs hover:bg-red-500 hover:text-white transition-all"
+                      >
+                        {lang === 'ar' ? 'رفض الطلب' : 'Reject Application'}
+                      </button>
+                      <button 
+                        onClick={() => handleApproveDriver(viewingApp)}
+                        className="flex-1 py-4 bg-dark text-white rounded-2xl font-black text-xs hover:bg-gold hover:text-dark transition-all"
+                      >
+                        {lang === 'ar' ? 'الموافقة والتعيين' : 'Approve & Assign'}
+                      </button>
+                    </>
+                  ) : (
+                    <button 
+                      onClick={() => setViewingApp(null)}
+                      className="w-full py-4 bg-gray-100 text-gray-500 rounded-2xl font-black text-xs hover:bg-gray-200 transition-all font-black uppercase tracking-widest"
+                    >
+                      {lang === 'ar' ? 'إغلاق' : 'Close'}
+                    </button>
+                  )}
                 </div>
               </div>
            </div>

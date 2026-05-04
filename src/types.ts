@@ -228,7 +228,7 @@ export interface Booking {
   review?: string;
   promoCode?: string;
   discount?: number;
-  status: 'pending' | 'searching_driver' | 'driver_assigned' | 'driver_arriving' | 'trip_started' | 'completed' | 'cancelled' | 'no_driver_found';
+  status: 'pending' | 'searching_driver' | 'assigned' | 'accepted' | 'driver_assigned' | 'driver_arriving' | 'trip_started' | 'completed' | 'cancelled' | 'no_driver_found';
   assignedDriverId: string | null;
   userId?: string;
   createdAt: any;
