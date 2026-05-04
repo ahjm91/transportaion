@@ -1079,48 +1079,8 @@ function App() {
         createdAt: new Date().toISOString()
       };
 
-      console.log('Saving to server...', tripData);
-      const bookingResponse = await fetch('/api/trips', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...tripData,
-          analytics: {
-            userAgent: navigator.userAgent,
-            language: navigator.language
-          }
-        })
-      });
-      
-      const result = await bookingResponse.json();
-      if (!result.success) {
-        throw new Error('فشل حفظ البيانات في قاعدة البيانات');
-      }
-      
-      const newTrip = { id: result.id, ...tripData } as Trip;
-      
-      logAnalyticsEvent('booking_step_1_submit', 'booking', newTrip.bookingNumber, { amount: newTrip.amount });
-      
-      // Notify Admin via our Notification Service
-      sendAdminNotification(NotificationType.NEW_TRIP, {
-        bookingNumber,
-        customer: tripData.customerName,
-        phone: tripData.phone,
-        route: tripData.direction,
-        amount: newTrip.amount
-      });
-      
-      // Secondary background notify via API
-      console.log('Sending notification email in background...');
-      fetch('/api/notify-booking', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...newTrip, companyName: siteSettings.companyName })
-      }).catch(e => console.error('Background Notify error:', e));
-
       // WhatsApp Message Construction
       const fullPhone = `${bookingData.countryCode || ''} ${bookingData.phone}`.trim();
-      
       const adminMessage = `👋 *طلب حجز جديد*\n\n` +
                            `مرحباً، أرغب في تأكيد الحجز التالي:\n\n` +
                            `🎫 رقم الحجز: ${bookingNumber}\n` +
@@ -1131,32 +1091,77 @@ function App() {
                            `🕒 الوقت: ${tripData.time}\n` +
                            `👥 الركاب: ${tripData.passengers}\n` +
                            `🚘 نوع السيارة: ${tripData.carType}\n` +
-                           `💰 السعر: ${newTrip.amount > 0 ? newTrip.amount + ' BHD' : (lang === 'ar' ? 'بانتظار التسعير' : 'Pending Price')}`;
+                           `💰 السعر: ${tripData.amount > 0 ? tripData.amount + ' BHD' : (lang === 'ar' ? 'بانتظار التسعير' : 'Pending Price')}`;
       
       const rawWhatsapp = siteSettings.notificationWhatsapp || siteSettings.whatsapp || '97332325997';
       const cleanWhatsapp = rawWhatsapp.replace(/\D/g, '').replace(/^0+/, ''); 
-      // Ensure Bahrain numbers (8 digits) are prefixed with 973
       const finalWhatsapp = cleanWhatsapp.length === 8 ? `973${cleanWhatsapp}` : (cleanWhatsapp || '97332325997');
       const whatsappUrl = `https://wa.me/${finalWhatsapp}?text=${encodeURIComponent(adminMessage)}`;
 
-      // Show success modal and auto-redirect after a short delay
-      setLastBookingInfo({ ...newTrip, notes: whatsappUrl }); 
-      setIsBookingSuccessOpen(true);
-      
-      // Auto-redirect to WhatsApp after 1.5 seconds so they see the success message
-      setTimeout(() => {
-        if (setIsBookingSuccessOpen) { // Check if still open/component mounted
-          window.open(whatsappUrl, '_blank');
+      console.log('Saving to server...', tripData);
+      try {
+        const bookingResponse = await fetch('/api/trips', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...tripData,
+            analytics: {
+              userAgent: navigator.userAgent,
+              language: navigator.language
+            }
+          })
+        });
+        
+        const result = await bookingResponse.json();
+        if (!result.success) {
+          console.warn('Backend save failed but proceeding to WhatsApp:', result.error);
         }
-      }, 1500);
-      
-      // Celebration!
-      confetti({
-        particleCount: 150,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: [siteSettings.primaryColor || '#D4AF37', '#ffffff', '#B8860B']
-      });
+        
+        const newId = result.id || `pending_${Date.now()}`;
+        const newTrip = { id: newId, ...tripData } as Trip;
+        
+        logAnalyticsEvent('booking_step_1_submit', 'booking', newTrip.bookingNumber, { amount: newTrip.amount });
+        
+        // Notify Admin via our Notification Service
+        sendAdminNotification(NotificationType.NEW_TRIP, {
+          bookingNumber,
+          customer: tripData.customerName,
+          phone: tripData.phone,
+          route: tripData.direction,
+          amount: newTrip.amount
+        });
+        
+        // Secondary background notify via API
+        fetch('/api/notify-booking', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...newTrip, companyName: siteSettings.companyName })
+        }).catch(e => console.error('Background Notify error:', e));
+
+        // Show success modal and auto-redirect
+        setLastBookingInfo({ ...newTrip, notes: whatsappUrl }); 
+        setIsBookingSuccessOpen(true);
+        
+        setTimeout(() => {
+          window.open(whatsappUrl, '_blank');
+        }, 1500);
+        
+        confetti({
+          particleCount: 150,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: [siteSettings.primaryColor || '#D4AF37', '#ffffff', '#B8860B']
+        });
+
+      } catch (saveError) {
+        console.error('Error during database save, but redirecting to WhatsApp anyway:', saveError);
+        // Even if DB fails, fulfill user intent by going to WhatsApp
+        setLastBookingInfo({ id: 'fallback', ...tripData, notes: whatsappUrl } as Trip);
+        setIsBookingSuccessOpen(true);
+        setTimeout(() => {
+          window.open(whatsappUrl, '_blank');
+        }, 1000);
+      }
 
       const resetForm = () => {
         setBookingData({

@@ -78,10 +78,16 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
-    // Counters - Restrict direct write
+    // Counters - Allow users to increment for booking numbers
     match /counters/{counterId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if true;
+    }
+
+    // Admin Notifications
+    match /admin_notifications/{notificationId} {
+      allow create: if true;
+      allow read, write: if isAdmin();
     }
 
     // Drivers collection
