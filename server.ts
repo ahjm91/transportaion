@@ -144,6 +144,61 @@ async function startServer() {
     }
   });
 
+  // Create Trip API (used by frontend)
+  app.post("/api/trips", async (req, res) => {
+    if (!db) return res.status(500).send("Database not initialized");
+    try {
+      const tripData = {
+        ...req.body,
+        serverTimestamp: admin.firestore.FieldValue.serverTimestamp()
+      };
+      const docRef = await db.collection("trips").add(tripData);
+      res.json({ success: true, id: docRef.id });
+    } catch (error: any) {
+      console.error("Error creating trip:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Create Realtime Booking API
+  app.post("/api/create-booking", async (req, res) => {
+    if (!db) return res.status(500).send("Database not initialized");
+    try {
+      const bookingData = {
+        ...req.body,
+        status: 'searching_driver',
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+      const docRef = await db.collection("bookings").add(bookingData);
+      res.json({ success: true, bookingId: docRef.id });
+    } catch (error: any) {
+      console.error("Error creating booking:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // Notification API
+  app.post("/api/notify-booking", async (req, res) => {
+    // This would typically send an email or SMS
+    // For now, we'll just log it as the frontend handles WhatsApp
+    console.log("Notification requested for booking:", req.body.bookingNumber);
+    res.json({ success: true });
+  });
+
+  // Create Checkout API
+  app.post("/api/create-checkout", async (req, res) => {
+    const { tripId, amount, gateway } = req.body;
+    console.log(`Checkout requested for trip ${tripId} via ${gateway} for amount ${amount}`);
+    
+    // In a real app, you'd integrate with MyFatoorah/Tap SDKs here
+    // For now, we'll redirect back with a success param as a fallback demo
+    // or provide the WhatsApp URL if that's the config
+    res.json({ 
+      success: true, 
+      url: `/?pay_success=${tripId}` // Mock success redirection
+    });
+  });
+
   // =====================
   // Vite Middleware
   // =====================

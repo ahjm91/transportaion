@@ -174,6 +174,19 @@ export const Navigation = ({
               <a href="#specialized-services" onClick={() => setIsMenuOpen(false)}>{t('specializedServices')}</a>
               <a href="#about" onClick={() => setIsMenuOpen(false)}>{t('whyUs')}</a>
               
+              {isAdmin && (
+                <button 
+                  onClick={() => {
+                    setIsDashboardOpen(true);
+                    setIsMenuOpen(false);
+                  }}
+                  className="text-right font-bold text-gold flex items-center gap-2"
+                >
+                  <Settings className="w-5 h-5" />
+                  {t('dashboard')}
+                </button>
+              )}
+
               {isDriver && (
                 <button 
                   onClick={() => {

@@ -286,6 +286,7 @@ function App() {
     }
   }, [siteSettings.companyName, siteSettings.companyName_en, siteSettings.siteTitle, siteSettings.siteTitle_en, lang]);
 
+
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isBookingSuccessOpen, setIsBookingSuccessOpen] = useState(false);
   const [lastBookingInfo, setLastBookingInfo] = useState<Trip | null>(null);
@@ -313,6 +314,16 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isEmailVerified, setIsEmailVerified] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('admin') === 'true' && isAdmin) {
+      setIsDashboardOpen(true);
+    }
+    if (params.get('customer') === 'true' && user && !isAdmin) {
+      setIsCustomerDashboardOpen(true);
+    }
+  }, [isAdmin, user]);
 
   const safeUpdateDoc = async (docRef: any, data: any) => {
     try {
@@ -600,13 +611,13 @@ function App() {
         
         // Recalculate admin status based on profile role or email
         const primaryAdmin = 'ahjm91@gmail.com';
-        const isEmailMatch = user.email === primaryAdmin || (siteSettings.adminEmails?.includes(user.email || ''));
-        const isUserAdmin = (isEmailMatch && (user.emailVerified === true || user.email === primaryAdmin)) || profile.role === 'admin';
+        const isEmailMatch = user.email?.toLowerCase() === primaryAdmin.toLowerCase() || (siteSettings.adminEmails?.map(e => e.toLowerCase()).includes(user.email?.toLowerCase() || ''));
+        const isUserAdmin = (isEmailMatch) || profile.role === 'admin';
         setIsAdmin(isUserAdmin);
       } else {
         const primaryAdmin = 'ahjm91@gmail.com';
-        const isEmailMatch = user.email === primaryAdmin || (siteSettings.adminEmails?.includes(user.email || ''));
-        const isUserAdmin = (isEmailMatch && (user.emailVerified === true || user.email === primaryAdmin));
+        const isEmailMatch = user.email?.toLowerCase() === primaryAdmin.toLowerCase() || (siteSettings.adminEmails?.map(e => e.toLowerCase()).includes(user.email?.toLowerCase() || ''));
+        const isUserAdmin = (isEmailMatch);
 
         try {
           await runTransaction(db, async (transaction) => {
@@ -1111,9 +1122,16 @@ function App() {
       const finalWhatsapp = cleanWhatsapp.length === 8 ? `973${cleanWhatsapp}` : (cleanWhatsapp || '97332325997');
       const whatsappUrl = `https://wa.me/${finalWhatsapp}?text=${encodeURIComponent(adminMessage)}`;
 
-      // Show success modal instead of direct redirect
+      // Show success modal and auto-redirect after a short delay
       setLastBookingInfo({ ...newTrip, notes: whatsappUrl }); 
       setIsBookingSuccessOpen(true);
+      
+      // Auto-redirect to WhatsApp after 1.5 seconds so they see the success message
+      setTimeout(() => {
+        if (setIsBookingSuccessOpen) { // Check if still open/component mounted
+          window.open(whatsappUrl, '_blank');
+        }
+      }, 1500);
       
       // Celebration!
       confetti({
@@ -1726,6 +1744,7 @@ function App() {
                     key="specialized"
                     lang={lang}
                     specializedServices={specializedServices}
+                    siteSettings={siteSettings}
                     t={t}
                   />
                 );

@@ -45,6 +45,10 @@ export const AuthModal = ({ isOpen, onClose, lang, siteSettings }: AuthModalProp
         setError(lang === 'ar' 
           ? 'تسجيل الدخول عبر Google غير مفعل في إعدادات Firebase. يرجى تفعيله من لوحة التحكم.' 
           : 'Google Sign-in is not enabled in Firebase Console.');
+      } else if (err.code === 'auth/email-already-in-use') {
+        setError(lang === 'ar' 
+          ? 'هذا البريد الإلكتروني مسجل بالفعل. يرجى تسجيل الدخول بدلاً من ذلك.' 
+          : 'This email is already in use. Please sign in instead.');
       } else {
         setError(err.message);
       }
@@ -87,6 +91,10 @@ export const AuthModal = ({ isOpen, onClose, lang, siteSettings }: AuthModalProp
         setError(lang === 'ar' 
           ? 'خيار التسجيل عبر البريد الإلكتروني غير مفعل في Firebase. يرجى تفعيله من "Sign-in method" في لوحة تحكم Firebase.' 
           : 'Email/Password auth is not enabled in Firebase Console.');
+      } else if (err.code === 'auth/email-already-in-use') {
+        setError(lang === 'ar' 
+          ? 'هذا البريد الإلكتروني مسجل بالفعل. يرجى تسجيل الدخول بدلاً من ذلك.' 
+          : 'This email is already in use. Please sign in instead.');
       } else {
         setError(err.message);
       }

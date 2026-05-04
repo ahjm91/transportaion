@@ -96,7 +96,10 @@ export const PaymentModal = ({
         }
       } else {
         // Fallback to WhatsApp if no card gateway or WhatsApp selected
-        const adminWhatsapp = siteSettings.notificationWhatsapp || siteSettings.whatsapp || '97332325997';
+        const rawWhatsapp = siteSettings.notificationWhatsapp || siteSettings.whatsapp || '97332325997';
+        const cleanWhatsapp = rawWhatsapp.replace(/\D/g, '').replace(/^0+/, ''); 
+        const finalWhatsapp = cleanWhatsapp.length === 8 ? `973${cleanWhatsapp}` : (cleanWhatsapp || '97332325997');
+
         const message = lang === 'ar' 
           ? `👋 *طلب دفع رحلة*\n\n` +
             `👤 العميل: ${paymentTrip.customerName}\n` +
@@ -113,7 +116,7 @@ export const PaymentModal = ({
             `🆔 Booking ID: ${paymentTrip.id.slice(-6).toUpperCase()}\n\n` +
             `I would like to confirm the payment for this trip.`;
         
-        window.open(`https://wa.me/${adminWhatsapp}?text=${encodeURIComponent(message)}`, '_blank');
+        window.open(`https://wa.me/${finalWhatsapp}?text=${encodeURIComponent(message)}`, '_blank');
       }
     } catch (err: any) {
       console.error(err);
