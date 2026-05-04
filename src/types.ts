@@ -181,6 +181,24 @@ export interface Driver {
   rating?: number;
 }
 
+export interface Report {
+  id: string;
+  type: 'daily' | 'weekly' | 'monthly';
+  startDate: string;
+  endDate: string;
+  totalIncome: number;
+  totalExpenses: number;
+  netProfit: number;
+  totalOrders: number;
+  completedOrders: number;
+  pendingOrders: number;
+  newOrders: number;
+  acceptedOrders: number;
+  modifiedOrders: number;
+  createdAt: string;
+  createdBy: string;
+}
+
 export interface Booking {
   id: string;
   customerName: string;

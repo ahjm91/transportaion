@@ -3,7 +3,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Layout, Box, Globe, DollarSign, Users, PieChart, Star, 
-  Settings, LogOut, Search, Bell, Menu, Shield, Loader2, Gift, Car
+  Settings, LogOut, Search, Bell, Menu, Shield, Loader2, Gift, Car, BarChart3
 } from 'lucide-react';
 import { Trip, SiteSettings, Service, SpecializedService, UserProfile, FixedRoute, Booking, Driver } from '../../types';
 import { AccountingTab } from './AccountingTab';
@@ -14,6 +14,7 @@ import { UsersTab } from './UsersTab';
 import { DriversTab } from './DriversTab';
 import { PayoutsTab } from './PayoutsTab';
 import { PromoCodesTab } from './PromoCodesTab';
+import { ReportsTab } from './ReportsTab';
 import { cn } from '../../lib/utils';
 
 interface AdminDashboardProps {
@@ -60,6 +61,7 @@ export const AdminDashboard = ({
 
   const menuItems = [
     { id: 'accounting', name: lang === 'ar' ? 'المحاسبة والرحلات' : 'Accounting & Trips', icon: PieChart },
+    { id: 'reports', name: lang === 'ar' ? 'التقارير والإغلاق' : 'Reports & Closure', icon: BarChart3 },
     { id: 'payouts', name: lang === 'ar' ? 'طلبات السحب' : 'Payout Requests', icon: DollarSign },
     { id: 'promos', name: lang === 'ar' ? 'أكواد الخصم' : 'Promo Codes', icon: Gift },
     { id: 'content', name: lang === 'ar' ? 'إدارة المحتوى' : 'Content Management', icon: Layout },
@@ -209,6 +211,10 @@ export const AdminDashboard = ({
 
               {activeTab === 'payouts' && (
                 <PayoutsTab lang={lang} />
+              )}
+
+              {activeTab === 'reports' && (
+                <ReportsTab lang={lang} />
               )}
 
               {activeTab === 'promos' && (

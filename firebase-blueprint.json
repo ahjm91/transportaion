@@ -184,6 +184,25 @@
         "expiresAt": { "type": "number" }
       },
       "required": ["driverId", "bookingId", "status", "expiresAt"]
+    },
+    "Report": {
+      "title": "Closing Report",
+      "description": "Financial and operational closure report",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["daily", "weekly", "monthly"] },
+        "startDate": { "type": "string", "format": "date-time" },
+        "endDate": { "type": "string", "format": "date-time" },
+        "totalIncome": { "type": "number" },
+        "totalExpenses": { "type": "number" },
+        "netProfit": { "type": "number" },
+        "totalOrders": { "type": "number" },
+        "completedOrders": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["type", "startDate", "endDate", "totalIncome", "createdAt", "createdBy"]
     }
   },
   "firestore": {
@@ -226,6 +245,10 @@
     "/ratings/{ratingId}": {
       "schema": "Rating",
       "description": "Driver ratings collection"
+    },
+    "/reports/{reportId}": {
+      "schema": "Report",
+      "description": "Daily/Weekly/Monthly financial reports"
     }
   }
 }
