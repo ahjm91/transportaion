@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { canTransition } from "../utils/orderRules";
+import { processTripPayment } from "./walletService";
 
 // Firebase might need to be imported differently if it's in a separate file
 // For now, I'll use the one from App.tsx as it's common in this template
@@ -64,6 +65,17 @@ export const startTrip = (orderId: string) => {
   return updateOrderStatus(orderId, "in_progress");
 };
 
-export const completeTrip = (orderId: string) => {
-  return updateOrderStatus(orderId, "completed");
+export const completeTrip = async (orderId: string) => {
+  const ref = doc(db, "bookings", orderId);
+  const snap = await getDoc(ref);
+  const data = snap.data();
+  
+  if (!data) throw new Error("Order not found");
+
+  await updateOrderStatus(orderId, "completed");
+
+  // If there's an assigned driver and a defined amount, process the payment
+  if (data.driverId && data.amount > 0) {
+    await processTripPayment(orderId, data.driverId, data.amount);
+  }
 };

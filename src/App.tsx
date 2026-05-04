@@ -643,7 +643,13 @@ function App() {
               verificationMessage: 'جاري مراجعة طلب اشتراكك من قبل الإدارة لتفعيل العضوية.',
               cashbackBalance: 0,
               availableRewards: [],
-              referralCode: Math.random().toString(36).substring(2, 8).toUpperCase()
+              referralCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
+              wallet: {
+                balance: 0,
+                totalEarnings: 0,
+                pendingPayouts: 0,
+                lastUpdate: new Date().toISOString()
+              }
             };
 
             transaction.set(userRef, newProfile);

@@ -208,6 +208,25 @@ const DriverDashboard: React.FC = () => {
     });
   };
 
+  const handlePayoutSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!driver || !payoutAmount) return;
+    
+    try {
+      const amount = parseFloat(payoutAmount);
+      if (isNaN(amount) || amount <= 0) throw new Error("مبلغ غير صالح");
+      
+      const { requestPayout } = await import('../services/walletService');
+      await requestPayout(driver.id, amount);
+      
+      setIsPayoutModalOpen(false);
+      setPayoutAmount('');
+      alert("تم إرسال طلب السحب بنجاح");
+    } catch (err: any) {
+      alert(err.message || "فشل طلب السحب");
+    }
+  };
+
   const toggleStatus = async () => {
     if (!driver) return;
     const newStatus = driver.status === 'online' ? 'offline' : 'online';
@@ -260,13 +279,13 @@ const DriverDashboard: React.FC = () => {
                 <p className="font-black text-sm text-dark">{driver.rating || '5.0'}</p>
              </div>
           </div>
-          <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-3 group relative cursor-pointer pt-6" onClick={() => setIsPayoutModalOpen(true)}>
+          <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-3 group relative cursor-pointer pt-6" onClick={() => setActiveTab('wallet')}>
              <div className="absolute -top-1 right-2 px-2 py-0.5 bg-green-500 text-white text-[8px] font-black rounded-full">سحب رصيد</div>
              <div className="flex items-center gap-3">
                 <Wallet className="w-5 h-5 text-green-500" />
                 <div className="text-right">
                   <p className="text-[10px] text-gray-400 font-bold leading-none uppercase">المحفظة</p>
-                  <p className="font-black text-sm text-dark">{driver.wallet || 0} BHD</p>
+                  <p className="font-black text-sm text-dark">{(driver.wallet as any)?.balance || 0} BHD</p>
                 </div>
              </div>
           </div>
@@ -646,18 +665,23 @@ const DriverDashboard: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'wallet' && (
+         {activeTab === 'wallet' && (
           <div className="space-y-6">
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
                   <Wallet className="w-8 h-8 text-green-500 mb-4" />
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">الرصيد الحالي</p>
-                  <h3 className="text-3xl font-black text-dark">{driver.wallet || 0} <span className="text-xs text-gray-400">BHD</span></h3>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">الرصيد المتاح</p>
+                  <h3 className="text-3xl font-black text-dark">{(driver.wallet as any)?.balance || 0} <span className="text-xs text-gray-400">BHD</span></h3>
                </div>
                <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-                  <Star className="w-8 h-8 text-gold mb-4" />
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">إجمالي التقييم</p>
-                  <h3 className="text-3xl font-black text-dark">{driver.rating || '5.0'} <span className="text-xs text-gray-400">STAR</span></h3>
+                  <DollarSign className="w-8 h-8 text-gold mb-4" />
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">إجمالي الأرباح</p>
+                  <h3 className="text-3xl font-black text-dark">{(driver.wallet as any)?.totalEarnings || 0} <span className="text-xs text-gray-400">BHD</span></h3>
+               </div>
+               <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+                  <Clock className="w-8 h-8 text-blue-500 mb-4" />
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">قيد السحب</p>
+                  <h3 className="text-3xl font-black text-dark">{(driver.wallet as any)?.pendingPayouts || 0} <span className="text-xs text-gray-400">BHD</span></h3>
                </div>
                <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col justify-center">
                   <button 
@@ -703,6 +727,62 @@ const DriverDashboard: React.FC = () => {
           </div>
         )}
       </div>
+
+      <AnimatePresence>
+        {isPayoutModalOpen && (
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsPayoutModalOpen(false)}
+              className="absolute inset-0 bg-dark/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl"
+            >
+              <h3 className="text-2xl font-black text-dark mb-2">طلب سحب رصيد</h3>
+              <p className="text-gray-400 text-sm font-bold mb-8">سيتم تحويل المبلغ إلى وسيلة الدفع المسجلة لديك خلال 24 ساعة.</p>
+              
+              <form onSubmit={handlePayoutSubmit} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">المبلغ المراد سحبه (BHD)</label>
+                  <input 
+                    type="number"
+                    step="0.1"
+                    required
+                    max={(driver.wallet as any)?.balance || 0}
+                    className="w-full bg-gray-50 border-gray-100 rounded-2xl py-4 px-6 text-xl font-black focus:ring-2 focus:ring-gold/20"
+                    placeholder="0.0"
+                    value={payoutAmount}
+                    onChange={(e) => setPayoutAmount(e.target.value)}
+                  />
+                  <p className="text-[10px] font-bold text-gray-400">الرصيد المتاح: {(driver.wallet as any)?.balance || 0} BHD</p>
+                </div>
+
+                <div className="flex gap-4">
+                  <button 
+                    type="button"
+                    onClick={() => setIsPayoutModalOpen(false)}
+                    className="flex-1 py-4 bg-gray-100 text-gray-400 rounded-2xl font-black transition-all"
+                  >
+                    إلغاء
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 py-4 bg-dark text-white rounded-2xl font-black hover:bg-gold hover:text-dark transition-all shadow-xl shadow-dark/10"
+                  >
+                    تأكيد الطلب
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

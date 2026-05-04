@@ -81,10 +81,64 @@
         "email": { "type": "string" },
         "phone": { "type": "string" },
         "photoURL": { "type": "string" },
-        "role": { "type": "string", "enum": ["admin", "customer"] },
+        "role": { "type": "string", "enum": ["admin", "customer", "driver"] },
+        "wallet": {
+          "type": "object",
+          "properties": {
+            "balance": { "type": "number" },
+            "totalEarnings": { "type": "number" },
+            "pendingPayouts": { "type": "number" }
+          }
+        },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "email", "role"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "A financial transaction for a driver",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["earning", "payout", "adjustment"] },
+        "amount": { "type": "number" },
+        "commission": { "type": "number" },
+        "orderId": { "type": "string" },
+        "driverId": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["completed", "pending", "failed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "amount", "driverId", "status"]
+    },
+    "PayoutRequest": {
+      "title": "Payout Request",
+      "description": "A request by a driver to withdraw funds",
+      "type": "object",
+      "properties": {
+        "driverId": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "completed", "rejected"] },
+        "bankDetails": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["driverId", "amount", "status"]
+    },
+    "AuditLog": {
+      "title": "Audit Log",
+      "description": "Records of sensitive actions in the system",
+      "type": "object",
+      "properties": {
+        "action": { "type": "string" },
+        "entityId": { "type": "string" },
+        "entityType": { "type": "string", "enum": ["order", "wallet", "user", "driver"] },
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "by": { "type": "string" },
+        "byName": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["action", "entityId", "entityType", "by"]
     },
     "FixedRoute": {
       "title": "Fixed Route",
@@ -114,6 +168,14 @@
         "totalRating": { "type": "number" },
         "ratingCount": { "type": "number" },
         "averageRating": { "type": "number" },
+        "wallet": {
+          "type": "object",
+          "properties": {
+            "balance": { "type": "number" },
+            "totalEarnings": { "type": "number" },
+            "pendingPayouts": { "type": "number" }
+          }
+        },
         "location": {
           "type": "object",
           "properties": {
@@ -246,9 +308,21 @@
       "schema": "Rating",
       "description": "Driver ratings collection"
     },
+    "/transactions/{id}": {
+      "schema": "Transaction",
+      "description": "Financial records for drivers"
+    },
+    "/payout_requests/{id}": {
+      "schema": "PayoutRequest",
+      "description": "Withdrawal requests from drivers"
+    },
     "/reports/{reportId}": {
       "schema": "Report",
       "description": "Daily/Weekly/Monthly financial reports"
+    },
+    "/audit_logs/{logId}": {
+      "schema": "AuditLog",
+      "description": "System-wide activity logs"
     }
   }
 }

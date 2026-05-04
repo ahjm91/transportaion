@@ -120,6 +120,13 @@ export interface SiteSettings {
   bookingButtonText_en?: string;
 }
 
+export interface Wallet {
+  balance: number;
+  totalEarnings: number;
+  pendingPayouts: number;
+  lastUpdate?: any;
+}
+
 export interface UserProfile {
   uid: string;
   name: string;
@@ -135,7 +142,7 @@ export interface UserProfile {
   cashbackBalance: number;
   availableRewards: string[]; 
   driverApplicationStatus?: 'pending' | 'approved' | 'rejected';
-  wallet?: number;
+  wallet?: Wallet;
   referralCode?: string;
   referredBy?: string;
   carImage?: string;
@@ -176,7 +183,7 @@ export interface Driver {
   totalRating?: number;
   ratingCount?: number;
   averageRating?: number;
-  wallet?: number;
+  wallet?: Wallet;
   carImage?: string;
   rating?: number;
   profileImage?: string;
