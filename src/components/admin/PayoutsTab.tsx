@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { collection, onSnapshot, doc, updateDoc, increment } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, increment, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { PayoutRequest } from '../../types';
 import { Check, X, Clock, Wallet, ArrowUpRight } from 'lucide-react';
@@ -22,8 +22,19 @@ export const PayoutsTab = ({ lang }: { lang: 'ar' | 'en' }) => {
       await updateDoc(doc(db, 'payout_requests', req.id), { status: newStatus });
       
       if (newStatus === 'completed') {
-        const driverRef = doc(db, 'drivers', req.driverId);
-        await updateDoc(driverRef, { wallet: increment(-req.amount) });
+        const driverProfileRef = doc(db, 'users', req.driverId);
+        const driverActiveRef = doc(db, 'drivers', req.driverId);
+        
+        const update = {
+          "wallet.pendingPayouts": increment(-req.amount),
+          "wallet.lastUpdate": serverTimestamp()
+        };
+
+        await updateDoc(driverProfileRef, update);
+        const activeSnap = await getDoc(driverActiveRef);
+        if (activeSnap.exists()) {
+          await updateDoc(driverActiveRef, update);
+        }
       }
       
       alert(newStatus === 'completed' 

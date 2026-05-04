@@ -12,9 +12,10 @@ interface UsersTabProps {
   isUsersLoading: boolean;
   safeUpdateDoc: (ref: any, data: any) => Promise<void>;
   lang: 'ar' | 'en';
+  isSuperAdmin?: boolean;
 }
 
-export const UsersTab = ({ users, allDrivers, isUsersLoading, safeUpdateDoc, lang }: UsersTabProps) => {
+export const UsersTab = ({ users, allDrivers, isUsersLoading, safeUpdateDoc, lang, isSuperAdmin }: UsersTabProps) => {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [viewingApp, setViewingApp] = React.useState<UserProfile | null>(null);
 
@@ -200,6 +201,26 @@ export const UsersTab = ({ users, allDrivers, isUsersLoading, safeUpdateDoc, lan
                               >
                                 <UserPlus className="w-3 h-3" />
                                 {lang === 'ar' ? 'تعيين كسائق' : 'Set as Driver'}
+                              </button>
+                            )}
+                            
+                            {isSuperAdmin && u.role !== 'admin' && (
+                              <button 
+                                onClick={async () => {
+                                  if (confirm(lang === 'ar' ? `تعيين ${u.name} كمدير للنظام؟` : `Promote ${u.name} to Admin?`)) {
+                                    try {
+                                      await safeUpdateDoc(doc(db, 'users', u.uid), { role: 'admin' });
+                                      alert(lang === 'ar' ? 'تم تعيين المدير بنجاح' : 'User promoted to Admin successfully');
+                                    } catch (err) {
+                                      console.error('Error promoting admin:', err);
+                                      alert(lang === 'ar' ? 'فشل الترقية' : 'Failed to promote');
+                                    }
+                                  }
+                                }}
+                                className="w-full flex items-center justify-center gap-1 p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-all text-[9px] font-black uppercase mt-1"
+                              >
+                                <ShieldCheck className="w-3 h-3" />
+                                {lang === 'ar' ? 'تعيين كمدير' : 'Set as Admin'}
                               </button>
                             )}
                           </div>

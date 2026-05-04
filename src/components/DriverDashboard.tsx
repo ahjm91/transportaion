@@ -34,6 +34,7 @@ const DriverDashboard: React.FC = () => {
   const [requests, setRequests] = useState<DriverRequest[]>([]);
   const [activeBooking, setActiveBooking] = useState<Booking | null>(null);
   const [payouts, setPayouts] = useState<PayoutRequest[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [isPayoutModalOpen, setIsPayoutModalOpen] = useState(false);
   const [payoutAmount, setPayoutAmount] = useState('');
   const [bankDetails, setBankDetails] = useState('');
@@ -75,10 +76,22 @@ const DriverDashboard: React.FC = () => {
       setPayouts(data);
     });
 
+    // Load Transactions
+    const qTransactions = query(
+      collection(db, 'transactions'),
+      where('driverId', '==', user.uid),
+      limit(20)
+    );
+    const unsubTransactions = onSnapshot(qTransactions, (snapshot) => {
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setTransactions(data.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
+    });
+
     return () => {
       unsubDriver();
       unsubRequests();
       unsubPayouts();
+      unsubTransactions();
     };
   }, [user]);
 

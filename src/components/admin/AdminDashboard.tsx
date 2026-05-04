@@ -15,6 +15,8 @@ import { DriversTab } from './DriversTab';
 import { PayoutsTab } from './PayoutsTab';
 import { PromoCodesTab } from './PromoCodesTab';
 import { ReportsTab } from './ReportsTab';
+import { AuditLogsTab } from './AuditLogsTab';
+import { FileText } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 interface AdminDashboardProps {
@@ -68,6 +70,7 @@ export const AdminDashboard = ({
     { id: 'pricing', name: lang === 'ar' ? 'التسعير والربط' : 'Pricing & Routes', icon: Settings },
     { id: 'drivers', name: lang === 'ar' ? 'إدارة السائقين' : 'Driver Management', icon: Car },
     { id: 'users', name: lang === 'ar' ? 'إدارة المستخدمين' : 'User Management', icon: Users },
+    { id: 'audit', name: lang === 'ar' ? 'سجلات النظام' : 'Audit Logs', icon: FileText },
     { id: 'branding', name: lang === 'ar' ? 'الهوية البصرية' : 'Brand Identity', icon: Star },
   ];
 
@@ -266,7 +269,12 @@ export const AdminDashboard = ({
                   isUsersLoading={isUsersLoading}
                   safeUpdateDoc={safeUpdateDoc}
                   lang={lang}
+                  isSuperAdmin={isSuperAdmin}
                 />
+              )}
+
+              {activeTab === 'audit' && (
+                <AuditLogsTab lang={lang} />
               )}
 
               {activeTab === 'branding' && (

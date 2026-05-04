@@ -86,13 +86,16 @@ import { logAudit, AuditAction } from "./auditService";
 export const requestPayout = async (driverId: string, amount: number) => {
   const driverRef = doc(db, 'users', driverId);
   const snap = await getDoc(driverRef);
-  const balance = snap.data()?.wallet?.balance || 0;
+  const driverData = snap.data();
+  const balance = driverData?.wallet?.balance || 0;
+  const driverName = driverData?.name || 'Driver';
 
   if (amount > balance) throw new Error("الرصيد غير كافٍ");
 
   const walletUpdate = {
     "wallet.balance": increment(-amount),
-    "wallet.pendingPayouts": increment(amount)
+    "wallet.pendingPayouts": increment(amount),
+    "wallet.lastUpdate": serverTimestamp()
   };
 
   // خصم من الرصيد ونقل للمبالغ المعلقة
@@ -110,12 +113,13 @@ export const requestPayout = async (driverId: string, amount: number) => {
     entityId: driverId,
     entityType: 'wallet',
     to: amount,
-    metadata: { driverId, amount }
+    metadata: { driverId, amount, driverName }
   });
 
   // تسجيل طلب سحب
   return await addDoc(collection(db, 'payout_requests'), {
     driverId,
+    driverName,
     amount,
     status: 'pending',
     createdAt: serverTimestamp()

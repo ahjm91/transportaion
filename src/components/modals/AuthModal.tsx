@@ -87,16 +87,32 @@ export const AuthModal = ({ isOpen, onClose, lang, siteSettings }: AuthModalProp
       }
       onClose();
     } catch (err: any) {
-      if (err.code === 'auth/operation-not-allowed') {
+      console.error("Auth error:", err);
+      const errorCode = err.code || '';
+      
+      if (errorCode === 'auth/operation-not-allowed') {
         setError(lang === 'ar' 
           ? 'خيار التسجيل عبر البريد الإلكتروني غير مفعل في Firebase. يرجى تفعيله من "Sign-in method" في لوحة تحكم Firebase.' 
           : 'Email/Password auth is not enabled in Firebase Console.');
-      } else if (err.code === 'auth/email-already-in-use') {
+      } else if (errorCode === 'auth/email-already-in-use') {
         setError(lang === 'ar' 
-          ? 'هذا البريد الإلكتروني مسجل بالفعل. يرجى تسجيل الدخول بدلاً من ذلك.' 
-          : 'This email is already in use. Please sign in instead.');
+          ? 'هذا البريد الإلكتروني مسجل بالفعل. هل ترغب في تسجيل الدخول بدلاً من ذلك؟' 
+          : 'This email is already in use. Would you like to login instead?');
+        // Optionally suggest switching mode
+        setTimeout(() => {
+          if (window.confirm(lang === 'ar' ? 'هذا البريد مسجل بالفعل، هل تريد الانتقال لصفحة تسجيل الدخول؟' : 'Email exists. Switch to login?')) {
+            setMode('login');
+            setError(null);
+          }
+        }, 500);
+      } else if (errorCode === 'auth/weak-password') {
+        setError(lang === 'ar' ? 'كلمة المرور ضعيفة جداً.' : 'Password is too weak.');
+      } else if (errorCode === 'auth/invalid-email') {
+        setError(lang === 'ar' ? 'البريد الإلكتروني غير صالح.' : 'Invalid email format.');
+      } else if (errorCode === 'auth/user-not-found' || errorCode === 'auth/wrong-password') {
+        setError(lang === 'ar' ? 'البريد الإلكتروني أو كلمة المرور غير صحيحة.' : 'Incorrect email or password.');
       } else {
-        setError(err.message);
+        setError(err.message || String(err));
       }
     } finally {
       setIsLoading(false);
