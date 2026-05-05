@@ -103,10 +103,7 @@ export const OverviewTab = ({ trips, bookings, allDrivers, users, lang }: Overvi
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          drag
-          dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-          whileDrag={{ scale: 1.02, zIndex: 50 }}
-          className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 cursor-grab active:cursor-grabbing"
+          className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100"
         >
           <div className="flex items-center justify-between mb-8">
             <div>
@@ -161,10 +158,7 @@ export const OverviewTab = ({ trips, bookings, allDrivers, users, lang }: Overvi
           initial={{ opacity: 0, x: lang === 'ar' ? -20 : 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.5 }}
-          drag
-          dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-          whileDrag={{ scale: 1.05, zIndex: 50 }}
-          className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 flex flex-col h-full cursor-grab active:cursor-grabbing"
+          className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 flex flex-col h-full"
         >
            <div className="flex items-center gap-3 mb-8">
               <div className="w-10 h-10 bg-dark rounded-2xl flex items-center justify-center">
@@ -226,15 +220,12 @@ const StatWidget = ({ title, value, subValue, icon: Icon, color, bgColor, index 
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ delay: index * 0.1 }}
-    drag
-    dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-    whileDrag={{ scale: 1.1, zIndex: 50 }}
     whileHover={{ 
       y: -8, 
       scale: 1.02,
       boxShadow: "0 20px 40px rgba(0,0,0,0.05)" 
     }}
-    className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm transition-all duration-300 group cursor-grab active:cursor-grabbing"
+    className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm transition-all duration-300 group cursor-default"
   >
     <div className="flex items-start justify-between mb-4">
       <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/5 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300", bgColor)}>

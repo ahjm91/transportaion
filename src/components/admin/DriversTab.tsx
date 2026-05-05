@@ -347,8 +347,8 @@ export const DriversTab = ({ allDrivers, users, safeUpdateDoc, lang }: DriversTa
               <p className="text-gray-400 text-sm">{lang === 'ar' ? 'تمت معالجة جميع طلبات التسجيل السابقة.' : 'All registration requests have been processed.'}</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-right" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-right min-w-[900px]" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
                 <thead className="bg-gray-50 text-[10px] font-black text-gray-400 uppercase tracking-widest">
                   <tr>
                     <th className="p-6">{lang === 'ar' ? 'السائق' : 'Driver'}</th>

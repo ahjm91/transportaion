@@ -171,10 +171,7 @@ export const AdminDashboard = ({
           {/* Sidebar Header */}
           <div className={cn("p-8 pb-4 transition-all duration-300", isSidebarCollapsed && "p-4 text-center")}>
              <motion.div 
-               drag
-               dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-               whileDrag={{ scale: 1.1, zIndex: 50 }}
-               className={cn("flex items-center gap-3 mb-8 cursor-grab active:cursor-grabbing transition-all", isSidebarCollapsed && "justify-center")}
+               className={cn("flex items-center gap-3 mb-8 transition-all", isSidebarCollapsed && "justify-center")}
              >
                 <div className="w-12 h-12 bg-dark rounded-2xl flex items-center justify-center shadow-lg shadow-dark/20 shrink-0">
                   <Box className="w-7 h-7 text-gold" />
@@ -195,10 +192,7 @@ export const AdminDashboard = ({
                <motion.div 
                  initial={{ opacity: 0, y: 10 }}
                  animate={{ opacity: 1, y: 0 }}
-                 drag
-                 dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-                 whileDrag={{ scale: 1.05, zIndex: 50 }}
-                 className="mb-6 cursor-grab active:cursor-grabbing"
+                 className="mb-6"
                >
                  <div className="relative group">
                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -220,6 +214,20 @@ export const AdminDashboard = ({
                      </button>
                    )}
                  </div>
+
+                 <div className="grid grid-cols-2 gap-2 mt-4">
+                    <div className="bg-gray-50/50 p-2.5 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center">
+                      <span className="text-[7px] font-black text-blue-400 uppercase tracking-tighter mb-0.5 line-clamp-1">{lang === 'ar' ? 'إجمالي الرحلات' : 'Total Trips'}</span>
+                      <span className="text-xs font-black text-dark leading-none">{trips.length + (bookings?.filter(b => b.status === 'completed').length || 0)}</span>
+                    </div>
+                    <div className="bg-gray-50/50 p-2.5 rounded-2xl border border-gray-100 shadow-sm flex flex-col items-center justify-center">
+                      <span className="text-[7px] font-black text-green-400 uppercase tracking-tighter mb-0.5 line-clamp-1">{lang === 'ar' ? 'سائقين متصلين' : 'Online Drivers'}</span>
+                      <div className="flex items-center gap-1">
+                        <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                        <span className="text-xs font-black text-dark leading-none">{allDrivers?.filter(d => d.status === 'online').length || 0}</span>
+                      </div>
+                    </div>
+                  </div>
                </motion.div>
              )}
           </div>
@@ -231,9 +239,6 @@ export const AdminDashboard = ({
                 initial={{ opacity: 0, x: lang === 'ar' ? 20 : -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.05 }}
-                drag
-                dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-                whileDrag={{ scale: 1.1, zIndex: 50 }}
                 whileHover={{ scale: 1.02, x: lang === 'ar' ? -5 : 5 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => {
@@ -241,7 +246,7 @@ export const AdminDashboard = ({
                   if (isMobile) setIsMobileMenuOpen(false);
                 }}
                 className={cn(
-                  "w-full rounded-2xl text-xs font-black flex items-center gap-4 transition-all duration-150 group cursor-grab active:cursor-grabbing",
+                  "w-full rounded-2xl text-xs font-black flex items-center gap-4 transition-all duration-150 group",
                   activeTab === item.id 
                     ? "bg-gold text-white shadow-lg shadow-gold/20 py-4 px-5" 
                     : "text-gray-400 hover:text-dark hover:bg-gray-50 py-4 px-5",
@@ -344,11 +349,11 @@ export const AdminDashboard = ({
                      <X className="w-5 h-5 md:w-6 md:h-6" />
                    </button>
                 </div>
-             </div>
-          </div>
+              </div>
+            </div>
 
           {/* Tab Content */}
-          <div className="flex-1 overflow-y-auto p-12 no-scrollbar">
+          <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12 no-scrollbar">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTab}
@@ -356,7 +361,7 @@ export const AdminDashboard = ({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 1.01 }}
                 transition={{ duration: 0.1 }}
-                className="max-w-[1400px] mx-auto"
+                className="w-full max-w-[1600px] mx-auto"
               >
               {activeTab === 'overview' && (
                 <OverviewTab 
