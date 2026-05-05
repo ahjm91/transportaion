@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapPin, Calendar, Clock, Users, ShoppingBag, Car, Star, ShieldCheck, Loader2, ArrowRight, Tag } from 'lucide-react';
+import { MapPin, Calendar, Clock, Users, ShoppingBag, Car, Star, ShieldCheck, Loader2, ArrowRight, Tag, ChevronDown } from 'lucide-react';
 import { BookingData, SiteSettings, FixedRoute } from '../../types';
 import { translations } from '../../translations';
 import { cn } from '../../lib/utils';
@@ -158,30 +158,35 @@ export const BookingForm = ({
               {bookingMode === 'fixed' ? (
                 <div className="space-y-2">
                   <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{lang === 'ar' ? 'اختر الوجهة الثابتة' : 'Select Fixed Route'}</label>
-                  <select 
-                    className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold cursor-pointer"
-                    onChange={e => {
-                      const route = fixedRoutes.find(r => r.id === e.target.value);
-                      if (route) {
-                        setBookingData({ 
-                          ...bookingData, 
-                          pickup: route.pickup, 
-                          dropoff: route.dropoff,
-                          amount: route.price
-                        });
-                      }
-                    }}
-                  >
-                    <option value="">{lang === 'ar' ? '--- اختر المسار ---' : '--- Select Route ---'}</option>
-                    {fixedRoutes.map(route => (
-                      <option key={route.id} value={route.id}>
-                        {lang === 'ar' 
-                          ? `${route.pickup} ← ${route.dropoff} (${route.price} BHD)` 
-                          : `${route.pickup_en || route.pickup} ← ${route.dropoff_en || route.dropoff} (${route.price} BHD)`
+                  <div className="relative">
+                    <select 
+                      className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold cursor-pointer appearance-none pr-10"
+                      onChange={e => {
+                        const route = fixedRoutes.find(r => r.id === e.target.value);
+                        if (route) {
+                          setBookingData({ 
+                            ...bookingData, 
+                            pickup: route.pickup, 
+                            dropoff: route.dropoff,
+                            amount: route.price
+                          });
                         }
-                      </option>
-                    ))}
-                  </select>
+                      }}
+                    >
+                      <option value="">{lang === 'ar' ? '--- اختر المسار ---' : '--- Select Route ---'}</option>
+                      {fixedRoutes.map(route => (
+                        <option key={route.id} value={route.id}>
+                          {lang === 'ar' 
+                            ? `${route.pickup} ← ${route.dropoff} (${route.price} BHD)` 
+                            : `${route.pickup_en || route.pickup} ← ${route.dropoff_en || route.dropoff} (${route.price} BHD)`
+                          }
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                      <ChevronDown className="w-5 h-5" />
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="grid md:grid-cols-2 gap-6">

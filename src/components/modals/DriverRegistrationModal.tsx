@@ -33,7 +33,13 @@ export const DriverRegistrationModal = ({ isOpen, onClose, lang, siteSettings }:
     licenseExpiry: ''
   });
 
-  const [files, setFiles] = useState<{ profilePic?: File; licensePic?: File }>({});
+  const [files, setFiles] = useState<{ 
+    profilePic?: File; 
+    licensePic?: File;
+    idPic?: File;
+    carFrontPic?: File;
+    carBackPic?: File;
+  }>({});
 
   const t = (key: string) => translations[lang][key] || key;
 
@@ -56,6 +62,9 @@ export const DriverRegistrationModal = ({ isOpen, onClose, lang, siteSettings }:
     try {
       let profileUrl = '';
       let licenseUrl = '';
+      let idUrl = '';
+      let carFrontUrl = '';
+      let carBackUrl = '';
 
       if (files.profilePic) {
         profileUrl = await handleFileUpload(files.profilePic, `drivers/${auth.currentUser.uid}/profile_${Date.now()}`);
@@ -63,11 +72,23 @@ export const DriverRegistrationModal = ({ isOpen, onClose, lang, siteSettings }:
       if (files.licensePic) {
         licenseUrl = await handleFileUpload(files.licensePic, `drivers/${auth.currentUser.uid}/license_${Date.now()}`);
       }
+      if (files.idPic) {
+        idUrl = await handleFileUpload(files.idPic, `drivers/${auth.currentUser.uid}/id_${Date.now()}`);
+      }
+      if (files.carFrontPic) {
+        carFrontUrl = await handleFileUpload(files.carFrontPic, `drivers/${auth.currentUser.uid}/car_front_${Date.now()}`);
+      }
+      if (files.carBackPic) {
+        carBackUrl = await handleFileUpload(files.carBackPic, `drivers/${auth.currentUser.uid}/car_back_${Date.now()}`);
+      }
 
       const applicationData = {
         ...formData,
         profilePic: profileUrl,
         licensePic: licenseUrl,
+        idPic: idUrl,
+        carFrontPic: carFrontUrl,
+        carBackPic: carBackUrl,
         appliedAt: new Date().toISOString()
       };
 
@@ -313,6 +334,63 @@ export const DriverRegistrationModal = ({ isOpen, onClose, lang, siteSettings }:
                                  {lang === 'ar' ? 'رفع صورة الرخصة' : 'Upload License Photo'}
                                </div>
                                <input type="file" className="hidden" accept="image/*" onChange={e => e.target.files?.[0] && setFiles({...files, licensePic: e.target.files[0]})} />
+                             </label>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{lang === 'ar' ? 'صورة الهوية' : 'ID Photo'}</label>
+                          <div className="flex items-center gap-4">
+                             <div className="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-200">
+                                {files.idPic ? (
+                                  <img src={URL.createObjectURL(files.idPic)} className="w-full h-full object-cover" alt="ID" />
+                                ) : (
+                                  <FileText className="text-gray-300 w-8 h-8" />
+                                )}
+                             </div>
+                             <label className="flex-1">
+                               <div className="bg-white border-2 border-gold/30 text-gold px-6 py-4 rounded-2xl font-black text-xs uppercase cursor-pointer hover:bg-gold hover:text-white transition-all text-center">
+                                 {lang === 'ar' ? 'رفع صورة الهوية' : 'Upload ID Photo'}
+                               </div>
+                               <input type="file" className="hidden" accept="image/*" onChange={e => e.target.files?.[0] && setFiles({...files, idPic: e.target.files[0]})} />
+                             </label>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{lang === 'ar' ? 'صورة السيارة (أمام)' : 'Car Photo (Front)'}</label>
+                          <div className="flex items-center gap-4">
+                             <div className="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-200">
+                                {files.carFrontPic ? (
+                                  <img src={URL.createObjectURL(files.carFrontPic)} className="w-full h-full object-cover" alt="Car Front" />
+                                ) : (
+                                  <Camera className="text-gray-300 w-8 h-8" />
+                                )}
+                             </div>
+                             <label className="flex-1">
+                               <div className="bg-white border-2 border-gold/30 text-gold px-6 py-4 rounded-2xl font-black text-xs uppercase cursor-pointer hover:bg-gold hover:text-white transition-all text-center">
+                                 {lang === 'ar' ? 'رفع صورة السيارة (أمام)' : 'Upload Car Front'}
+                               </div>
+                               <input type="file" className="hidden" accept="image/*" onChange={e => e.target.files?.[0] && setFiles({...files, carFrontPic: e.target.files[0]})} />
+                             </label>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{lang === 'ar' ? 'صورة السيارة (خلف)' : 'Car Photo (Back)'}</label>
+                          <div className="flex items-center gap-4">
+                             <div className="w-20 h-20 bg-gray-100 rounded-2xl flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-200">
+                                {files.carBackPic ? (
+                                  <img src={URL.createObjectURL(files.carBackPic)} className="w-full h-full object-cover" alt="Car Back" />
+                                ) : (
+                                  <Camera className="text-gray-300 w-8 h-8" />
+                                )}
+                             </div>
+                             <label className="flex-1">
+                               <div className="bg-white border-2 border-gold/30 text-gold px-6 py-4 rounded-2xl font-black text-xs uppercase cursor-pointer hover:bg-gold hover:text-white transition-all text-center">
+                                 {lang === 'ar' ? 'رفع صورة السيارة (خلف)' : 'Upload Car Back'}
+                               </div>
+                               <input type="file" className="hidden" accept="image/*" onChange={e => e.target.files?.[0] && setFiles({...files, carBackPic: e.target.files[0]})} />
                              </label>
                           </div>
                         </div>

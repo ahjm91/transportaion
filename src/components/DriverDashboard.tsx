@@ -94,13 +94,29 @@ const DriverDashboard: React.FC = () => {
     }
   };
 
-  const handleDocUpload = async (field: string) => {
-    const url = prompt(lang === 'ar' ? "يرجى إدخال رابط الصورة للمستند" : "Please enter the document image URL");
-    if (url && driver) {
+  const [uploadingField, setUploadingField] = useState<string | null>(null);
+
+  const handleDocUpload = async (field: string, file: File) => {
+    if (!driver) return;
+    setUploadingField(field);
+    try {
+      const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
+      const { storage } = await import('../firebase');
+      const storageRef = ref(storage, `drivers/${driver.id}/${field}_${Date.now()}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      
       await updateDoc(doc(db, 'drivers', driver.id), {
         [field]: url,
-        isVerified: false
+        isVerified: false, // Reset verification if documents change
+        updatedAt: serverTimestamp()
       });
+      alert(lang === 'ar' ? "تم رفع المستند بنجاح" : "Document uploaded successfully");
+    } catch (err) {
+      console.error(err);
+      alert(lang === 'ar' ? "فشل رفع المستند" : "Upload failed");
+    } finally {
+      setUploadingField(null);
     }
   };
 
@@ -736,11 +752,18 @@ const DriverDashboard: React.FC = () => {
                         </label>
                         {driver.licenseImage && <span className="p-1 px-2 bg-green-50 text-green-500 rounded-lg text-[8px] font-black">UPLOADED</span>}
                       </div>
-                      <div 
-                        onClick={() => handleDocUpload('licenseImage')}
+                      <label 
                         className="aspect-video relative rounded-[2rem] bg-gray-50 border-4 border-dashed border-gray-100 flex flex-col items-center justify-center cursor-pointer group hover:bg-gold/5 hover:border-gold/20 transition-all overflow-hidden"
                       >
-                        {driver.licenseImage ? (
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          accept="image/*"
+                          onChange={e => e.target.files?.[0] && handleDocUpload('licenseImage', e.target.files[0])}
+                        />
+                        {uploadingField === 'licenseImage' ? (
+                          <Clock className="w-8 h-8 text-gold animate-spin" />
+                        ) : driver.licenseImage ? (
                           <>
                             <img src={driver.licenseImage} className="w-full h-full object-cover transition-all group-hover:scale-110" alt="License" />
                             <div className="absolute inset-0 bg-dark/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
@@ -753,7 +776,7 @@ const DriverDashboard: React.FC = () => {
                              <p className="text-[10px] font-black text-gray-300 uppercase">{lang === 'ar' ? 'اضغط للرفع' : 'Click to Upload'}</p>
                           </div>
                         )}
-                      </div>
+                      </label>
                     </div>
 
                     {/* ID Card */}
@@ -764,11 +787,18 @@ const DriverDashboard: React.FC = () => {
                         </label>
                         {driver.idCardImage && <span className="p-1 px-2 bg-blue-50 text-blue-500 rounded-lg text-[8px] font-black">UPLOADED</span>}
                       </div>
-                      <div 
-                        onClick={() => handleDocUpload('idCardImage')}
+                      <label 
                         className="aspect-video relative rounded-[2rem] bg-gray-50 border-4 border-dashed border-gray-100 flex flex-col items-center justify-center cursor-pointer group hover:bg-gold/5 hover:border-gold/20 transition-all overflow-hidden"
                       >
-                        {driver.idCardImage ? (
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          accept="image/*"
+                          onChange={e => e.target.files?.[0] && handleDocUpload('idCardImage', e.target.files[0])}
+                        />
+                        {uploadingField === 'idCardImage' ? (
+                          <Clock className="w-8 h-8 text-gold animate-spin" />
+                        ) : driver.idCardImage ? (
                           <>
                             <img src={driver.idCardImage} className="w-full h-full object-cover transition-all group-hover:scale-110" alt="ID" />
                             <div className="absolute inset-0 bg-dark/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
@@ -781,7 +811,7 @@ const DriverDashboard: React.FC = () => {
                              <p className="text-[10px] font-black text-gray-300 uppercase">{lang === 'ar' ? 'اضغط للرفع' : 'Click to Upload'}</p>
                           </div>
                         )}
-                      </div>
+                      </label>
                     </div>
 
                     {/* Car Exterior */}
@@ -792,11 +822,18 @@ const DriverDashboard: React.FC = () => {
                         </label>
                         {driver.carImage && <span className="p-1 px-2 bg-green-50 text-green-500 rounded-lg text-[8px] font-black">UPLOADED</span>}
                       </div>
-                      <div 
-                        onClick={() => handleDocUpload('carImage')}
+                      <label 
                         className="aspect-video relative rounded-[2rem] bg-gray-50 border-4 border-dashed border-gray-100 flex flex-col items-center justify-center cursor-pointer group hover:bg-gold/5 hover:border-gold/20 transition-all overflow-hidden"
                       >
-                        {driver.carImage ? (
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          accept="image/*"
+                          onChange={e => e.target.files?.[0] && handleDocUpload('carImage', e.target.files[0])}
+                        />
+                        {uploadingField === 'carImage' ? (
+                          <Clock className="w-8 h-8 text-gold animate-spin" />
+                        ) : driver.carImage ? (
                           <>
                             <img src={driver.carImage} className="w-full h-full object-cover transition-all group-hover:scale-110" alt="Car" />
                             <div className="absolute inset-0 bg-dark/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
@@ -809,7 +846,7 @@ const DriverDashboard: React.FC = () => {
                              <p className="text-[10px] font-black text-gray-300 uppercase">{lang === 'ar' ? 'اضغط للرفع' : 'Click to Upload'}</p>
                           </div>
                         )}
-                      </div>
+                      </label>
                     </div>
 
                     {/* Car Interior */}
@@ -819,11 +856,18 @@ const DriverDashboard: React.FC = () => {
                           <ImageIcon className="w-3 h-3 text-purple-500" /> {lang === 'ar' ? 'صورة السيارة (داخلي)' : 'Car Photo (Interior)'}
                         </label>
                       </div>
-                      <div 
-                        onClick={() => handleDocUpload('carInteriorImage')}
+                      <label 
                         className="aspect-video relative rounded-[2rem] bg-gray-50 border-4 border-dashed border-gray-100 flex flex-col items-center justify-center cursor-pointer group hover:bg-gold/5 hover:border-gold/20 transition-all overflow-hidden"
                       >
-                        {(driver as any).carInteriorImage ? (
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          accept="image/*"
+                          onChange={e => e.target.files?.[0] && handleDocUpload('carInteriorImage', e.target.files[0])}
+                        />
+                        {uploadingField === 'carInteriorImage' ? (
+                          <Clock className="w-8 h-8 text-gold animate-spin" />
+                        ) : (driver as any).carInteriorImage ? (
                           <>
                             <img src={(driver as any).carInteriorImage} className="w-full h-full object-cover transition-all group-hover:scale-110" alt="Interior" />
                             <div className="absolute inset-0 bg-dark/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
@@ -836,7 +880,7 @@ const DriverDashboard: React.FC = () => {
                              <p className="text-[10px] font-black text-gray-300 uppercase">{lang === 'ar' ? 'رفع (اختياري)' : 'Upload (Optional)'}</p>
                           </div>
                         )}
-                      </div>
+                      </label>
                     </div>
                   </div>
                 </div>
@@ -846,19 +890,35 @@ const DriverDashboard: React.FC = () => {
               <div className="space-y-6">
                 <div className="bg-white p-8 rounded-[3rem] shadow-xl border border-gray-100 flex flex-col items-center text-center">
                   <div className="relative group">
-                    <div className="w-32 h-32 rounded-[2.5rem] bg-gold/10 p-1 relative overflow-hidden ring-4 ring-gold/5 shadow-2xl">
-                       <img 
-                        src={driver.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${driver.id}`} 
-                        className="w-full h-full object-cover rounded-[2rem]"
-                        alt="Profile"
+                     <label className="w-32 h-32 rounded-[2.5rem] bg-gold/10 p-1 relative overflow-hidden ring-4 ring-gold/5 shadow-2xl cursor-pointer block">
+                       <input 
+                         type="file" 
+                         className="hidden" 
+                         accept="image/*"
+                         onChange={e => {
+                           const file = e.target.files?.[0];
+                           if (file) handleDocUpload('profileImage', file);
+                         }}
                        />
-                       <button 
-                        onClick={() => handleDocUpload('profileImage')}
-                        className="absolute inset-0 bg-dark/60 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"
-                       >
-                         <Camera className="w-8 h-8 text-white" />
-                       </button>
-                    </div>
+                       {uploadingField === 'profileImage' ? (
+                         <div className="w-full h-full flex items-center justify-center bg-dark/20">
+                           <Clock className="w-8 h-8 text-gold animate-spin" />
+                         </div>
+                       ) : (
+                         <>
+                           <img 
+                            src={driver.profileImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${driver.id}`} 
+                            className="w-full h-full object-cover rounded-[2rem]"
+                            alt="Profile"
+                           />
+                           <div 
+                            className="absolute inset-0 bg-dark/60 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"
+                           >
+                             <Camera className="w-8 h-8 text-white" />
+                           </div>
+                         </>
+                       )}
+                    </label>
                     {driver.isVerified && (
                       <div className="absolute -bottom-2 -right-2 bg-green-500 text-white p-1.5 rounded-xl border-4 border-white shadow-lg">
                         <CheckCircle2 className="w-4 h-4" />

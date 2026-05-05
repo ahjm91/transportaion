@@ -17,7 +17,7 @@ interface NavigationProps {
   setIsDriverDashboardOpen: (open: boolean) => void;
   setIsCustomerDashboardOpen: (open: boolean) => void;
   setIsPaymentOpen: (open: boolean) => void;
-  handleLogin: () => void;
+  handleLogin: (mode?: 'customer' | 'driver') => void;
   handleLogout: () => void;
   isMenuOpen: boolean;
   setIsMenuOpen: (open: boolean) => void;
@@ -117,12 +117,20 @@ export const Navigation = ({
                 </button>
               )}
               {!user ? (
-                <button 
-                  onClick={handleLogin}
-                  className="bg-dark text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition-all"
-                >
-                  {t('login')}
-                </button>
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={() => handleLogin('driver')}
+                    className="text-xs font-bold text-gray-400 hover:text-gold transition-colors"
+                  >
+                    {lang === 'ar' ? 'سائق' : 'Driver'}
+                  </button>
+                  <button 
+                    onClick={() => handleLogin('customer')}
+                    className="bg-dark text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition-all shadow-lg shadow-dark/10"
+                  >
+                    {t('login')}
+                  </button>
+                </div>
               ) : (
                 <button 
                   onClick={handleLogout}

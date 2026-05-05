@@ -113,6 +113,7 @@ export const UsersTab = ({ users, allDrivers, isUsersLoading, safeUpdateDoc, lan
               <thead>
                 <tr className={cn("bg-gray-50 text-[10px] font-black text-gray-400 uppercase tracking-widest", lang === 'ar' ? "text-right" : "text-left")}>
                   <th className="p-5 border-b">{lang === 'ar' ? 'المستخدم' : 'User'}</th>
+                  <th className="p-5 border-b">{lang === 'ar' ? 'كود الإحالة' : 'Referral Code'}</th>
                   <th className="p-5 border-b">{lang === 'ar' ? 'العضوية' : 'Membership'}</th>
                   <th className="p-5 border-b">{lang === 'ar' ? 'المحفظة (Wallet)' : 'Wallet balance'}</th>
                   <th className="p-5 border-b">{lang === 'ar' ? 'التفعيل' : 'Status'}</th>
@@ -159,6 +160,21 @@ export const UsersTab = ({ users, allDrivers, isUsersLoading, safeUpdateDoc, lan
                                 )}
                               </div>
                             </div>
+                          </div>
+                        </td>
+                        <td className="p-5">
+                          <div className="flex items-center gap-2">
+                             <div className="p-2 bg-gray-50 rounded-lg">
+                               <input 
+                                  type="text"
+                                  className="w-20 bg-transparent border-none text-center font-black text-gold focus:ring-0 p-0 uppercase tracking-widest"
+                                  value={u.referralCode || ''}
+                                  onChange={async e => {
+                                    const val = e.target.value.toUpperCase();
+                                    await safeUpdateDoc(doc(db, 'users', u.uid), { referralCode: val });
+                                  }}
+                               />
+                             </div>
                           </div>
                         </td>
                         <td className="p-5">

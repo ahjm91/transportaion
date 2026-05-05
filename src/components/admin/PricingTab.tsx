@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { DollarSign, CreditCard, Copy, Wallet, Trash2, Mail, CheckCircle, Smartphone } from 'lucide-react';
+import { DollarSign, CreditCard, Copy, Wallet, Trash2, Mail, CheckCircle, Smartphone, Gift } from 'lucide-react';
 import { SiteSettings, FixedRoute, UserProfile } from '../../types';
 import { cn } from '../../lib/utils';
 import { doc, updateDoc, collection, addDoc, deleteDoc } from 'firebase/firestore';
@@ -83,6 +83,45 @@ export const PricingTab = ({
                 onChange={e => setSiteSettings({...siteSettings, commissionRate: parseFloat(e.target.value) || 0})}
               />
             </div>
+          </div>
+
+          {/* Referral System Toggle */}
+          <div className="p-6 bg-gold/5 rounded-[2rem] border border-gold/10 space-y-6">
+             <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                   <div className="w-10 h-10 bg-gold rounded-xl flex items-center justify-center text-white">
+                      <Gift className="w-5 h-5" />
+                   </div>
+                   <div>
+                      <h5 className="font-black text-dark text-sm">{lang === 'ar' ? 'نظام "شارك واربح"' : 'Referral System'}</h5>
+                      <p className="text-[10px] font-bold text-gray-400">{lang === 'ar' ? 'تفعيل عمولة الإحالة للعملاء' : 'Enable customer referral bonuses'}</p>
+                   </div>
+                </div>
+                <button 
+                  onClick={() => setSiteSettings({...siteSettings, showReferralSystem: !siteSettings.showReferralSystem})}
+                  className={cn(
+                    "w-12 h-6 rounded-full transition-all relative",
+                    siteSettings.showReferralSystem ? "bg-gold" : "bg-gray-200"
+                  )}
+                >
+                  <div className={cn(
+                    "absolute top-1 w-4 h-4 bg-white rounded-full transition-all",
+                    siteSettings.showReferralSystem ? (lang === 'ar' ? 'right-7' : 'left-7') : (lang === 'ar' ? 'right-1' : 'left-1')
+                  )} />
+                </button>
+             </div>
+
+             {siteSettings.showReferralSystem && (
+               <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{lang === 'ar' ? 'مبلغ المكافأة (BHD)' : 'Bonus Amount (BHD)'}</label>
+                 <input 
+                   type="number" 
+                   className="w-full bg-white border-gray-100 rounded-xl py-3 px-4 font-black text-dark"
+                   value={siteSettings.referralBonus || 0}
+                   onChange={e => setSiteSettings({...siteSettings, referralBonus: parseFloat(e.target.value) || 0})}
+                 />
+               </div>
+             )}
           </div>
 
           <div className="p-5 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-100">

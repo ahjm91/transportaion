@@ -66,15 +66,17 @@ export const CustomerDashboardModal = ({
                     >
                       {lang === 'ar' ? 'العضوية والجوائز' : 'Membership & Rewards'}
                     </button>
-                    <button 
-                      onClick={() => setCustomerTab('referral')}
-                      className={cn(
-                        "text-xs font-bold transition-colors border-r border-gray-200 pr-4",
-                        customerTab === 'referral' ? "text-gold underline underline-offset-4" : "text-gray-400 hover:text-dark"
-                      )}
-                    >
-                      {lang === 'ar' ? 'أرسل واكسب' : 'Referral'}
-                    </button>
+                    {siteSettings.showReferralSystem && (
+                      <button 
+                        onClick={() => setCustomerTab('referral')}
+                        className={cn(
+                          "text-xs font-bold transition-colors border-r border-gray-200 pr-4",
+                          customerTab === 'referral' ? "text-gold underline underline-offset-4" : "text-gray-400 hover:text-dark"
+                        )}
+                      >
+                        {lang === 'ar' ? 'أرسل واكسب' : 'Referral'}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -208,8 +210,8 @@ export const CustomerDashboardModal = ({
                       <h4 className="text-3xl font-black">{lang === 'ar' ? 'شارك واربح رصيد!' : 'Refer & Earn Credit!'}</h4>
                       <p className="text-white/70 max-w-sm mx-auto text-sm leading-relaxed">
                         {lang === 'ar' 
-                          ? 'أرسل كود الإحالة لأصدقائك واحصل على 5 BHD رصيد في محفظتك لكل صديق يقوم برحلته الأولى.'
-                          : 'Send your referral code to friends and get 5 BHD credit in your wallet for every friend who completes their first trip.'}
+                          ? `أرسل كود الإحالة لأصدقائك واحصل على ${siteSettings.referralBonus || 5} BHD رصيد في محفظتك لكل صديق يقوم برحلته الأولى.`
+                          : `Send your referral code to friends and get ${siteSettings.referralBonus || 5} BHD credit in your wallet for every friend who completes their first trip.`}
                       </p>
                       
                       <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 flex flex-col items-center gap-4 max-w-sm mx-auto">

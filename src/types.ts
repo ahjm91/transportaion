@@ -101,6 +101,8 @@ export interface SiteSettings {
   showAboutSection: boolean;
   showBookingSection: boolean;
   showCTASection: boolean;
+  showReferralSystem?: boolean;
+  referralBonus?: number;
   commissionRate: number;
   promoCodes?: { code: string; discountPercent: number; maxUsage?: number }[];
   

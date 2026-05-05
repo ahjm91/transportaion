@@ -101,9 +101,9 @@ import { TripForm } from './components/admin/TripForm';
 import { TripDeleteModal } from './components/admin/TripDeleteModal';
 import { PaymentModal } from './components/modals/PaymentModal';
 import { CustomerDashboardModal } from './components/modals/CustomerDashboardModal';
-import { AuthModal } from './components/modals/AuthModal';
 import { RatingModal } from './components/modals/RatingModal';
 import { DriverRegistrationModal } from './components/modals/DriverRegistrationModal';
+import { AuthScreen } from './components/auth/AuthScreen';
 import { TermsModal, PrivacyModal } from './components/common/Modals';
 import { handleFirestoreError as handleFirestoreErrorUtils } from './lib/firestoreUtils';
 import { BookingData, Service, SpecializedService, SiteSettings, UserProfile, Trip, FixedRoute, OperationType, Booking, Driver } from './types';
@@ -222,6 +222,8 @@ function App() {
     showAboutSection: true,
     showBookingSection: true,
     showCTASection: true,
+    showReferralSystem: true,
+    referralBonus: 5,
     commissionRate: 10,
     spacingFactor: 1.0,
     layoutDensity: 'spacious',
@@ -296,7 +298,9 @@ function App() {
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
   const [isDriverDashboardOpen, setIsDriverDashboardOpen] = useState(false);
   const [isCustomerDashboardOpen, setIsCustomerDashboardOpen] = useState(false);
-  const [customerTab, setCustomerTab] = useState<'trips' | 'rewards'>('trips');
+  const [showAuthScreen, setShowAuthScreen] = useState(false);
+  const [authDefaultMode, setAuthDefaultMode] = useState<'customer' | 'driver'>('customer');
+  const [customerTab, setCustomerTab] = useState<'trips' | 'rewards' | 'referral'>('trips');
   const [bookingMode, setBookingMode] = useState<'fixed' | 'custom' | 'realtime'>('fixed');
   const [activeRealtimeBooking, setActiveRealtimeBooking] = useState<Booking | null>(null);
   const [activeDriver, setActiveDriver] = useState<Driver | null>(null);
@@ -864,9 +868,33 @@ function App() {
     }
   }, [isAdmin, specializedServices]);
 
-  const handleLogin = () => setIsAuthOpen(true);
+  const handleLogin = (mode: 'customer' | 'driver' = 'customer') => {
+    setAuthDefaultMode(mode);
+    setShowAuthScreen(true);
+  };
 
-  const handleLogout = () => signOut(auth);
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setUserProfile(null);
+      setIsDriverDashboardOpen(false);
+      setIsCustomerDashboardOpen(false);
+      setIsDashboardOpen(false);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleAuthSuccess = (user: any) => {
+    setUserProfile(user);
+    if (user.role === 'admin') {
+      setIsDashboardOpen(true);
+    } else if (user.role === 'driver') {
+      setIsDriverDashboardOpen(true);
+    } else {
+      setIsCustomerDashboardOpen(true);
+    }
+  };
 
   const handleImageUpload = async (file: File, collectionName: string, docId: string, fieldName: string = 'image') => {
     if (!isAdmin) {
@@ -1078,7 +1106,7 @@ function App() {
         driverCost: 0,
         profit: (Number(finalAmount) * (siteSettings.commissionRate || 10)) / 100,
         paymentStatus: 'Pending',
-        status: Number(finalAmount) > 0 ? 'Confirmed' : 'Requested',
+        status: 'Requested',
         notes: !isFixed ? 'طلب حجز مخصص' : (matchedRoute ? 'حجز تلقائي (سعر ثابت)' : 'حجز عبر الموقع'),
         specialRequests: bookingData.specialRequests || '',
         bookingNumber: bookingNumber,
@@ -1631,6 +1659,22 @@ function App() {
         .rounded-custom { border-radius: var(--radius); }
         .rounded-custom-xl { border-radius: calc(var(--radius) * 1.5); }
         .rounded-custom-2xl { border-radius: calc(var(--radius) * 2); }
+        
+        /* Chrome & Safari fixes */
+        .backdrop-blur-sm { -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+        .backdrop-blur-md { -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+        .backdrop-blur-lg { -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+        .backdrop-blur-xl { -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
+        
+        /* Smooth scrolling for anchor links */
+        html { scroll-behavior: smooth; }
+        
+        /* Prevent layout shift */
+        body { overflow-x: hidden; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { bg: transparent; }
+        ::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
       `}</style>
       {/* Navigation */}
       <Navigation 
@@ -2129,12 +2173,6 @@ function App() {
     }}
   />
 
-  <AuthModal 
-    isOpen={isAuthOpen}
-    onClose={() => setIsAuthOpen(false)}
-    lang={lang}
-    siteSettings={siteSettings}
-  />
 
   <RatingModal
     isOpen={showRatingModal}
@@ -2367,6 +2405,17 @@ function App() {
               </button>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showAuthScreen && (
+          <AuthScreen 
+            lang={lang}
+            onClose={() => setShowAuthScreen(false)}
+            defaultMode={authDefaultMode}
+            onAuthSuccess={handleAuthSuccess}
+          />
         )}
       </AnimatePresence>
     </div>

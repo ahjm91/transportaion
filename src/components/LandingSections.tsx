@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Clock3, Star, MapPin, ChevronRight, Users, Bus, Clock, DollarSign, Loader2, ArrowUp, ArrowDown, Phone } from 'lucide-react';
+import { ShieldCheck, Clock3, Star, MapPin, ChevronRight, ChevronDown, Users, Bus, Clock, DollarSign, Loader2, ArrowUp, ArrowDown, Phone } from 'lucide-react';
 import { SiteSettings, Service, SpecializedService, FixedRoute, BookingData } from '../types';
 import { translations } from '../translations';
 import { cn } from '../lib/utils';
@@ -138,25 +138,30 @@ export const Hero = ({
                {bookingMode === 'fixed' ? (
                  <div className="space-y-2">
                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{t('selectDropoff')} *</label>
-                   <select 
-                      required
-                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 font-bold text-dark appearance-none"
-                      onChange={e => {
-                        const route = fixedRoutes.find(r => r.id === e.target.value);
-                        if (route) {
-                          setBookingData({ 
-                            ...bookingData, 
-                            pickup: route.pickup, 
-                            dropoff: route.dropoff, 
-                            amount: route.price,
-                            bookingType: 'transfer'
-                          });
-                        }
-                      }}
-                   >
-                     <option value="">{t('selectDropoff')}</option>
-                     {fixedRoutes.map(r => <option key={r.id} value={r.id}>{lang === 'ar' ? `${r.pickup} - ${r.dropoff}` : `${r.pickup_en || r.pickup} - ${r.dropoff_en || r.dropoff}`}</option>)}
-                   </select>
+                   <div className="relative">
+                     <select 
+                        required
+                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 font-bold text-dark appearance-none pr-12"
+                        onChange={e => {
+                          const route = fixedRoutes.find(r => r.id === e.target.value);
+                          if (route) {
+                            setBookingData({ 
+                              ...bookingData, 
+                              pickup: route.pickup, 
+                              dropoff: route.dropoff, 
+                              amount: route.price,
+                              bookingType: 'transfer'
+                            });
+                          }
+                        }}
+                     >
+                       <option value="">{t('selectDropoff')}</option>
+                       {fixedRoutes.map(r => <option key={r.id} value={r.id}>{lang === 'ar' ? `${r.pickup} - ${r.dropoff}` : `${r.pickup_en || r.pickup} - ${r.dropoff_en || r.dropoff}`}</option>)}
+                     </select>
+                     <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                       <ChevronDown className="w-5 h-5" />
+                     </div>
+                   </div>
                  </div>
                ) : (
                  <div className="grid md:grid-cols-2 gap-4">
@@ -328,16 +333,25 @@ export const Hero = ({
 );
 
 export const Services = ({ lang, services, t }: { key?: string | number, lang: 'ar' | 'en', services: Service[], t: any }) => (
-  <section id="services" className="py-24 bg-gray-50">
+  <section id="services" className="py-24 bg-gray-50 relative">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="text-center mb-16">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="text-center mb-16"
+      >
         <h2 className="text-3xl md:text-5xl font-black text-dark mb-4">{t('ourServices')}</h2>
         <p className="text-gray-500 text-lg">{t('ourServicesDesc')}</p>
-      </div>
+      </motion.div>
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {services.map((service) => (
+        {services.map((service, index) => (
           <motion.div 
             key={service.id}
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: index * 0.1 }}
             whileHover={{ y: -10 }}
             className="bg-white rounded-[2.5rem] overflow-hidden shadow-xl shadow-dark/5 border border-gray-100 group"
           >
@@ -390,9 +404,14 @@ export const SpecializedServices = ({ lang, specializedServices, siteSettings, t
   };
 
   return (
-    <section id="specialized-services" className="py-24 bg-white">
+    <section id="specialized-services" className="py-24 bg-white relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-6">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="flex flex-col md:flex-row justify-between items-end mb-16 gap-6"
+        >
           <div className="max-w-2xl">
             <h2 className="text-3xl md:text-5xl font-black text-dark mb-4">{t('specializedServices')}</h2>
             <p className="text-gray-500 text-lg">{t('specializedServicesDesc')}</p>
@@ -402,12 +421,16 @@ export const SpecializedServices = ({ lang, specializedServices, siteSettings, t
             <div className="w-4 h-1 bg-gray-200 rounded-full" />
             <div className="w-4 h-1 bg-gray-200 rounded-full" />
           </div>
-        </div>
+        </motion.div>
         
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {specializedServices.map((service) => (
-            <div 
+          {specializedServices.map((service, index) => (
+            <motion.div 
               key={service.id} 
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: index * 0.1 }}
               className="group cursor-pointer"
               onClick={() => handleServiceClick(service)}
             >
@@ -446,7 +469,7 @@ export const SpecializedServices = ({ lang, specializedServices, siteSettings, t
               <p className="text-gray-500 leading-relaxed px-4">
                 {lang === 'ar' ? service.desc : (service.desc_en || service.desc)}
               </p>
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>

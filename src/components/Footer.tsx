@@ -9,7 +9,7 @@ interface FooterProps {
   lang: 'ar' | 'en';
   siteSettings: SiteSettings;
   userProfile: UserProfile | null;
-  handleLogin: () => void;
+  handleLogin: (mode?: 'customer' | 'driver') => void;
 }
 
 export const Footer = ({ lang, siteSettings, userProfile, handleLogin }: FooterProps) => {
@@ -18,7 +18,7 @@ export const Footer = ({ lang, siteSettings, userProfile, handleLogin }: FooterP
 
   const handleJoinAsDriver = () => {
     if (!userProfile) {
-      handleLogin();
+      handleLogin('driver');
     } else {
       setIsDriverModalOpen(true);
     }
