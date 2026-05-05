@@ -86,6 +86,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import confetti from 'canvas-confetti';
+import { format } from 'date-fns';
 import { translations } from './translations';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -984,250 +985,100 @@ function App() {
         return;
       }
 
+      // Unified Server-Side Persistence for all booking modes
+      const response = await fetch('/api/create-booking', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName: bookingData.customerName,
+          phone: `${bookingData.countryCode || ''} ${bookingData.phone}`.trim(),
+          pickupAddress: bookingData.pickup,
+          dropoffAddress: bookingData.dropoff,
+          date: bookingData.date,
+          time: bookingData.time,
+          passengers: bookingData.passengers,
+          bags: bookingData.bags,
+          carType: bookingData.carType,
+          bookingMode: bookingMode,
+          amount: bookingData.amount || 0,
+          status: 'pending'
+        })
+      });
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to save booking');
+      }
+
+      console.log('Booking successfully saved to server:', result.bookingId);
+
       if (bookingMode === 'realtime') {
-        const response = await fetch('/api/create-booking', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            customerName: bookingData.customerName,
-            phone: `${bookingData.countryCode || ''} ${bookingData.phone}`.trim(),
-            pickupLocation: { lat: 26.22, lng: 50.58 }, // Demo coordinates, in real app would use geocoding
-            dropoffLocation: { lat: 26.25, lng: 50.60 },
-            pickupAddress: bookingData.pickup,
-            dropoffAddress: bookingData.dropoff,
-            carType: bookingData.carType,
-            price: 15 // Mock price for demo
-          })
+        setActiveRealtimeBooking({
+          id: result.bookingId,
+          customerName: bookingData.customerName,
+          phone: bookingData.phone,
+          pickupAddress: bookingData.pickup,
+          dropoffAddress: bookingData.dropoff,
+          carType: bookingData.carType,
+          status: 'searching_driver',
+          pickupLocation: { lat: 26.22, lng: 50.58 },
+          dropoffLocation: { lat: 26.25, lng: 50.60 },
+          price: 15,
+          createdAt: new Date(),
+          assignedDriverId: null
         });
-        const result = await response.json();
-        if (result.success) {
-          setActiveRealtimeBooking({
-            id: result.bookingId,
-            customerName: bookingData.customerName,
-            phone: bookingData.phone,
-            pickupAddress: bookingData.pickup,
-            dropoffAddress: bookingData.dropoff,
-            carType: bookingData.carType,
-            status: 'searching_driver',
-            pickupLocation: { lat: 26.22, lng: 50.58 },
-            dropoffLocation: { lat: 26.25, lng: 50.60 },
-            price: 15,
-            createdAt: new Date(),
-            assignedDriverId: null
-          });
-          // Scroll to tracking section
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else {
-          throw new Error(result.error);
-        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
         setIsBooking(false);
         return;
       }
 
-      console.log('Calculating price...');
-      
-      // Generate Booking Number DD/MM/YYYY/N
-      const now = new Date();
-      const day = String(now.getDate()).padStart(2, '0');
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const year = now.getFullYear();
-      const monthKey = `${year}-${month}`;
-      let sequence = Math.floor(1000 + Math.random() * 9000); // More unique default
-
-      try {
-        await runTransaction(db, async (transaction) => {
-          const counterRef = doc(db, 'counters', `bookings_${monthKey}`);
-          const counterSnap = await transaction.get(counterRef);
-          if (counterSnap.exists()) {
-            const currentCount = counterSnap.data().count || 0;
-            sequence = currentCount + 1;
-            transaction.update(counterRef, { count: sequence });
-          } else {
-            sequence = 1;
-            transaction.set(counterRef, { count: 1 });
-          }
-        });
-      } catch (e) {
-        console.error("Error generating sequence:", e);
+      // Handle WhatsApp redirection if needed for non-realtime
+      if (bookingMode === 'custom' || bookingMode === 'fixed') {
+        const message = lang === 'ar' 
+          ? `طلب حجز جديد (#${result.bookingId}):\nالاسم: ${bookingData.customerName}\nمن: ${bookingData.pickup}\nإلى: ${bookingData.dropoff}\nالتاريخ: ${bookingData.date}`
+          : `New Booking Request (#${result.bookingId}):\nName: ${bookingData.customerName}\nFrom: ${bookingData.pickup}\nTo: ${bookingData.dropoff}\nDate: ${bookingData.date}`;
+        
+        const washare = `https://wa.me/${siteSettings.notificationWhatsapp || siteSettings.whatsapp || '97332325997'}?text=${encodeURIComponent(message)}`;
+        window.open(washare, '_blank');
       }
 
-      const bookingNumber = `${day}/${month}/${year}/${sequence}`;
-
-      // Determine if it's a custom booking or fixed
-      const isFixed = bookingMode === 'fixed';
+      alert(lang === 'ar' ? 'تم استلام طلبك بنجاح! سيتم التواصل معك قريباً.' : 'Booking request received! We will contact you soon.');
       
-      // Check for fixed price
-      let matchedRoute = null;
-      if (isFixed) {
-        matchedRoute = fixedRoutes.find(r => 
-          (r.pickup.trim().toLowerCase() === (bookingData.pickup || '').trim().toLowerCase() && 
-           r.dropoff.trim().toLowerCase() === (bookingData.dropoff || '').trim().toLowerCase()) ||
-          r.id === bookingData.promoCode // Fallback check if id was stored in promoCode during selection hack
-        );
-      }
+      // Reset form
+      setBookingData({
+        pickup: '',
+        dropoff: '',
+        date: format(new Date(), 'yyyy-MM-dd'),
+        time: format(new Date(), 'HH:mm'),
+        passengers: 1,
+        bags: 0,
+        carType: 'Standard',
+        customerName: '',
+        phone: ''
+      });
       
-      let finalAmount = bookingData.amount || (matchedRoute ? matchedRoute.price : 0);
-
-      // Final protective check for amount if it's still 0 but we have a matched route
-      if (!finalAmount && matchedRoute) {
-        finalAmount = matchedRoute.price;
-        if (bookingData.carType === 'VIP') finalAmount += (siteSettings.vipSurcharge || 5);
-        else if (bookingData.carType === 'Van') finalAmount += (siteSettings.vanSurcharge || 12);
-      }
-      
-      console.log('Final amount calculated:', finalAmount);
-
-      // Save to Firestore first
-      const tripData: Omit<Trip, 'id'> = {
-        userId: user?.uid || null,
-        bookingType: bookingData.bookingType || 'transfer',
-        firstName: bookingData.firstName || '',
-        lastName: bookingData.lastName || '',
-        customerName: `${bookingData.firstName || ''} ${bookingData.lastName || ''}`.trim() || bookingData.customerName || 'عميل',
-        email: bookingData.email || '',
-        phone: `${bookingData.countryCode || ''} ${bookingData.phone}`.trim() || '',
-        passengers: bookingData.passengers || 1,
-        bags: bookingData.bags || 0,
-        carType: bookingData.carType || 'Standard',
-        direction: bookingData.bookingType === 'hourly' 
-          ? `${t('hourly')} (${bookingData.hours} ${t('hours')}) - ${bookingData.pickup}`
-          : `${bookingData.pickup} ← ${bookingData.dropoff}`,
-        pickup: bookingData.pickup || '',
-        dropoff: bookingData.bookingType === 'hourly' ? `${bookingData.hours} ${t('hours')}` : (bookingData.dropoff || ''),
-        distance: bookingData.distance || 0,
-        date: bookingData.date || new Date().toISOString().split('T')[0],
-        time: bookingData.time || '10:00',
-        hours: bookingData.hours || 1,
-        amount: Number(finalAmount) || 0,
-        driverType: 'In',
-        driverName: '',
-        driverCost: 0,
-        profit: (Number(finalAmount) * (siteSettings.commissionRate || 10)) / 100,
-        paymentStatus: 'Pending',
-        status: 'Requested',
-        notes: !isFixed ? 'طلب حجز مخصص' : (matchedRoute ? 'حجز تلقائي (سعر ثابت)' : 'حجز عبر الموقع'),
-        specialRequests: bookingData.specialRequests || '',
-        bookingNumber: bookingNumber,
-        createdAt: new Date().toISOString()
-      };
-
-      // WhatsApp Message Construction
-      const fullPhone = `${bookingData.countryCode || ''} ${bookingData.phone}`.trim();
-      const adminMessage = `👋 *طلب حجز جديد*\n\n` +
-                           `مرحباً، أرغب في تأكيد الحجز التالي:\n\n` +
-                           `🎫 رقم الحجز: ${bookingNumber}\n` +
-                           `👤 العميل: ${tripData.customerName}\n` +
-                           `📞 الهاتف: ${fullPhone}\n` +
-                           `📍 المسار: ${tripData.direction}\n` +
-                           `📅 التاريخ: ${tripData.date}\n` +
-                           `🕒 الوقت: ${tripData.time}\n` +
-                           `👥 الركاب: ${tripData.passengers}\n` +
-                           `🚘 نوع السيارة: ${tripData.carType}\n` +
-                           `💰 السعر: ${tripData.amount > 0 ? tripData.amount + ' BHD' : (lang === 'ar' ? 'بانتظار التسعير' : 'Pending Price')}`;
-      
-      const rawWhatsapp = siteSettings.notificationWhatsapp || siteSettings.whatsapp || '97332325997';
-      const cleanWhatsapp = rawWhatsapp.replace(/\D/g, '').replace(/^0+/, ''); 
-      const finalWhatsapp = cleanWhatsapp.length === 8 ? `973${cleanWhatsapp}` : (cleanWhatsapp || '97332325997');
-      const whatsappUrl = `https://wa.me/${finalWhatsapp}?text=${encodeURIComponent(adminMessage)}`;
-
-      console.log('Saving to server...', tripData);
-      try {
-        const bookingResponse = await fetch('/api/trips', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...tripData,
-            analytics: {
-              userAgent: navigator.userAgent,
-              language: navigator.language
-            }
-          })
-        });
-        
-        const result = await bookingResponse.json();
-        if (!result.success) {
-          console.warn('Backend save failed but proceeding to WhatsApp:', result.error);
-        }
-        
-        const newId = result.id || `pending_${Date.now()}`;
-        const newTrip = { id: newId, ...tripData } as Trip;
-        
-        logAnalyticsEvent('booking_step_1_submit', 'booking', newTrip.bookingNumber, { amount: newTrip.amount });
-        
-        // Notify Admin via our Notification Service
-        sendAdminNotification(NotificationType.NEW_TRIP, {
-          bookingNumber,
-          customer: tripData.customerName,
-          phone: tripData.phone,
-          route: tripData.direction,
-          amount: newTrip.amount
-        });
-        
-        // Secondary background notify via API
-        fetch('/api/notify-booking', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...newTrip, companyName: siteSettings.companyName })
-        }).catch(e => console.error('Background Notify error:', e));
-
-        // Show success modal and auto-redirect
-        setLastBookingInfo({ ...newTrip, notes: whatsappUrl }); 
-        setIsBookingSuccessOpen(true);
-        
-        setTimeout(() => {
-          window.open(whatsappUrl, '_blank');
-        }, 1500);
-        
-        confetti({
-          particleCount: 150,
-          spread: 70,
-          origin: { y: 0.6 },
-          colors: [siteSettings.primaryColor || '#D4AF37', '#ffffff', '#B8860B']
-        });
-
-      } catch (saveError) {
-        console.error('Error during database save, but redirecting to WhatsApp anyway:', saveError);
-        // Even if DB fails, fulfill user intent by going to WhatsApp
-        setLastBookingInfo({ id: 'fallback', ...tripData, notes: whatsappUrl } as Trip);
-        setIsBookingSuccessOpen(true);
-        setTimeout(() => {
-          window.open(whatsappUrl, '_blank');
-        }, 1000);
-      }
-
-      const resetForm = () => {
-        setBookingData({
-          customerName: '',
-          firstName: '',
-          lastName: '',
-          email: '',
-          phone: '',
-          countryCode: '+973',
-          confirmPhone: '',
-          pickup: '',
-          dropoff: '',
-          date: new Date().toISOString().split('T')[0],
-          time: '10:00',
-          passengers: 1,
-          bags: 0,
-          carType: 'Standard',
-          service: 'luxury',
-          bookingType: 'transfer',
-          hours: 1,
-          specialRequests: ''
-        });
-      };
-        
-      resetForm();
-    } catch (error) {
-      console.error('Booking failed:', error);
-      const errorMsg = lang === 'ar' ? 'فشل إرسال الطلب، يرجى المحاولة مرة أخرى.' : 'Booking failed, please try again.';
-      alert(errorMsg);
+    } catch (error: any) {
+      console.error('Booking submission failed:', error);
+      alert(lang === 'ar' ? `فشل الحجز: ${error.message}` : `Booking failed: ${error.message}`);
     } finally {
       setIsBooking(false);
     }
   };
 
+  const handlePayment = async (tripId: string, amount: number) => {
+    try {
+      console.log('Initiating payment for trip:', tripId, 'Amount:', amount);
+      if (siteSettings.paymentGateway === 'WhatsApp') {
+        const trip = trips.find(t => t.id === tripId);
+        const message = `Payment for Booking #${trip?.bookingNumber || tripId}\nAmount: ${amount} BHD`;
+        window.open(`https://wa.me/${siteSettings.whatsapp}?text=${encodeURIComponent(message)}`, '_blank');
+        return;
+      }
+    } catch (err) {
+      console.error('Payment failed:', err);
+    }
+  };
   // Seed Database Function
   const seedDatabase = async () => {
     if (!isAdmin) return;

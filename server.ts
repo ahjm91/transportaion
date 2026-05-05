@@ -6,31 +6,107 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import admin from 'firebase-admin';
+import nodemailer from 'nodemailer';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Initialize Firebase Admin
-// In a real production environment, you would use a service account key
-// Here we initialize with environment variables or default if available
-if (admin.apps.length === 0) {
+const initializeFirebase = () => {
+  if (admin.apps.length > 0) return;
+
   try {
+    // Try default credentials (Cloud Run / AI Studio env)
     admin.initializeApp({
       credential: admin.credential.applicationDefault(),
-      // databaseURL: "https://your-project-id.firebaseio.com"
     });
-  } catch (error) {
-    console.warn("Firebase Admin could not initialize with applicationDefault. Ensure GOOGLE_APPLICATION_CREDENTIALS is set in production.");
-    // Fallback for development if keys are provided in .env
-    if (process.env.FIREBASE_PROJECT_ID) {
+    console.log("Firebase Admin initialized with applicationDefault");
+  } catch (err) {
+    console.warn("Firebase Admin applicationDefault failed, trying config file...");
+    const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      admin.initializeApp({
+        projectId: config.projectId,
+        // We can't use credential without service account, 
+        // but projectId allows basic Firestore ops in some envs
+      });
+      console.log("Firebase Admin initialized with projectId from config file");
+    } else if (process.env.FIREBASE_PROJECT_ID) {
       admin.initializeApp({
         projectId: process.env.FIREBASE_PROJECT_ID
       });
+      console.log("Firebase Admin initialized with FIREBASE_PROJECT_ID env var");
+    } else {
+      console.error("CRITICAL: Failed to initialize Firebase Admin. Persistence will fail.");
     }
   }
-}
+};
+
+initializeFirebase();
 
 const db = admin.firestore?.() || null;
+
+// =====================
+// Email Configuration (Nodemailer)
+// =====================
+const createTransporter = () => {
+  // Use professional service like SendGrid, Mailtrap or Gmail (App Password)
+  // For demo/dev, we recommend Mailtrap.io
+  const host = process.env.SMTP_HOST || 'smtp.mailtrap.io';
+  const port = parseInt(process.env.SMTP_PORT || '2525');
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+
+  if (!user || !pass) {
+    console.warn("⚠️ Email credentials missing in .env. Emails will not be sent.");
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+  });
+};
+
+const sendBookingEmail = async (bookingData: any) => {
+  const transporter = createTransporter();
+  if (!transporter) return;
+
+  const { customerName, phone, pickupAddress, dropoffAddress, date, time, bookingId } = bookingData;
+
+  const mailOptions = {
+    from: `"GCC TAXI Support" <${process.env.SMTP_USER}>`,
+    to: process.env.ADMIN_EMAIL || 'ahjm91@gmail.com', // Notify admin
+    subject: `New Booking Request: #${bookingId}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+        <h2 style="color: #D4AF37; text-align: center;">GCC TAXI - New Booking</h2>
+        <p>A new booking has been created with the following details:</p>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr><td style="padding: 10px; border-bottom: 1px solid #eee;"><strong>Booking ID:</strong></td><td style="padding: 10px; border-bottom: 1px solid #eee;">${bookingId}</td></tr>
+          <tr><td style="padding: 10px; border-bottom: 1px solid #eee;"><strong>Customer:</strong></td><td style="padding: 10px; border-bottom: 1px solid #eee;">${customerName}</td></tr>
+          <tr><td style="padding: 10px; border-bottom: 1px solid #eee;"><strong>Phone:</strong></td><td style="padding: 10px; border-bottom: 1px solid #eee;">${phone}</td></tr>
+          <tr><td style="padding: 10px; border-bottom: 1px solid #eee;"><strong>Pickup:</strong></td><td style="padding: 10px; border-bottom: 1px solid #eee;">${pickupAddress}</td></tr>
+          <tr><td style="padding: 10px; border-bottom: 1px solid #eee;"><strong>Dropoff:</strong></td><td style="padding: 10px; border-bottom: 1px solid #eee;">${dropoffAddress}</td></tr>
+          <tr><td style="padding: 10px; border-bottom: 1px solid #eee;"><strong>Date/Time:</strong></td><td style="padding: 10px; border-bottom: 1px solid #eee;">${date} at ${time}</td></tr>
+        </table>
+        <p style="margin-top: 20px; color: #666; font-size: 12px; text-align: center;">This is an automated notification from GCC TAXI System.</p>
+      </div>
+    `
+  };
+
+  try {
+    console.log(`[EMAIL] Attempting to send email for booking ${bookingId}...`);
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`[EMAIL] Successfully sent: ${info.messageId}`);
+  } catch (error) {
+    console.error(`[EMAIL] Failed to send email:`, error);
+  }
+};
 
 async function startServer() {
   const app = express();
@@ -162,17 +238,49 @@ async function startServer() {
 
   // Create Realtime Booking API
   app.post("/api/create-booking", async (req, res) => {
-    if (!db) return res.status(500).send("Database not initialized");
+    console.log("[BOOKING] Received new booking request:", req.body);
+    
+    if (!db) {
+      console.error("[BOOKING] Error: Firestore database not initialized");
+      return res.status(500).send("Database not initialized");
+    }
+
     try {
+      // 1. Validation
+      const { customerName, phone, pickupAddress, dropoffAddress } = req.body;
+      if (!customerName || !phone || !pickupAddress) {
+        console.warn("[BOOKING] Validation failed: Missing fields");
+        return res.status(400).json({ success: false, error: "Missing required fields" });
+      }
+
+      // 2. Save to Database
+      console.log("[BOOKING] Saving to Firestore...");
       const bookingData = {
         ...req.body,
         status: 'pending',
+        source: 'web_form',
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       };
+      
       const docRef = await db.collection("bookings").add(bookingData);
-      res.json({ success: true, bookingId: docRef.id });
+      console.log("[BOOKING] Successfully saved with ID:", docRef.id);
+
+      // 3. Send Email Notification
+      // We don't await this to keep the response fast, but it runs in background
+      sendBookingEmail({ 
+        ...req.body, 
+        bookingId: docRef.id 
+      }).catch(err => console.error("[BOOKING] Background email error:", err));
+
+      // 4. Send Success Response
+      res.json({ 
+        success: true, 
+        bookingId: docRef.id,
+        message: "Booking created successfully" 
+      });
+
     } catch (error: any) {
-      console.error("Error creating booking:", error);
+      console.error("[BOOKING] Fatal error during creation:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });

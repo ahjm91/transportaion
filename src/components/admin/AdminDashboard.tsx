@@ -63,7 +63,16 @@ export const AdminDashboard = ({
   const [isAdminScheduleView, setIsAdminScheduleView] = React.useState(false);
   const [tripFilter, setTripFilter] = React.useState<'all' | 'requested' | 'pending_price' | 'unpaid' | 'paid'>('all');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  React.useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const menuItems = React.useMemo(() => [
     { id: 'overview', name: lang === 'ar' ? 'نظرة عامة' : 'Overview', icon: Layout },
@@ -113,33 +122,84 @@ export const AdminDashboard = ({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.15 }}
-        className="relative bg-gray-50 w-full h-full shadow-2xl flex overflow-hidden"
+        className="relative bg-gray-50 w-full h-full shadow-2xl flex flex-col md:flex-row overflow-hidden"
       >
+        {/* Mobile Top Header */}
+        {isMobile && (
+          <div className="h-16 bg-white border-b border-gray-100 flex items-center justify-between px-6 shrink-0 z-50">
+             <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-dark rounded-xl flex items-center justify-center">
+                  <Box className="w-5 h-5 text-gold" />
+                </div>
+                <h1 className="text-sm font-black text-dark truncate max-w-[150px]">
+                  {menuItems.find(i => i.id === activeTab)?.name}
+                </h1>
+             </div>
+             <button 
+               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+               className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-dark"
+             >
+               <Menu className="w-5 h-5" />
+             </button>
+          </div>
+        )}
+
         {/* Vertical Sidebar */}
         <motion.div 
-          animate={{ width: isSidebarCollapsed ? 88 : 320 }}
+          animate={{ 
+            width: isMobile ? (isMobileMenuOpen ? '100%' : '0%') : (isSidebarCollapsed ? 88 : 320),
+            x: isMobile && !isMobileMenuOpen ? (lang === 'ar' ? 320 : -320) : 0
+          }}
           transition={{ type: "spring", stiffness: 450, damping: 35 }}
           className={cn(
-            "bg-white border-gray-100 flex flex-col shrink-0 z-20 shadow-xl overflow-hidden",
+            "bg-white border-gray-100 flex flex-col shrink-0 z-40 shadow-xl overflow-hidden",
+            isMobile ? "fixed inset-0" : "relative",
             lang === 'ar' ? "border-l" : "border-r"
           )}
         >
+          {/* Mobile Sidebar Close Button */}
+          {isMobile && (
+            <div className="flex justify-end p-4">
+              <button 
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          )}
           {/* Sidebar Header */}
           <div className={cn("p-8 pb-4 transition-all duration-300", isSidebarCollapsed && "p-4 text-center")}>
-             <div className="flex items-center gap-3 mb-8">
+             <motion.div 
+               drag
+               dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+               whileDrag={{ scale: 1.1, zIndex: 50 }}
+               className={cn("flex items-center gap-3 mb-8 cursor-grab active:cursor-grabbing transition-all", isSidebarCollapsed && "justify-center")}
+             >
                 <div className="w-12 h-12 bg-dark rounded-2xl flex items-center justify-center shadow-lg shadow-dark/20 shrink-0">
                   <Box className="w-7 h-7 text-gold" />
                 </div>
                 {!isSidebarCollapsed && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="overflow-hidden">
+                  <motion.div 
+                    initial={{ opacity: 0, x: -10 }} 
+                    animate={{ opacity: 1, x: 0 }} 
+                    className="overflow-hidden"
+                  >
                     <h2 className="text-xl font-black text-dark leading-none whitespace-nowrap">{lang === 'ar' ? 'لوحة التحكم' : 'Control Panel'}</h2>
                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1.5 whitespace-nowrap">Admin System</p>
                   </motion.div>
                 )}
-             </div>
+             </motion.div>
 
              {!isSidebarCollapsed && (
-               <div className="mb-6">
+               <motion.div 
+                 initial={{ opacity: 0, y: 10 }}
+                 animate={{ opacity: 1, y: 0 }}
+                 drag
+                 dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+                 whileDrag={{ scale: 1.05, zIndex: 50 }}
+                 className="mb-6 cursor-grab active:cursor-grabbing"
+               >
                  <div className="relative group">
                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                      <Search className={cn("w-4 h-4 transition-colors", searchQuery ? "text-gold" : "text-gray-400")} />
@@ -160,86 +220,70 @@ export const AdminDashboard = ({
                      </button>
                    )}
                  </div>
-               </div>
-             )}
-
-             {!isSidebarCollapsed && (
-               <div className="space-y-4 mb-8">
-                  <div className="bg-gray-50 p-4 rounded-3xl border border-gray-100 flex items-center gap-4 shadow-sm group hover:shadow-md transition-all cursor-default">
-                    <div className="w-10 h-10 bg-gold/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-                      <PieChart className="w-5 h-5 text-gold" />
-                    </div>
-                    <div>
-                      <div className="text-[8px] text-gray-400 font-bold uppercase">{lang === 'ar' ? 'إجمالي الرحلات' : 'Total Trips'}</div>
-                      <div className="text-sm font-black text-dark">{trips.length + bookings.filter(b => b.status === 'completed').length}</div>
-                    </div>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-3xl border border-gray-100 flex items-center gap-4 shadow-sm group hover:shadow-md transition-all cursor-default">
-                    <div className="w-10 h-10 bg-green-50 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-                      <Users className="w-5 h-5 text-green-500" />
-                    </div>
-                    <div>
-                      <div className="text-[8px] text-gray-400 font-bold uppercase">{lang === 'ar' ? 'سائقين متصلين' : 'Online Drivers'}</div>
-                      <div className="text-sm font-black text-dark">{allDrivers.filter(d => d.status === 'online').length}</div>
-                    </div>
-                  </div>
-               </div>
+               </motion.div>
              )}
           </div>
 
-          {/* Navigation Items */}
           <div className="flex-1 overflow-y-auto px-4 space-y-1 no-scrollbar py-2">
-            {filteredMenuItems.map((item) => (
-              <button
+            {filteredMenuItems.map((item, index) => (
+              <motion.button
                 key={item.id}
-                onClick={() => setActiveTab(item.id)}
+                initial={{ opacity: 0, x: lang === 'ar' ? 20 : -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.05 }}
+                drag
+                dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+                whileDrag={{ scale: 1.1, zIndex: 50 }}
+                whileHover={{ scale: 1.02, x: lang === 'ar' ? -5 : 5 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  setActiveTab(item.id);
+                  if (isMobile) setIsMobileMenuOpen(false);
+                }}
                 className={cn(
-                  "w-full rounded-2xl text-xs font-black flex items-center gap-4 transition-all duration-150 group",
+                  "w-full rounded-2xl text-xs font-black flex items-center gap-4 transition-all duration-150 group cursor-grab active:cursor-grabbing",
                   activeTab === item.id 
-                    ? "bg-gold text-white shadow-lg shadow-gold/20 scale-[1.02] py-4 px-5" 
+                    ? "bg-gold text-white shadow-lg shadow-gold/20 py-4 px-5" 
                     : "text-gray-400 hover:text-dark hover:bg-gray-50 py-4 px-5",
-                  isSidebarCollapsed && "justify-center px-0 py-4"
+                  isSidebarCollapsed && !isMobile && "justify-center px-0 py-4"
                 )}
-                title={isSidebarCollapsed ? item.name : ""}
+                title={isSidebarCollapsed && !isMobile ? item.name : ""}
               >
                 <item.icon className={cn(
                   "w-5 h-5 transition-transform group-hover:scale-110", 
                   activeTab === item.id ? "text-white" : "text-gray-400 group-hover:text-gold"
                 )} />
-                {!isSidebarCollapsed && (
+                {(!isSidebarCollapsed || isMobile) && (
                   <span className="whitespace-nowrap overflow-hidden text-ellipsis">{item.name}</span>
                 )}
-              </button>
+              </motion.button>
             ))}
           </div>
 
           {/* Sidebar Footer */}
-          <div className="p-4 border-t border-gray-50 space-y-3 bg-white">
-             <button 
+          <div className="p-4 border-t border-gray-50 space-y-3 bg-white mt-auto">
+             <motion.button 
+               whileHover={{ scale: 1.05 }}
+               whileTap={{ scale: 0.95 }}
                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-               className="w-full h-12 bg-gray-50 text-gray-400 rounded-2xl flex items-center justify-center hover:bg-gray-100 hover:text-gold transition-all"
+               className="hidden md:flex w-full h-12 bg-gray-50 text-gray-400 rounded-2xl items-center justify-center hover:bg-gray-100 hover:text-gold transition-all"
              >
                <ChevronRight className={cn(
                  "w-5 h-5 transition-transform duration-300", 
                  isSidebarCollapsed ? (lang === 'ar' ? "rotate-0 text-gold" : "rotate-180 text-gold") : (lang === 'ar' ? "rotate-180" : "rotate-0")
                )} />
-             </button>
+             </motion.button>
 
              <div className="flex items-center gap-3">
-                <button 
+                <motion.button 
+                  whileHover={{ scale: 1.02, backgroundColor: '#212121' }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={onClose}
-                  className="flex-1 bg-gold text-white rounded-2xl py-4 text-xs font-black uppercase tracking-widest hover:bg-dark transition-all flex items-center justify-center gap-2 shadow-lg shadow-gold/20"
+                  className="w-full bg-gold text-white rounded-2xl py-4 text-xs font-black uppercase tracking-widest hover:bg-dark transition-all flex items-center justify-center gap-2 shadow-lg shadow-gold/20"
                 >
                   <Save className="w-4 h-4" />
                   {lang === 'ar' ? 'حفظ الحالات' : 'Save & Exit'}
-                </button>
-                <button 
-                  onClick={onClose}
-                  className="w-full bg-red-50 text-red-500 rounded-2xl py-4 text-xs font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all flex items-center justify-center gap-2"
-                >
-                  <LogOut className="w-4 h-4" />
-                  {lang === 'ar' ? 'تسجيل الخروج' : 'Logout'}
-                </button>
+                </motion.button>
              </div>
              
              {!isSidebarCollapsed && (
@@ -254,14 +298,15 @@ export const AdminDashboard = ({
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col h-full bg-gray-50/50 overflow-hidden relative">
           {/* Content Header */}
-          <div className="h-24 bg-white/50 backdrop-blur-sm border-b border-gray-100 flex items-center justify-between px-12 shrink-0">
+          <div className="h-20 md:h-24 bg-white/50 backdrop-blur-sm border-b border-gray-100 flex items-center justify-between px-6 md:px-12 shrink-0">
              <motion.div
                key={activeTab}
                initial={{ opacity: 0, x: -10 }}
                animate={{ opacity: 1, x: 0 }}
                transition={{ duration: 0.1 }}
+               className="hidden md:block"
              >
-                <h1 className="text-2xl font-black text-dark">
+                <h1 className="text-xl md:text-2xl font-black text-dark">
                   {menuItems.find(item => item.id === activeTab)?.name}
                 </h1>
                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">
@@ -269,39 +314,34 @@ export const AdminDashboard = ({
                 </p>
              </motion.div>
 
-             <div className="flex items-center gap-6">
-                <div className="hidden md:flex items-center gap-4">
-                   <button 
-                     onClick={onClose}
-                     className="bg-gold text-white px-8 h-12 rounded-2xl flex items-center gap-3 text-xs font-black uppercase tracking-widest hover:bg-dark transition-all shadow-lg shadow-gold/20 active:scale-95 duration-150"
-                   >
-                     <Save className="w-4 h-4" />
-                     {lang === 'ar' ? 'حفظ وخروج' : 'Save & Exit'}
-                   </button>
-                   <div className="bg-white p-2 px-4 rounded-2xl border border-gray-100 flex items-center gap-3 shadow-sm">
-                      <Star className="w-4 h-4 text-gold fill-gold" />
-                      <span className="text-sm font-black text-dark">
-                        {allDrivers.length > 0 
-                          ? (allDrivers.reduce((acc, d) => acc + (d.averageRating || 5), 0) / allDrivers.length).toFixed(1)
-                          : '5.0'}
-                      </span>
-                   </div>
-                   <div className="bg-white p-2 px-4 rounded-2xl border border-gray-100 flex items-center gap-3 shadow-sm">
-                      <Shield className="w-4 h-4 text-blue-500" />
-                      <span className="text-[10px] font-black text-gray-400 uppercase">Admin Mode</span>
-                   </div>
+             <div className="flex items-center gap-3 md:gap-6 w-full md:w-auto justify-end md:justify-end">
+                <button 
+                  onClick={onClose}
+                  className="bg-gold text-white px-4 md:px-8 h-10 md:h-12 rounded-xl md:rounded-2xl flex items-center gap-2 md:gap-3 text-[10px] md:text-xs font-black uppercase tracking-widest hover:bg-dark transition-all shadow-lg shadow-gold/20 active:scale-95 duration-150"
+                >
+                  <Save className="w-3 h-3 md:w-4 md:h-4" />
+                  <span className="inline">{lang === 'ar' ? 'حفظ وخروج' : 'Save & Exit'}</span>
+                </button>
+
+                <div className="hidden sm:flex bg-white p-2 px-4 rounded-xl md:rounded-2xl border border-gray-100 items-center gap-3 shadow-sm h-10 md:h-12">
+                   <Star className="w-4 h-4 text-gold fill-gold" />
+                   <span className="text-xs md:text-sm font-black text-dark">
+                     {allDrivers.length > 0 
+                       ? (allDrivers.reduce((acc, d) => acc + (d.rating || 5), 0) / allDrivers.length).toFixed(1)
+                       : '5.0'}
+                   </span>
                 </div>
 
-                <div className="flex items-center gap-3">
-                   <button className="relative w-12 h-12 bg-white border border-gray-100 rounded-2xl flex items-center justify-center text-gray-400 hover:text-dark transition-all shadow-sm hover:scale-105 active:scale-95 duration-150">
+                <div className="flex items-center gap-2 md:gap-3">
+                   <button className="relative w-10 h-10 md:w-12 md:h-12 bg-white border border-gray-100 rounded-xl md:rounded-2xl flex items-center justify-center text-gray-400 hover:text-dark transition-all shadow-sm hover:scale-105 active:scale-95 duration-150">
                       <Bell className="w-5 h-5" />
-                      <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
+                      <span className="absolute top-2.5 right-2.5 w-2 h-2 md:w-2.5 md:h-2.5 bg-red-500 rounded-full border-2 border-white" />
                    </button>
                    <button 
                      onClick={onClose}
-                     className="w-12 h-12 bg-dark text-white rounded-2xl flex items-center justify-center hover:bg-gold transition-all shadow-lg shadow-dark/10 hover:scale-105 active:scale-95 duration-150"
+                     className="w-10 h-10 md:w-12 md:h-12 bg-dark text-white rounded-xl md:rounded-2xl flex items-center justify-center hover:bg-gold transition-all shadow-lg shadow-dark/10 hover:scale-105 active:scale-95 duration-150"
                    >
-                     <X className="w-6 h-6" />
+                     <X className="w-5 h-5 md:w-6 md:h-6" />
                    </button>
                 </div>
              </div>

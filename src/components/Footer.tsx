@@ -87,6 +87,19 @@ export const Footer = React.memo(({ lang, siteSettings, userProfile, handleLogin
                 </div>
                 <span className="text-gray-400 font-medium">{siteSettings.phone}</span>
               </li>
+              {siteSettings.whatsapp && (
+                <li className="flex items-center gap-4">
+                  <a 
+                    href={`https://wa.me/${siteSettings.whatsapp}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center text-green-500 hover:bg-green-500 hover:text-white transition-all shrink-0"
+                  >
+                    <Phone className="w-5 h-5 rotate-12" />
+                  </a>
+                  <span className="text-gray-400 font-medium">{siteSettings.whatsapp}</span>
+                </li>
+              )}
               <li className="flex items-center gap-4">
                 <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center text-gold shrink-0">
                   <MapPin className="w-5 h-5" />

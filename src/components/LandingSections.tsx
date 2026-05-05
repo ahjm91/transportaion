@@ -69,10 +69,10 @@ export const Hero = React.memo(({
             <Star className="w-4 h-4 fill-gold" />
             <span className="text-xs font-black uppercase tracking-widest">{lang === 'ar' ? 'الخدمة رقم 1 في الخليج' : '#1 Service in GCC'}</span>
           </div>
-          <h1 className="text-6xl lg:text-7xl font-black leading-tight">
+          <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black leading-tight">
             {lang === 'ar' ? siteSettings.heroTitle : (siteSettings.heroTitle_en || siteSettings.heroTitle)}
           </h1>
-          <h2 className="text-3xl lg:text-4xl font-bold text-gold opacity-90">
+          <h2 className="text-xl sm:text-2xl lg:text-4xl font-bold text-gold opacity-90">
             {lang === 'ar' ? siteSettings.heroSubtitle : (siteSettings.heroSubtitle_en || siteSettings.heroSubtitle)}
           </h2>
           <p className="text-xl text-gray-300 max-w-xl font-medium leading-relaxed">
@@ -584,7 +584,7 @@ export const CTA = React.memo(({ lang, siteSettings, t }: { key?: string | numbe
           viewport={{ once: true }}
           className="relative z-10"
         >
-          <h2 className="text-4xl lg:text-5xl font-bold text-white mb-6">{lang === 'ar' ? 'جاهز لرحلتك القادمة؟' : 'Ready for your next trip?'}</h2>
+          <h2 className="text-3xl lg:text-5xl font-bold text-white mb-6">{lang === 'ar' ? 'جاهز لرحلتك القادمة؟' : 'Ready for your next trip?'}</h2>
           <p className="text-gray-400 text-xl mb-10 max-w-2xl mx-auto">
             {lang === 'ar'
               ? 'احجز معنا الان واستمتع بخصم 20% على رحلاتك في شهرك الاول معنا'

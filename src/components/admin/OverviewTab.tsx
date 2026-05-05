@@ -3,7 +3,7 @@ import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { 
   TrendingUp, Users, Car, CheckCircle, Clock, 
-  ArrowUpRight, ArrowDownRight, Activity, DollarSign
+  ArrowUpRight, ArrowDownRight, Activity, DollarSign, PieChart
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
@@ -30,7 +30,7 @@ export const OverviewTab = ({ trips, bookings, allDrivers, users, lang }: Overvi
     
     return {
       revenue: totalRevenue,
-      completed: completedBookings,
+      totalTrips: trips.length + bookings.filter(b => b.status === 'completed').length,
       active: activeBookings,
       online: onlineDrivers,
       totalUsers: users.length
@@ -60,6 +60,7 @@ export const OverviewTab = ({ trips, bookings, allDrivers, users, lang }: Overvi
       {/* Visual Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatWidget 
+          index={0}
           title={lang === 'ar' ? 'إجمالي الأرباح' : 'Total Revenue'} 
           value={`${stats.revenue} BHD`} 
           subValue="+12.5% vs last week"
@@ -68,22 +69,25 @@ export const OverviewTab = ({ trips, bookings, allDrivers, users, lang }: Overvi
           bgColor="bg-green-50"
         />
         <StatWidget 
-          title={lang === 'ar' ? 'الرحلات النشطة' : 'Active Rides'} 
-          value={stats.active.toString()} 
-          subValue={`${stats.completed} completed today`}
-          icon={Car}
-          color="text-blue-600"
-          bgColor="bg-blue-50"
-        />
-        <StatWidget 
-          title={lang === 'ar' ? 'سائقين متصلين' : 'Drivers Online'} 
-          value={stats.online.toString()} 
-          subValue={`out of ${allDrivers.length} total`}
-          icon={Users}
+          index={1}
+          title={lang === 'ar' ? 'إجمالي الرحلات' : 'Total Trips'} 
+          value={stats.totalTrips.toString()} 
+          subValue={`${stats.active} active now`}
+          icon={PieChart}
           color="text-gold"
           bgColor="bg-gold/10"
         />
         <StatWidget 
+          index={2}
+          title={lang === 'ar' ? 'سائقين متصلين' : 'Drivers Online'} 
+          value={stats.online.toString()} 
+          subValue={`out of ${allDrivers.length} total`}
+          icon={Users}
+          color="text-blue-600"
+          bgColor="bg-blue-50"
+        />
+        <StatWidget 
+          index={3}
           title={lang === 'ar' ? 'المستخدمين الجدد' : 'New Members'} 
           value={stats.totalUsers.toString()} 
           subValue="+5 added today"
@@ -95,7 +99,15 @@ export const OverviewTab = ({ trips, bookings, allDrivers, users, lang }: Overvi
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Chart */}
-        <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          drag
+          dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+          whileDrag={{ scale: 1.02, zIndex: 50 }}
+          className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 cursor-grab active:cursor-grabbing"
+        >
           <div className="flex items-center justify-between mb-8">
             <div>
               <h3 className="text-xl font-black text-dark">{lang === 'ar' ? 'إحصائيات الأداء' : 'Performance Analytics'}</h3>
@@ -142,10 +154,18 @@ export const OverviewTab = ({ trips, bookings, allDrivers, users, lang }: Overvi
               </AreaChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </motion.div>
 
         {/* Real-time Activity Feed */}
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 flex flex-col h-full">
+        <motion.div 
+          initial={{ opacity: 0, x: lang === 'ar' ? -20 : 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.5 }}
+          drag
+          dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+          whileDrag={{ scale: 1.05, zIndex: 50 }}
+          className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 flex flex-col h-full cursor-grab active:cursor-grabbing"
+        >
            <div className="flex items-center gap-3 mb-8">
               <div className="w-10 h-10 bg-dark rounded-2xl flex items-center justify-center">
                  <Activity className="w-5 h-5 text-gold" />
@@ -157,24 +177,35 @@ export const OverviewTab = ({ trips, bookings, allDrivers, users, lang }: Overvi
            </div>
 
            <div className="flex-1 space-y-6">
-              {recentActivity.map((act) => (
-                <div key={act.id} className="flex gap-4">
-                   <div className={cn("w-2 h-10 rounded-full shrink-0", act.color)} />
+              {recentActivity.map((act, index) => (
+                <motion.div 
+                  key={act.id} 
+                  initial={{ opacity: 0, x: -10 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.6 + (index * 0.1) }}
+                  whileHover={{ scale: 1.02, x: lang === 'ar' ? -5 : 5 }}
+                  className="flex gap-4 group cursor-pointer"
+                >
+                   <div className={cn("w-2 h-10 rounded-full shrink-0 group-hover:h-12 transition-all", act.color)} />
                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-black text-dark truncate leading-tight">{act.title}</p>
+                      <p className="text-sm font-black text-dark truncate leading-tight group-hover:text-gold transition-colors">{act.title}</p>
                       <p className="text-[10px] text-gray-400 font-bold mt-1 uppercase tracking-widest">{act.time}</p>
                    </div>
-                   <button className="text-gray-300 hover:text-gold transition-colors">
+                   <button className="text-gray-300 group-hover:text-gold group-hover:translate-x-1 transition-all">
                       <ArrowUpRight className="w-4 h-4" />
                    </button>
-                </div>
+                </motion.div>
               ))}
            </div>
 
-           <button className="w-full mt-8 py-4 bg-gray-50 hover:bg-gold hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-400 transition-all">
+           <motion.button 
+             whileHover={{ scale: 1.02, backgroundColor: '#D4AF37', color: '#ffffff' }}
+             whileTap={{ scale: 0.98 }}
+             className="w-full mt-8 py-4 bg-gray-50 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-400 transition-all"
+           >
               {lang === 'ar' ? 'عرض السجلات الكاملة' : 'View Full Logs'}
-           </button>
-        </div>
+           </motion.button>
+        </motion.div>
       </div>
     </div>
   );
@@ -187,18 +218,29 @@ interface StatWidgetProps {
   icon: any;
   color: string;
   bgColor: string;
+  index?: number;
 }
 
-const StatWidget = ({ title, value, subValue, icon: Icon, color, bgColor }: StatWidgetProps) => (
+const StatWidget = ({ title, value, subValue, icon: Icon, color, bgColor, index = 0 }: StatWidgetProps) => (
   <motion.div 
-    whileHover={{ y: -5 }}
-    className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300"
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay: index * 0.1 }}
+    drag
+    dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
+    whileDrag={{ scale: 1.1, zIndex: 50 }}
+    whileHover={{ 
+      y: -8, 
+      scale: 1.02,
+      boxShadow: "0 20px 40px rgba(0,0,0,0.05)" 
+    }}
+    className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm transition-all duration-300 group cursor-grab active:cursor-grabbing"
   >
     <div className="flex items-start justify-between mb-4">
-      <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/5", bgColor)}>
-        <Icon className={cn("w-6 h-6", color)} />
+      <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg shadow-black/5 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300", bgColor)}>
+        <Icon className={cn("w-6 h-6 group-hover:scale-110 transition-transform", color)} />
       </div>
-      <div className="flex items-center gap-1 text-green-500 font-black text-[10px]">
+      <div className="flex items-center gap-1 text-green-500 font-black text-[10px] group-hover:translate-y-[-2px] transition-transform">
         <ArrowUpRight className="w-3 h-3" />
         12%
       </div>
