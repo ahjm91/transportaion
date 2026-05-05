@@ -23,7 +23,7 @@ interface NavigationProps {
   setIsMenuOpen: (open: boolean) => void;
 }
 
-export const Navigation = ({
+export const Navigation = React.memo(({
   lang,
   setLang,
   siteSettings,
@@ -237,4 +237,4 @@ export const Navigation = ({
       </AnimatePresence>
     </>
   );
-};
+});

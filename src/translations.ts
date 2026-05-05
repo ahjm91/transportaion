@@ -3,6 +3,8 @@ export const translations = {
   ar: {
     home: "الرئيسية",
     services: "خدماتنا",
+    ourServices: "خدماتنا الفاخرة",
+    ourServicesDesc: "نقدم مجموعة متكاملة من خدمات النقل الراقي لتلبية كافة احتياجاتكم",
     specializedServices: "خدمات خاصة",
     whyUs: "لماذا نحن؟",
     payTrip: "دفع قيمة رحلة",
@@ -358,6 +360,8 @@ export const translations = {
   en: {
     home: "Home",
     services: "Our Services",
+    ourServices: "Our Luxury Services",
+    ourServicesDesc: "We provide a full range of high-end transportation services to meet all your needs",
     specializedServices: "Specialized Services",
     whyUs: "Why Us?",
     payTrip: "Pay for a Trip",

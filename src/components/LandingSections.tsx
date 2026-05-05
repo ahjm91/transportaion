@@ -6,7 +6,7 @@ import { SiteSettings, Service, SpecializedService, FixedRoute, BookingData } fr
 import { translations } from '../translations';
 import { cn } from '../lib/utils';
 
-export const Hero = ({ 
+export const Hero = React.memo(({ 
   lang, 
   siteSettings, 
   t,
@@ -330,66 +330,90 @@ export const Hero = ({
       </div>
     </div>
   </section>
-);
+));
 
-export const Services = ({ lang, services, t }: { key?: string | number, lang: 'ar' | 'en', services: Service[], t: any }) => (
-  <section id="services" className="py-24 bg-gray-50 relative">
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        className="text-center mb-16"
-      >
-        <h2 className="text-3xl md:text-5xl font-black text-dark mb-4">{t('ourServices')}</h2>
-        <p className="text-gray-500 text-lg">{t('ourServicesDesc')}</p>
-      </motion.div>
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {services.map((service, index) => (
-          <motion.div 
-            key={service.id}
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: index * 0.1 }}
-            whileHover={{ y: -10 }}
-            className="bg-white rounded-[2.5rem] overflow-hidden shadow-xl shadow-dark/5 border border-gray-100 group"
-          >
-            <div className="h-64 overflow-hidden relative">
-              <img 
-                src={service.image} 
-                alt={service.name}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                crossOrigin="anonymous"
-                onError={(e) => {
-                   const fallback = 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=800';
-                   (e.target as HTMLImageElement).src = fallback;
-                }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-            </div>
-            <div className="p-8">
-              <h3 className="text-2xl font-bold mb-4 text-dark">{lang === 'ar' ? service.name : (service.name_en || service.name)}</h3>
-              <p className="text-gray-600 mb-6 leading-relaxed">
-                {lang === 'ar' ? service.description : (service.description_en || service.description)}
-              </p>
-              <ul className="space-y-3">
-                {(lang === 'ar' ? service.features : (service.features_en || service.features)).map((feature, idx) => (
-                  <li key={idx} className="flex items-center gap-3 text-sm font-medium text-gray-500">
-                    <div className="w-1.5 h-1.5 bg-gold rounded-full" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </motion.div>
-        ))}
+export const Services = React.memo(({ lang, services, siteSettings, t }: { key?: string | number, lang: 'ar' | 'en', services: Service[], siteSettings: SiteSettings, t: any }) => {
+  const handleServiceClick = (service: Service) => {
+    const title = lang === 'ar' ? service.name : (service.name_en || service.name);
+    const message = lang === 'ar' 
+      ? `مرحباً، أرغب في الاستفسار عن خدمة: *${title}*`
+      : `Hello, I'm interested in the service: *${title}*`;
+    
+    const rawWhatsapp = siteSettings.notificationWhatsapp || siteSettings.whatsapp || '97332325997';
+    const cleanWhatsapp = rawWhatsapp.replace(/\D/g, '').replace(/^0+/, ''); 
+    const finalWhatsapp = cleanWhatsapp.length === 8 ? `973${cleanWhatsapp}` : (cleanWhatsapp || '97332325997');
+    
+    window.open(`https://wa.me/${finalWhatsapp}?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
+  return (
+    <section id="services" className="py-24 bg-gray-50 relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="text-center mb-16"
+        >
+          <h2 className="text-3xl md:text-5xl font-black text-dark mb-4">
+            {lang === 'ar' ? (siteSettings.servicesTitle || t('ourServices')) : (siteSettings.servicesTitle_en || t('ourServices'))}
+          </h2>
+          <p className="text-gray-500 text-lg">
+            {lang === 'ar' ? (siteSettings.servicesSubtitle || t('ourServicesDesc')) : (siteSettings.servicesSubtitle_en || t('ourServicesDesc'))}
+          </p>
+        </motion.div>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {services.map((service, index) => (
+            <motion.div 
+              key={service.id}
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: index * 0.1 }}
+              whileHover={{ y: -10 }}
+              onClick={() => handleServiceClick(service)}
+              className="bg-white rounded-[2.5rem] overflow-hidden shadow-xl shadow-dark/5 border border-gray-100 group cursor-pointer"
+            >
+              <div className="h-64 overflow-hidden relative">
+                <img 
+                  src={service.image} 
+                  alt={service.name}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  crossOrigin="anonymous"
+                  onError={(e) => {
+                     const fallback = 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=800';
+                     (e.target as HTMLImageElement).src = fallback;
+                  }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <div className="bg-white/20 backdrop-blur-md p-4 rounded-full border border-white/30 transform translate-y-4 group-hover:translate-y-0 transition-transform">
+                    <Phone className="w-8 h-8 text-white" />
+                  </div>
+                </div>
+              </div>
+              <div className="p-8">
+                <h3 className="text-2xl font-bold mb-4 text-dark">{lang === 'ar' ? service.name : (service.name_en || service.name)}</h3>
+                <p className="text-gray-600 mb-6 leading-relaxed">
+                  {lang === 'ar' ? service.description : (service.description_en || service.description)}
+                </p>
+                <ul className="space-y-3">
+                  {(lang === 'ar' ? service.features : (service.features_en || service.features)).map((feature, idx) => (
+                    <li key={idx} className="flex items-center gap-3 text-sm font-medium text-gray-500">
+                      <div className="w-1.5 h-1.5 bg-gold rounded-full" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </motion.div>
+          ))}
+        </div>
       </div>
-    </div>
-  </section>
-);
+    </section>
+  );
+});
 
-export const SpecializedServices = ({ lang, specializedServices, siteSettings, t }: { key?: string | number, lang: 'ar' | 'en', specializedServices: SpecializedService[], siteSettings: SiteSettings, t: any }) => {
+export const SpecializedServices = React.memo(({ lang, specializedServices, siteSettings, t }: { key?: string | number, lang: 'ar' | 'en', specializedServices: SpecializedService[], siteSettings: SiteSettings, t: any }) => {
   const handleServiceClick = (service: SpecializedService) => {
     const title = lang === 'ar' ? service.title : (service.title_en || service.title);
     const message = lang === 'ar' 
@@ -413,8 +437,12 @@ export const SpecializedServices = ({ lang, specializedServices, siteSettings, t
           className="flex flex-col md:flex-row justify-between items-end mb-16 gap-6"
         >
           <div className="max-w-2xl">
-            <h2 className="text-3xl md:text-5xl font-black text-dark mb-4">{t('specializedServices')}</h2>
-            <p className="text-gray-500 text-lg">{t('specializedServicesDesc')}</p>
+            <h2 className="text-3xl md:text-5xl font-black text-dark mb-4">
+              {lang === 'ar' ? (siteSettings.specializedTitle || t('specializedServices')) : (siteSettings.specializedTitle_en || t('specializedServices'))}
+            </h2>
+            <p className="text-gray-500 text-lg">
+              {lang === 'ar' ? (siteSettings.specializedSubtitle || t('specializedServicesDesc')) : (siteSettings.specializedSubtitle_en || t('specializedServicesDesc'))}
+            </p>
           </div>
           <div className="flex gap-2">
             <div className="w-12 h-1 bg-gold rounded-full" />
@@ -475,9 +503,9 @@ export const SpecializedServices = ({ lang, specializedServices, siteSettings, t
       </div>
     </section>
   );
-};
+});
 
-export const WhyUs = ({ lang, siteSettings, t }: { key?: string | number, lang: 'ar' | 'en', siteSettings: SiteSettings, t: any }) => (
+export const WhyUs = React.memo(({ lang, siteSettings, t }: { key?: string | number, lang: 'ar' | 'en', siteSettings: SiteSettings, t: any }) => (
   <section id="about" className="py-24">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="grid lg:grid-cols-2 gap-16 items-center">
@@ -540,9 +568,9 @@ export const WhyUs = ({ lang, siteSettings, t }: { key?: string | number, lang: 
       </div>
     </div>
   </section>
-);
+));
 
-export const CTA = ({ lang, siteSettings, t }: { key?: string | number, lang: 'ar' | 'en', siteSettings: SiteSettings, t: any }) => (
+export const CTA = React.memo(({ lang, siteSettings, t }: { key?: string | number, lang: 'ar' | 'en', siteSettings: SiteSettings, t: any }) => (
   <section id="cta" className="py-20">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="bg-dark rounded-[3rem] p-12 lg:p-20 relative overflow-hidden text-center">
@@ -583,4 +611,4 @@ export const CTA = ({ lang, siteSettings, t }: { key?: string | number, lang: 'a
       </div>
     </div>
   </section>
-);
+));

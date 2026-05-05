@@ -12,7 +12,7 @@ interface FooterProps {
   handleLogin: (mode?: 'customer' | 'driver') => void;
 }
 
-export const Footer = ({ lang, siteSettings, userProfile, handleLogin }: FooterProps) => {
+export const Footer = React.memo(({ lang, siteSettings, userProfile, handleLogin }: FooterProps) => {
   const t = (key: keyof typeof translations.ar) => translations[lang][key] || key;
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
 
@@ -80,14 +80,18 @@ export const Footer = ({ lang, siteSettings, userProfile, handleLogin }: FooterP
           
           <div>
             <h4 className="font-bold mb-6 text-gold">{lang === 'ar' ? 'للتواصل' : 'Contact'}</h4>
-            <ul className="space-y-4 text-gray-400">
-              <li className="flex items-center gap-3">
-                <Phone className="w-5 h-5 text-gold" />
-                <span>{siteSettings.phone}</span>
+            <ul className="space-y-4">
+              <li className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center text-gold shrink-0">
+                  <Phone className="w-5 h-5" />
+                </div>
+                <span className="text-gray-400 font-medium">{siteSettings.phone}</span>
               </li>
-              <li className="flex items-center gap-3">
-                <MapPin className="w-5 h-5 text-gold" />
-                <span>{lang === 'ar' ? siteSettings.footerAddress : (siteSettings.footerAddress_en || siteSettings.footerAddress)}</span>
+              <li className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center text-gold shrink-0">
+                  <MapPin className="w-5 h-5" />
+                </div>
+                <span className="text-gray-400 font-medium">{lang === 'ar' ? siteSettings.footerAddress : (siteSettings.footerAddress_en || siteSettings.footerAddress)}</span>
               </li>
             </ul>
           </div>
@@ -112,4 +116,4 @@ export const Footer = ({ lang, siteSettings, userProfile, handleLogin }: FooterP
       />
     </footer>
   );
-};
+});

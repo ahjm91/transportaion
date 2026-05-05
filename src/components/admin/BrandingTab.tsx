@@ -121,6 +121,75 @@ export const BrandingTab = ({ siteSettings, setSiteSettings, handleImageUpload, 
             </div>
           </div>
 
+          {/* Custom Section Titles */}
+          <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm">
+            <h5 className="font-black text-dark mb-6 flex items-center gap-3 text-sm">
+              <Type className="w-4 h-4 text-gold" />
+              {lang === 'ar' ? 'عناوين الأقسام المخصصة' : 'Custom Section Titles'}
+            </h5>
+            <div className="grid md:grid-cols-2 gap-8">
+              <div className="space-y-4 bg-gray-50/50 p-6 rounded-[2.5rem]">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{lang === 'ar' ? 'عنوان خدماتنا (AR)' : 'Services Title (AR)'}</label>
+                <input 
+                  type="text" 
+                  className="w-full bg-white border-none rounded-2xl p-4 font-black text-dark"
+                  value={siteSettings.servicesTitle || ''}
+                  placeholder="خدماتنا الفاخرة"
+                  onChange={e => updateSettings({ servicesTitle: e.target.value })}
+                />
+              </div>
+              <div className="space-y-4 bg-gray-50/50 p-6 rounded-[2.5rem]">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Services Title (EN)</label>
+                <input 
+                  type="text" 
+                  className="w-full bg-white border-none rounded-2xl p-4 font-black text-dark"
+                  value={siteSettings.servicesTitle_en || ''}
+                  placeholder="Our Luxury Services"
+                  onChange={e => updateSettings({ servicesTitle_en: e.target.value })}
+                />
+              </div>
+              <div className="space-y-4 bg-gray-50/50 p-6 rounded-[2.5rem]">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{lang === 'ar' ? 'العنوان الفرعي للخدمات (AR)' : 'Services Subtitle (AR)'}</label>
+                <input 
+                  type="text" 
+                  className="w-full bg-white border-none rounded-2xl p-4 font-bold text-dark"
+                  value={siteSettings.servicesSubtitle || ''}
+                  onChange={e => updateSettings({ servicesSubtitle: e.target.value })}
+                />
+              </div>
+              <div className="space-y-4 bg-gray-50/50 p-6 rounded-[2.5rem]">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Services Subtitle (EN)</label>
+                <input 
+                  type="text" 
+                  className="w-full bg-white border-none rounded-2xl p-4 font-bold text-dark"
+                  value={siteSettings.servicesSubtitle_en || ''}
+                  onChange={e => updateSettings({ servicesSubtitle_en: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-4 bg-gray-50/50 p-6 rounded-[2.5rem]">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{lang === 'ar' ? 'عنوان الخدمات الخاصة (AR)' : 'Specialized Title (AR)'}</label>
+                <input 
+                  type="text" 
+                  className="w-full bg-white border-none rounded-2xl p-4 font-black text-dark"
+                  value={siteSettings.specializedTitle || ''}
+                  placeholder="خدمات حصرية"
+                  onChange={e => updateSettings({ specializedTitle: e.target.value })}
+                />
+              </div>
+              <div className="space-y-4 bg-gray-50/50 p-6 rounded-[2.5rem]">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Specialized Title (EN)</label>
+                <input 
+                  type="text" 
+                  className="w-full bg-white border-none rounded-2xl p-4 font-black text-dark"
+                  value={siteSettings.specializedTitle_en || ''}
+                  placeholder="Exclusive Services"
+                  onChange={e => updateSettings({ specializedTitle_en: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Typography & Style Card */}
           <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm">
             <h5 className="font-black text-dark mb-6 flex items-center gap-3 text-sm">

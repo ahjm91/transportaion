@@ -3,7 +3,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Layout, Box, Globe, DollarSign, Users, PieChart, Star, 
-  Settings, LogOut, Search, Bell, Menu, Shield, Loader2, Gift, Car, BarChart3, Truck
+  Settings, LogOut, Search, Bell, Menu, Shield, Loader2, Gift, Car, BarChart3, Truck, ChevronRight, Save, Check
 } from 'lucide-react';
 import { Trip, SiteSettings, Service, SpecializedService, UserProfile, FixedRoute, Booking, Driver } from '../../types';
 import { AccountingTab } from './AccountingTab';
@@ -17,7 +17,8 @@ import { PromoCodesTab } from './PromoCodesTab';
 import { ReportsTab } from './ReportsTab';
 import { AuditLogsTab } from './AuditLogsTab';
 import { ManualDispatchTab } from './ManualDispatchTab';
-import { FileText } from 'lucide-react';
+import { OverviewTab } from './OverviewTab';
+import { FileText, ChevronLeft } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 interface AdminDashboardProps {
@@ -61,25 +62,44 @@ export const AdminDashboard = ({
 }: AdminDashboardProps) => {
   const [isAdminScheduleView, setIsAdminScheduleView] = React.useState(false);
   const [tripFilter, setTripFilter] = React.useState<'all' | 'requested' | 'pending_price' | 'unpaid' | 'paid'>('all');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState('');
 
-  const menuItems = [
+  const menuItems = React.useMemo(() => [
+    { id: 'overview', name: lang === 'ar' ? 'نظرة عامة' : 'Overview', icon: Layout },
     { id: 'dispatch', name: lang === 'ar' ? 'توزيع الطلبات' : 'Manual Dispatch', icon: Truck },
     { id: 'accounting', name: lang === 'ar' ? 'المحاسبة والرحلات' : 'Accounting & Trips', icon: PieChart },
     { id: 'reports', name: lang === 'ar' ? 'التقارير والإغلاق' : 'Reports & Closure', icon: BarChart3 },
     { id: 'payouts', name: lang === 'ar' ? 'طلبات السحب' : 'Payout Requests', icon: DollarSign },
     { id: 'promos', name: lang === 'ar' ? 'أكواد الخصم' : 'Promo Codes', icon: Gift },
-    { id: 'content', name: lang === 'ar' ? 'إدارة المحتوى' : 'Content Management', icon: Layout },
+    { id: 'content', name: lang === 'ar' ? 'إدارة المحتوى' : 'Content Management', icon: Box },
     { id: 'pricing', name: lang === 'ar' ? 'التسعير والربط' : 'Pricing & Routes', icon: Settings },
     { id: 'drivers', name: lang === 'ar' ? 'إدارة السائقين' : 'Driver Management', icon: Car },
     { id: 'users', name: lang === 'ar' ? 'إدارة المستخدمين' : 'User Management', icon: Users },
     { id: 'audit', name: lang === 'ar' ? 'سجلات النظام' : 'Audit Logs', icon: FileText },
     { id: 'branding', name: lang === 'ar' ? 'الهوية البصرية' : 'Brand Identity', icon: Star },
-  ];
+  ], [lang]);
+
+  const filteredMenuItems = React.useMemo(() => {
+    if (!searchQuery.trim()) return menuItems;
+    const query = searchQuery.toLowerCase();
+    return menuItems.filter(item => 
+      item.name.toLowerCase().includes(query) || 
+      item.id.toLowerCase().includes(query)
+    );
+  }, [menuItems, searchQuery]);
+
+  // Set default tab to overview if none selected or on first open
+  React.useEffect(() => {
+    if (!activeTab || activeTab === 'content') {
+      setActiveTab('overview');
+    }
+  }, []);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center p-0 md:p-6" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-0" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -89,113 +109,225 @@ export const AdminDashboard = ({
       />
       
       <motion.div 
-        initial={{ y: 50, opacity: 0, scale: 0.95 }}
-        animate={{ y: 0, opacity: 1, scale: 1 }}
-        exit={{ y: 50, opacity: 0, scale: 0.95 }}
-        className="relative bg-gray-50 w-full h-full md:max-w-[95vw] md:h-[90vh] md:rounded-[3rem] shadow-2xl flex flex-col overflow-hidden"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.15 }}
+        className="relative bg-gray-50 w-full h-full shadow-2xl flex overflow-hidden"
       >
-        {/* Top Header */}
-        <div className="bg-white px-8 py-6 border-b border-gray-100 flex items-center justify-between z-10 shrink-0">
-          <div className="flex items-center gap-6">
-             <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-dark rounded-2xl flex items-center justify-center shadow-lg shadow-dark/20">
+        {/* Vertical Sidebar */}
+        <motion.div 
+          animate={{ width: isSidebarCollapsed ? 88 : 320 }}
+          transition={{ type: "spring", stiffness: 450, damping: 35 }}
+          className={cn(
+            "bg-white border-gray-100 flex flex-col shrink-0 z-20 shadow-xl overflow-hidden",
+            lang === 'ar' ? "border-l" : "border-r"
+          )}
+        >
+          {/* Sidebar Header */}
+          <div className={cn("p-8 pb-4 transition-all duration-300", isSidebarCollapsed && "p-4 text-center")}>
+             <div className="flex items-center gap-3 mb-8">
+                <div className="w-12 h-12 bg-dark rounded-2xl flex items-center justify-center shadow-lg shadow-dark/20 shrink-0">
                   <Box className="w-7 h-7 text-gold" />
                 </div>
-                <div>
-                  <h2 className="text-xl font-black text-dark leading-none">{lang === 'ar' ? 'لوحة التحكم' : 'Control Panel'}</h2>
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1.5">Admin Management System</p>
-                </div>
+                {!isSidebarCollapsed && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="overflow-hidden">
+                    <h2 className="text-xl font-black text-dark leading-none whitespace-nowrap">{lang === 'ar' ? 'لوحة التحكم' : 'Control Panel'}</h2>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1.5 whitespace-nowrap">Admin System</p>
+                  </motion.div>
+                )}
+             </div>
+
+             {!isSidebarCollapsed && (
+               <div className="mb-6">
+                 <div className="relative group">
+                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                     <Search className={cn("w-4 h-4 transition-colors", searchQuery ? "text-gold" : "text-gray-400")} />
+                   </div>
+                   <input
+                     type="text"
+                     value={searchQuery}
+                     onChange={(e) => setSearchQuery(e.target.value)}
+                     placeholder={lang === 'ar' ? 'بحث في القائمة...' : 'Search menu...'}
+                     className="w-full bg-gray-50 border border-gray-100 rounded-2xl py-3 pl-11 pr-4 text-sm font-medium focus:ring-2 focus:ring-gold/20 focus:border-gold transition-all"
+                   />
+                   {searchQuery && (
+                     <button 
+                       onClick={() => setSearchQuery('')}
+                       className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-dark"
+                     >
+                       <X className="w-3 h-3" />
+                     </button>
+                   )}
+                 </div>
+               </div>
+             )}
+
+             {!isSidebarCollapsed && (
+               <div className="space-y-4 mb-8">
+                  <div className="bg-gray-50 p-4 rounded-3xl border border-gray-100 flex items-center gap-4 shadow-sm group hover:shadow-md transition-all cursor-default">
+                    <div className="w-10 h-10 bg-gold/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+                      <PieChart className="w-5 h-5 text-gold" />
+                    </div>
+                    <div>
+                      <div className="text-[8px] text-gray-400 font-bold uppercase">{lang === 'ar' ? 'إجمالي الرحلات' : 'Total Trips'}</div>
+                      <div className="text-sm font-black text-dark">{trips.length + bookings.filter(b => b.status === 'completed').length}</div>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded-3xl border border-gray-100 flex items-center gap-4 shadow-sm group hover:shadow-md transition-all cursor-default">
+                    <div className="w-10 h-10 bg-green-50 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+                      <Users className="w-5 h-5 text-green-500" />
+                    </div>
+                    <div>
+                      <div className="text-[8px] text-gray-400 font-bold uppercase">{lang === 'ar' ? 'سائقين متصلين' : 'Online Drivers'}</div>
+                      <div className="text-sm font-black text-dark">{allDrivers.filter(d => d.status === 'online').length}</div>
+                    </div>
+                  </div>
+               </div>
+             )}
+          </div>
+
+          {/* Navigation Items */}
+          <div className="flex-1 overflow-y-auto px-4 space-y-1 no-scrollbar py-2">
+            {filteredMenuItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={cn(
+                  "w-full rounded-2xl text-xs font-black flex items-center gap-4 transition-all duration-150 group",
+                  activeTab === item.id 
+                    ? "bg-gold text-white shadow-lg shadow-gold/20 scale-[1.02] py-4 px-5" 
+                    : "text-gray-400 hover:text-dark hover:bg-gray-50 py-4 px-5",
+                  isSidebarCollapsed && "justify-center px-0 py-4"
+                )}
+                title={isSidebarCollapsed ? item.name : ""}
+              >
+                <item.icon className={cn(
+                  "w-5 h-5 transition-transform group-hover:scale-110", 
+                  activeTab === item.id ? "text-white" : "text-gray-400 group-hover:text-gold"
+                )} />
+                {!isSidebarCollapsed && (
+                  <span className="whitespace-nowrap overflow-hidden text-ellipsis">{item.name}</span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Sidebar Footer */}
+          <div className="p-4 border-t border-gray-50 space-y-3 bg-white">
+             <button 
+               onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+               className="w-full h-12 bg-gray-50 text-gray-400 rounded-2xl flex items-center justify-center hover:bg-gray-100 hover:text-gold transition-all"
+             >
+               <ChevronRight className={cn(
+                 "w-5 h-5 transition-transform duration-300", 
+                 isSidebarCollapsed ? (lang === 'ar' ? "rotate-0 text-gold" : "rotate-180 text-gold") : (lang === 'ar' ? "rotate-180" : "rotate-0")
+               )} />
+             </button>
+
+             <div className="flex items-center gap-3">
+                <button 
+                  onClick={onClose}
+                  className="flex-1 bg-gold text-white rounded-2xl py-4 text-xs font-black uppercase tracking-widest hover:bg-dark transition-all flex items-center justify-center gap-2 shadow-lg shadow-gold/20"
+                >
+                  <Save className="w-4 h-4" />
+                  {lang === 'ar' ? 'حفظ الحالات' : 'Save & Exit'}
+                </button>
+                <button 
+                  onClick={onClose}
+                  className="w-full bg-red-50 text-red-500 rounded-2xl py-4 text-xs font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all flex items-center justify-center gap-2"
+                >
+                  <LogOut className="w-4 h-4" />
+                  {lang === 'ar' ? 'تسجيل الخروج' : 'Logout'}
+                </button>
              </div>
              
-             <div className="hidden lg:flex items-center gap-2 bg-gray-50 p-1 rounded-2xl border border-gray-100 overflow-x-auto max-w-[60vw] no-scrollbar">
-               {menuItems.map((item) => (
-                 <button
-                   key={item.id}
-                   onClick={() => setActiveTab(item.id)}
-                   className={cn(
-                     "px-4 py-2.5 rounded-xl text-[10px] font-black flex items-center gap-2 transition-all whitespace-nowrap",
-                     activeTab === item.id 
-                       ? "bg-white text-gold shadow-lg shadow-gold/5" 
-                       : "text-gray-400 hover:text-dark hover:bg-gray-100"
-                   )}
-                 >
-                   <item.icon className="w-3.5 h-3.5" />
-                   {item.name}
-                 </button>
-               ))}
+             {!isSidebarCollapsed && (
+               <div className="flex items-center gap-3 px-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none">System Operational</p>
+               </div>
+             )}
+          </div>
+        </motion.div>
+
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col h-full bg-gray-50/50 overflow-hidden relative">
+          {/* Content Header */}
+          <div className="h-24 bg-white/50 backdrop-blur-sm border-b border-gray-100 flex items-center justify-between px-12 shrink-0">
+             <motion.div
+               key={activeTab}
+               initial={{ opacity: 0, x: -10 }}
+               animate={{ opacity: 1, x: 0 }}
+               transition={{ duration: 0.1 }}
+             >
+                <h1 className="text-2xl font-black text-dark">
+                  {menuItems.find(item => item.id === activeTab)?.name}
+                </h1>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">
+                  Management Dashboard / {activeTab}
+                </p>
+             </motion.div>
+
+             <div className="flex items-center gap-6">
+                <div className="hidden md:flex items-center gap-4">
+                   <button 
+                     onClick={onClose}
+                     className="bg-gold text-white px-8 h-12 rounded-2xl flex items-center gap-3 text-xs font-black uppercase tracking-widest hover:bg-dark transition-all shadow-lg shadow-gold/20 active:scale-95 duration-150"
+                   >
+                     <Save className="w-4 h-4" />
+                     {lang === 'ar' ? 'حفظ وخروج' : 'Save & Exit'}
+                   </button>
+                   <div className="bg-white p-2 px-4 rounded-2xl border border-gray-100 flex items-center gap-3 shadow-sm">
+                      <Star className="w-4 h-4 text-gold fill-gold" />
+                      <span className="text-sm font-black text-dark">
+                        {allDrivers.length > 0 
+                          ? (allDrivers.reduce((acc, d) => acc + (d.averageRating || 5), 0) / allDrivers.length).toFixed(1)
+                          : '5.0'}
+                      </span>
+                   </div>
+                   <div className="bg-white p-2 px-4 rounded-2xl border border-gray-100 flex items-center gap-3 shadow-sm">
+                      <Shield className="w-4 h-4 text-blue-500" />
+                      <span className="text-[10px] font-black text-gray-400 uppercase">Admin Mode</span>
+                   </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                   <button className="relative w-12 h-12 bg-white border border-gray-100 rounded-2xl flex items-center justify-center text-gray-400 hover:text-dark transition-all shadow-sm hover:scale-105 active:scale-95 duration-150">
+                      <Bell className="w-5 h-5" />
+                      <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
+                   </button>
+                   <button 
+                     onClick={onClose}
+                     className="w-12 h-12 bg-dark text-white rounded-2xl flex items-center justify-center hover:bg-gold transition-all shadow-lg shadow-dark/10 hover:scale-105 active:scale-95 duration-150"
+                   >
+                     <X className="w-6 h-6" />
+                   </button>
+                </div>
              </div>
           </div>
 
-          <div className="flex items-center gap-4">
-             <button className="relative w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-400 hover:text-dark transition-all">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
-             </button>
-             <div className="h-10 w-px bg-gray-100 mx-2" />
-             <button 
-               onClick={onClose}
-               className="w-12 h-12 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm"
-             >
-               <X className="w-6 h-6" />
-             </button>
-          </div>
-        </div>
+          {/* Tab Content */}
+          <div className="flex-1 overflow-y-auto p-12 no-scrollbar">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, scale: 0.99 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.01 }}
+                transition={{ duration: 0.1 }}
+                className="max-w-[1400px] mx-auto"
+              >
+              {activeTab === 'overview' && (
+                <OverviewTab 
+                  trips={trips}
+                  bookings={bookings}
+                  allDrivers={allDrivers}
+                  users={users}
+                  lang={lang}
+                />
+              )}
 
-        {/* Pro Stats Summary */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-8 mb-4 shrink-0">
-          <div className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4 shadow-sm group hover:shadow-md transition-all">
-            <div className="w-10 h-10 bg-gold/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <PieChart className="w-5 h-5 text-gold" />
-            </div>
-            <div>
-              <div className="text-[10px] text-gray-400 font-bold uppercase">{lang === 'ar' ? 'إجمالي الرحلات' : 'Total Trips'}</div>
-              <div className="text-lg font-black text-dark">{trips.length + bookings.filter(b => b.status === 'completed').length}</div>
-            </div>
-          </div>
-          <div className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4 shadow-sm group hover:shadow-md transition-all">
-            <div className="w-10 h-10 bg-green-50 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Users className="w-5 h-5 text-green-500" />
-            </div>
-            <div>
-              <div className="text-[10px] text-gray-400 font-bold uppercase">{lang === 'ar' ? 'سائقين متصلين' : 'Online Drivers'}</div>
-              <div className="text-lg font-black text-dark">{allDrivers.filter(d => d.status === 'online').length}</div>
-            </div>
-          </div>
-          <div className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4 shadow-sm group hover:shadow-md transition-all">
-            <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Star className="w-5 h-5 text-blue-500" />
-            </div>
-            <div>
-              <div className="text-[10px] text-gray-400 font-bold uppercase">{lang === 'ar' ? 'رحلات نشطة' : 'Active Trips'}</div>
-              <div className="text-lg font-black text-dark">{bookings.filter(b => !['completed', 'cancelled', 'no_driver_found'].includes(b.status)).length}</div>
-            </div>
-          </div>
-          <div className="bg-white p-4 rounded-3xl border border-gray-100 flex items-center gap-4 shadow-sm group hover:shadow-md transition-all">
-            <div className="w-10 h-10 bg-gold/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Star className="w-5 h-5 text-gold fill-gold" />
-            </div>
-            <div>
-              <div className="text-[10px] text-gray-400 font-bold uppercase">{lang === 'ar' ? 'متوسط التقييم' : 'Avg Rating'}</div>
-              <div className="text-lg font-black text-dark">
-                {allDrivers.length > 0 
-                  ? (allDrivers.reduce((acc, d) => acc + (d.averageRating || 5), 0) / allDrivers.length).toFixed(1)
-                  : '5.0'}
-              </div>
-            </div>
-          </div>
-
-        </div>
-
-        {/* Main Content Area */}
-        <div className="flex-1 overflow-y-auto p-8 lg:p-12 pt-4 lg:pt-4 pb-24 md:pb-8">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
               {activeTab === 'dispatch' && (
                 <ManualDispatchTab 
                   bookings={bookings}
@@ -300,37 +432,6 @@ export const AdminDashboard = ({
           </AnimatePresence>
         </div>
 
-        {/* Mobile Bottom Nav */}
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-gray-100 p-2 flex items-center justify-around z-20">
-          {menuItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={cn(
-                "flex flex-col items-center gap-1 p-2 rounded-xl transition-all",
-                activeTab === item.id ? "text-gold" : "text-gray-400"
-              )}
-            >
-              <item.icon className="w-5 h-5" />
-              <span className="text-[8px] font-black uppercase">{item.name.split(' ')[0]}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Footer Info */}
-        <div className="bg-white border-t border-gray-100 p-6 flex flex-wrap justify-between items-center gap-4 shrink-0">
-           <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center animate-pulse">
-                <Shield className="w-4 h-4 text-white" />
-              </div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">System Status: All Systems Operational</p>
-           </div>
-             <button 
-               onClick={onClose}
-               className="bg-dark text-white px-10 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-gold transition-all shadow-xl shadow-dark/10"
-             >
-               {lang === 'ar' ? 'خروج وحفظ الإعدادات' : 'Exit & Save Settings'}
-             </button>
         </div>
       </motion.div>
     </div>

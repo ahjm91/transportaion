@@ -167,9 +167,9 @@ function App() {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isDriverRegistrationOpen, setIsDriverRegistrationOpen] = useState(false);
   const authProcessedRef = React.useRef<string | null>(null);
-  const t = (key: keyof typeof translations.ar) => translations[lang][key] || key;
+  const t = React.useCallback((key: keyof typeof translations.ar) => translations[lang][key] || key, [lang]);
 
-  const logAnalyticsEvent = (event: string, category: string, label?: string, metadata?: any) => {
+  const logAnalyticsEvent = React.useCallback((event: string, category: string, label?: string, metadata?: any) => {
     try {
       fetch('/api/analytics', {
         method: 'POST',
@@ -177,7 +177,7 @@ function App() {
         body: JSON.stringify({ event, category, label, metadata })
       }).catch(() => {});
     } catch (e) {}
-  };
+  }, []);
 
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({
     companyName: 'GCC TAXI',
@@ -330,21 +330,21 @@ function App() {
     }
   }, [isAdmin, user]);
 
-  const safeUpdateDoc = async (docRef: any, data: any) => {
+  const safeUpdateDoc = React.useCallback(async (docRef: any, data: any) => {
     try {
       await updateDoc(docRef, data);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, docRef.path);
     }
-  };
+  }, []);
 
-  const safeAddDoc = async (colRef: any, data: any) => {
+  const safeAddDoc = React.useCallback(async (colRef: any, data: any) => {
     try {
       return await addDoc(colRef, data);
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, colRef.path);
     }
-  };
+  }, []);
 
   // Real-time Booking Listener
   useEffect(() => {
@@ -395,13 +395,13 @@ function App() {
   }, [activeDriver?.id, activeRealtimeBooking]);
 
   // Dynamic Theme Applier
-  const safeDeleteDoc = async (docRef: any) => {
+  const safeDeleteDoc = React.useCallback(async (docRef: any) => {
     try {
       await deleteDoc(docRef);
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, docRef.path);
     }
-  };
+  }, []);
   const [activeTab, setActiveTab] = useState<'content' | 'accounting' | 'branding' | 'pricing' | 'users'>('content');
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -680,7 +680,6 @@ function App() {
   useEffect(() => {
     const unsubscribeServices = onSnapshot(collection(db, 'services'), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
-      console.log('Services updated from Firestore:', data);
       setServices(data);
     }, (error) => {
       console.error('Firestore services listener error:', error);
@@ -688,7 +687,6 @@ function App() {
 
     const unsubscribeSpecialized = onSnapshot(collection(db, 'specialized_services'), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SpecializedService));
-      console.log('Specialized Services updated from Firestore:', data);
       setSpecializedServices(data.sort((a, b) => (a.order || 0) - (b.order || 0)));
     }, (error) => {
       console.error('Firestore specialized services listener error:', error);
@@ -1807,6 +1805,7 @@ function App() {
                     key="services"
                     lang={lang}
                     services={services}
+                    siteSettings={siteSettings}
                     t={t}
                   />
                 );

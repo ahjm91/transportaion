@@ -120,6 +120,16 @@ export interface SiteSettings {
   // CTAs
   bookingButtonText?: string;
   bookingButtonText_en?: string;
+
+  // Custom Section Texts
+  servicesTitle?: string;
+  servicesTitle_en?: string;
+  servicesSubtitle?: string;
+  servicesSubtitle_en?: string;
+  specializedTitle?: string;
+  specializedTitle_en?: string;
+  specializedSubtitle?: string;
+  specializedSubtitle_en?: string;
 }
 
 export interface Wallet {
