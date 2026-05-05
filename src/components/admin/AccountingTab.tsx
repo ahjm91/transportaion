@@ -158,7 +158,7 @@ export const AccountingTab = ({
       {!isAdminScheduleView ? (
         <div className="bg-white border border-gray-100 rounded-[2.5rem] shadow-sm overflow-hidden">
           <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full border-collapse min-w-[1000px]">
+            <table className={cn("w-full border-collapse min-w-[1000px]", lang === 'ar' ? "text-right" : "text-left")}>
               <thead>
                 <tr className={cn("bg-gray-50 text-[10px] font-black text-gray-400 uppercase tracking-widest", lang === 'ar' ? "text-right" : "text-left")}>
                   <th className="p-4 border-b w-10">

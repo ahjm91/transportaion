@@ -320,6 +320,27 @@ export const AdminDashboard = ({
              </motion.div>
 
              <div className="flex items-center gap-3 md:gap-6 w-full md:w-auto justify-end md:justify-end">
+                {/* Desktop Quick Stats */}
+                <div className="hidden xl:flex items-center gap-4 mr-2">
+                   <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-xl border border-blue-100">
+                      <PieChart className="w-4 h-4 text-blue-600" />
+                      <div className="flex flex-col">
+                        <span className="text-[8px] font-black text-blue-400 uppercase tracking-widest leading-none mb-0.5">{lang === 'ar' ? 'إجمالي الرحلات' : 'Total Trips'}</span>
+                        <span className="text-[12px] font-black text-dark leading-none">{trips.length + bookings.filter(b => b.status === 'completed').length}</span>
+                      </div>
+                   </div>
+                   <div className="flex items-center gap-2 px-4 py-2 bg-green-50 rounded-xl border border-green-100">
+                      <div className="relative">
+                        <Users className="w-4 h-4 text-green-600" />
+                        <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[8px] font-black text-green-400 uppercase tracking-widest leading-none mb-0.5">{lang === 'ar' ? 'سائقين متصلين' : 'Online Drivers'}</span>
+                        <span className="text-[12px] font-black text-dark leading-none">{allDrivers.filter(d => d.status === 'online').length}</span>
+                      </div>
+                   </div>
+                </div>
+
                 <button 
                   onClick={onClose}
                   className="bg-gold text-white px-4 md:px-8 h-10 md:h-12 rounded-xl md:rounded-2xl flex items-center gap-2 md:gap-3 text-[10px] md:text-xs font-black uppercase tracking-widest hover:bg-dark transition-all shadow-lg shadow-gold/20 active:scale-95 duration-150"
@@ -353,17 +374,18 @@ export const AdminDashboard = ({
             </div>
 
           {/* Tab Content */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12 no-scrollbar">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTab}
-                initial={{ opacity: 0, scale: 0.99 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 1.01 }}
-                transition={{ duration: 0.1 }}
-                className="w-full max-w-[1600px] mx-auto"
-              >
-              {activeTab === 'overview' && (
+          <div className="flex-1 overflow-y-auto no-scrollbar">
+            <div className="p-4 md:p-8 lg:p-12 w-full">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeTab}
+                  initial={{ opacity: 0, scale: 0.99 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 1.01 }}
+                  transition={{ duration: 0.1 }}
+                  className="w-full max-w-[1600px] mx-auto"
+                >
+                {activeTab === 'overview' && (
                 <OverviewTab 
                   trips={trips}
                   bookings={bookings}
@@ -476,9 +498,9 @@ export const AdminDashboard = ({
             </motion.div>
           </AnimatePresence>
         </div>
-
-        </div>
-      </motion.div>
+      </div>
     </div>
+  </motion.div>
+</div>
   );
 };

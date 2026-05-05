@@ -160,7 +160,7 @@ export const BookingForm = ({
                   <label className="text-xs font-black text-gray-400 uppercase tracking-widest">{lang === 'ar' ? 'اختر الوجهة الثابتة' : 'Select Fixed Route'}</label>
                   <div className="relative">
                     <select 
-                      className="w-full bg-gray-50 border-none rounded-2xl py-4 px-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold cursor-pointer appearance-none pr-10"
+                      className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-10 pl-10 focus:ring-2 focus:ring-gold/20 transition-all font-bold cursor-pointer appearance-none text-sm md:text-base overflow-hidden text-ellipsis"
                       onChange={e => {
                         const route = fixedRoutes.find(r => r.id === e.target.value);
                         if (route) {
