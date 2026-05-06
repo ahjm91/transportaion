@@ -6,7 +6,8 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import admin from 'firebase-admin';
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
+import axios from 'axios';
 import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -56,63 +57,65 @@ try {
 }
 
 // =====================
-// Email Configuration (Nodemailer)
+// Email Notification (Resend)
 // =====================
-const createTransporter = () => {
-  // Use professional service like SendGrid, Mailtrap or Gmail (App Password)
-  // For demo/dev, we recommend Mailtrap.io
-  const host = process.env.SMTP_HOST || 'smtp.mailtrap.io';
-  const port = parseInt(process.env.SMTP_PORT || '2525');
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-
-  if (!user || !pass) {
-    console.warn("⚠️ Email credentials missing in .env. Emails will not be sent.");
-    return null;
-  }
-
-  return nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: { user, pass },
-  });
-};
+const resendClient = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 const sendBookingEmail = async (bookingData: any) => {
-  const transporter = createTransporter();
-  if (!transporter) return;
+  if (!resendClient) {
+    console.warn("⚠️ RESEND_API_KEY missing. Email skipped.");
+    return;
+  }
 
-  const { customerName, phone, pickupAddress, dropoffAddress, date, time, bookingId } = bookingData;
-
-  const mailOptions = {
-    from: `"GCC TAXI Support" <${process.env.SMTP_USER}>`,
-    to: process.env.ADMIN_EMAIL || 'ahjm91@gmail.com', // Notify admin
-    subject: `New Booking Request: #${bookingId}`,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-        <h2 style="color: #D4AF37; text-align: center;">GCC TAXI - New Booking</h2>
-        <p>A new booking has been created with the following details:</p>
-        <table style="width: 100%; border-collapse: collapse;">
-          <tr><td style="padding: 10px; border-bottom: 1px solid #eee;"><strong>Booking ID:</strong></td><td style="padding: 10px; border-bottom: 1px solid #eee;">${bookingId}</td></tr>
-          <tr><td style="padding: 10px; border-bottom: 1px solid #eee;"><strong>Customer:</strong></td><td style="padding: 10px; border-bottom: 1px solid #eee;">${customerName}</td></tr>
-          <tr><td style="padding: 10px; border-bottom: 1px solid #eee;"><strong>Phone:</strong></td><td style="padding: 10px; border-bottom: 1px solid #eee;">${phone}</td></tr>
-          <tr><td style="padding: 10px; border-bottom: 1px solid #eee;"><strong>Pickup:</strong></td><td style="padding: 10px; border-bottom: 1px solid #eee;">${pickupAddress}</td></tr>
-          <tr><td style="padding: 10px; border-bottom: 1px solid #eee;"><strong>Dropoff:</strong></td><td style="padding: 10px; border-bottom: 1px solid #eee;">${dropoffAddress}</td></tr>
-          <tr><td style="padding: 10px; border-bottom: 1px solid #eee;"><strong>Date/Time:</strong></td><td style="padding: 10px; border-bottom: 1px solid #eee;">${date} at ${time}</td></tr>
-        </table>
-        <p style="margin-top: 20px; color: #666; font-size: 12px; text-align: center;">This is an automated notification from GCC TAXI System.</p>
-      </div>
-    `
-  };
+  const { customerName, phone, pickupAddress, dropoffAddress, date, time, bookingId, price } = bookingData;
+  const adminEmail = process.env.ADMIN_EMAIL || 'ahjm91@gmail.com';
 
   try {
-    console.log(`[EMAIL] Attempting to send email for booking ${bookingId}...`);
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`[EMAIL] Successfully sent: ${info.messageId}`);
+    console.log(`[EMAIL] Sending Resend email for booking ${bookingId}...`);
+    await resendClient.emails.send({
+      from: "GCC TAXI <onboarding@resend.dev>",
+      to: [adminEmail],
+      subject: `🚗 حجز جديد: #${bookingId}`,
+      html: `
+        <div dir="rtl" style="font-family: Tahoma, Arial, sans-serif; border: 1px solid #D4AF37; border-radius: 12px; padding: 25px; background-color: #fcfcfc;">
+          <h2 style="color: #D4AF37; margin-bottom: 20px;">طلب حجز جديد 🚗</h2>
+          <hr style="border: 0; border-top: 1px solid #eee;" />
+          <ul style="list-style: none; padding: 0;">
+            <li style="padding: 10px 0;"><strong>العميل:</strong> ${customerName}</li>
+            <li style="padding: 10px 0;"><strong>الهاتف:</strong> ${phone}</li>
+            <li style="padding: 10px 0;"><strong>من:</strong> ${pickupAddress}</li>
+            <li style="padding: 10px 0;"><strong>إلى:</strong> ${dropoffAddress || 'غير محدد'}</li>
+            <li style="padding: 10px 0;"><strong>التوقيت:</strong> ${date} ${time}</li>
+            <li style="padding: 10px 0; color: #D4AF37;"><strong>القيمة المتوقعة:</strong> ${price || '-'} دينار</li>
+          </ul>
+          <div style="margin-top: 30px; padding: 15px; background: #eee; border-radius: 8px;">
+            <strong>رقم التتبع:</strong> #${bookingId}
+          </div>
+        </div>
+      `
+    });
+    console.log(`[EMAIL] Resend email success.`);
   } catch (error) {
-    console.error(`[EMAIL] Failed to send email:`, error);
+    console.error(`[EMAIL] Resend error:`, error);
   }
+};
+
+// =====================
+// WhatsApp Logic
+// =====================
+const generateWhatsAppLink = (booking: any) => {
+  const adminPhone = "97333138113"; // GCC TAXI Admin Phone
+  const message = `🚗 *طلب حجز جديد*
+  
+👤 *الاسم:* ${booking.customerName}
+📞 *الهاتف:* ${booking.phone}
+📍 *من:* ${booking.pickupAddress}
+📍 *إلى:* ${booking.dropoffAddress || 'غير محدد'}
+🕒 *الوقت:* ${booking.date} ${booking.time}
+💰 *القيمة:* ${booking.price || '-'} دينار
+🆔 *رقم الحجز:* ${booking.bookingId}`;
+
+  return `https://wa.me/${adminPhone}?text=${encodeURIComponent(message)}`;
 };
 
 async function startServer() {
@@ -272,17 +275,23 @@ async function startServer() {
       const docRef = await db.collection("bookings").add(bookingData);
       console.log("[BOOKING] Successfully saved with ID:", docRef.id);
 
-      // 3. Send Email Notification
-      // We don't await this to keep the response fast, but it runs in background
+      // 3. Generate Redirect Link
+      const whatsappLink = generateWhatsAppLink({
+        ...req.body,
+        bookingId: docRef.id
+      });
+
+      // 4. Send Notifications in background
       sendBookingEmail({ 
         ...req.body, 
         bookingId: docRef.id 
       }).catch(err => console.error("[BOOKING] Background email error:", err));
 
-      // 4. Send Success Response
+      // 5. Send Success Response including WhatsApp link
       res.json({ 
         success: true, 
         bookingId: docRef.id,
+        whatsappLink,
         message: "Booking created successfully" 
       });
 

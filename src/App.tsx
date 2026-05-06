@@ -1044,7 +1044,9 @@ function App() {
       }
 
       // Handle WhatsApp redirection if needed for non-realtime
-      if (bookingMode === 'custom' || bookingMode === 'fixed') {
+      if (result.whatsappLink) {
+        window.open(result.whatsappLink, '_blank');
+      } else if (bookingMode === 'custom' || bookingMode === 'fixed') {
         const message = lang === 'ar' 
           ? `طلب حجز جديد (#${result.bookingId}):\nالاسم: ${bookingData.customerName}\nمن: ${bookingData.pickup}\nإلى: ${bookingData.dropoff}\nالتاريخ: ${bookingData.date}`
           : `New Booking Request (#${result.bookingId}):\nName: ${bookingData.customerName}\nFrom: ${bookingData.pickup}\nTo: ${bookingData.dropoff}\nDate: ${bookingData.date}`;
