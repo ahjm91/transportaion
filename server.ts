@@ -14,101 +14,140 @@ import fs from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize Firebase Admin
+import { initializeApp as initializeClientApp } from 'firebase/app';
+import { getFirestore as getClientFirestore, collection, addDoc, serverTimestamp, doc, updateDoc, query, where, getDocs, limit, setDoc } from 'firebase/firestore';
+
+// Initialize Firebase (Client SDK for Server-side to bypass IAM)
 const initializeFirebase = () => {
   const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
-  let config: any = {};
-  if (fs.existsSync(configPath)) {
-    try {
-      config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    } catch (e) {
-      console.error("[FIREBASE] Failed to parse firebase-applet-config.json", e);
-    }
-  }
+  const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 
-  const projectId = config.projectId || process.env.FIREBASE_PROJECT_ID;
-
-  if (admin.apps.length > 0) {
-    const existingApp = admin.app();
-    if (existingApp.options.projectId === projectId) {
-      return existingApp;
-    }
-    console.log(`[FIREBASE] Project ID mismatch (got ${existingApp.options.projectId}, want ${projectId}). Re-initializing...`);
-  }
-
-  try {
-    // Standard initialization for GCP/Cloud Run
-    const app = admin.initializeApp({
-      credential: admin.credential.applicationDefault(),
-      projectId: projectId
+  // Initialize Admin for Auth and potentially other things
+  if (admin.apps.length === 0) {
+    admin.initializeApp({
+      projectId: config.projectId
     });
-    console.log(`[FIREBASE] Admin initialized with applicationDefault for project: ${projectId}`);
-    return app;
-  } catch (err: any) {
-    console.warn("[FIREBASE] applicationDefault failed. Attempting projectId only initialization...", err.message);
-    
-    // If we already have an app with this project ID, just use it
-    if (admin.apps.length > 0 && admin.app().options.projectId === projectId) {
-      return admin.app();
-    }
-
-    if (projectId) {
-      const app = admin.initializeApp({
-        projectId: projectId
-      });
-      console.log(`[FIREBASE] Admin initialized with projectId only: ${projectId}. Note: Admin bypass might not work.`);
-      return app;
-    } else {
-      console.error("[FIREBASE] CRITICAL: No projectId found for initialization.");
-      return null;
-    }
   }
+
+  // Initialize Client SDK
+  const clientApp = initializeClientApp(config);
+  return getClientFirestore(clientApp, config.firestoreDatabaseId);
 };
 
-const firebaseApp = initializeFirebase();
+const db = initializeFirebase();
 
-// Helper to get Firestore instance
-const getDb = () => {
-  try {
-    const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
-    const config = fs.existsSync(configPath) ? JSON.parse(fs.readFileSync(configPath, 'utf8')) : {};
-    const expectedProjectId = config.projectId || process.env.FIREBASE_PROJECT_ID;
+// =====================
+// DB Seeding (Internal)
+// =====================
+// =============================================================================
+// MASTER SYSTEM SETTINGS & CORE DATA SEEDING
+// These configurations are the "Source of Truth" for the application.
+// Do NOT delete or modify these unless explicitly commanded by the user.
+// See /AGENTS.md for persistent instructions.
+// =============================================================================
+const seedDestinations = async () => {
+    try {
+        const routesCol = collection(db, "fixed_routes");
+        const snapshot = await getDocs(routesCol);
+        
+        if (snapshot.empty) {
+            console.log("[FIREBASE] Seeding Master Destinations...");
+            const defaultRoutes = [
+                // Bahrain Local/Airport
+                { pickup: "مطار البحرين", pickup_en: "Bahrain Airport", dropoff: "المنامة", dropoff_en: "Manama", price: 10 },
+                { pickup: "مطار البحرين", pickup_en: "Bahrain Airport", dropoff: "الرفاع", dropoff_en: "Riffa", price: 12 },
+                { pickup: "مطار البحرين", pickup_en: "Bahrain Airport", dropoff: "المحرق", dropoff_en: "Muharraq", price: 5 },
+                { pickup: "مطار البحرين", pickup_en: "Bahrain Airport", dropoff: "الزلاق", dropoff_en: "Zallaq", price: 15 },
+                
+                // Cross-Border KSA
+                { pickup: "المنامة", pickup_en: "Manama", dropoff: "جسر الملك فهد", dropoff_en: "King Fahd Causeway", price: 15 },
+                { pickup: "المنامة", pickup_en: "Manama", dropoff: "الخبر", dropoff_en: "Khobar", price: 35 },
+                { pickup: "المنامة", pickup_en: "Manama", dropoff: "الدمام", dropoff_en: "Dammam", price: 40 },
+                { pickup: "المنامة", pickup_en: "Manama", dropoff: "مطار الدمام", dropoff_en: "Dammam Airport (DMM)", price: 50 },
+                { pickup: "المنامة", pickup_en: "Manama", dropoff: "الرياض", dropoff_en: "Riyadh", price: 150 },
+                
+                // From KSA to Bahrain
+                { pickup: "الخبر", pickup_en: "Khobar", dropoff: "المنامة", dropoff_en: "Manama", price: 35 },
+                { pickup: "الدمام", pickup_en: "Dammam", dropoff: "مطار البحرين", dropoff_en: "Bahrain Airport", price: 45 },
+                
+                // UAE Routes
+                { pickup: "المنامة", pickup_en: "Manama", dropoff: "دبي", dropoff_en: "Dubai", price: 250 },
+                { pickup: "المنامة", pickup_en: "Manama", dropoff: "أبو ظبي", dropoff_en: "Abu Dhabi", price: 240 }
+            ];
+            
+            for (const route of defaultRoutes) {
+                await addDoc(routesCol, route);
+            }
+            console.log("[FIREBASE] Destinations Seeded Successfully.");
+        }
 
-    if (admin.apps.length > 0) {
-      if (admin.app().options.projectId !== expectedProjectId) {
-        console.log(`[FIREBASE] Project ID mismatch. Expected ${expectedProjectId}, got ${admin.app().options.projectId}. Re-initializing...`);
-        // Note: delete() is async, but for simplicity we'll just re-init if possible or proceed
-      }
-    } else {
-      initializeFirebase();
+        // Seed site settings (Master Config)
+        const settingsRef = doc(db, "settings", "site");
+        const settingsSnap = await getDoc(settingsRef);
+        if (!settingsSnap.exists()) {
+            console.log("[FIREBASE] Seeding Master Site Settings...");
+            await setDoc(settingsRef, {
+                companyName: 'GCC TAXI',
+                companyName_en: 'GCC TAXI',
+                heroTitle: 'GCC TAXI',
+                heroSubtitle: 'فخامة التنقل',
+                heroDescription: 'نقدم لك أرقى خدمات التوصيل واللوميزين في مملكة البحرين وجميع دول الخليج.',
+                phone: '+973 32325997',
+                whatsapp: '97332325997',
+                pricePerKm: 0.5,
+                baseFee: 2,
+                adminEmails: ['ahjm91@gmail.com'],
+                primaryColor: '#D4AF37',
+                secondaryColor: '#1A1A1A'
+            });
+        }
+
+        // Seed Services
+        const servicesSnapshot = await getDocs(collection(db, "services"));
+        if (servicesSnapshot.empty) {
+            console.log("[FIREBASE] Seeding services...");
+            const defaultServices = [
+                { name: "Luxury Sedan", name_en: "Luxury Sedan", description: "S-Class or similar", image: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2", features: ["VIP", "WiFi", "Water"] },
+                { name: "Family Van", name_en: "Family Van", description: "Large van for 7+ people", image: "https://images.unsplash.com/photo-1542296332-2e4473faf563", features: ["Spacious", "WiFi"] }
+            ];
+            for (const s of defaultServices) await addDoc(collection(db, "services"), s);
+        }
+
+        // Seed Specialized Services (Landing Page Content)
+        const specSnapshot = await getDocs(collection(db, "specialized_services"));
+        if (specSnapshot.empty) {
+            console.log("[FIREBASE] Seeding Master Specialized Services...");
+            const defaultSpec = [
+                { 
+                    title: "توصيل واستقبال المطار", 
+                    title_en: "Airport Transfer", 
+                    desc: "خدمة راقية من وإلى جميع مطارات دول الخليج العربي، مع استقبال خاص في صالات الانتظار ومتابعة دقيقة لمواعيد الرحلات.", 
+                    image: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=800", 
+                    order: 1 
+                },
+                { 
+                    title: "رحلات جسر الملك فهد", 
+                    title_en: "King Fahd Causeway Trips", 
+                    desc: "تنقل يومي سلس وآمن بين مملكة البحرين والمملكة العربية السعودية (الخبر، الدمام، الجبيل، الرياض) بأفضل الأسعار.", 
+                    image: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&q=80&w=800", 
+                    order: 2 
+                },
+                { 
+                    title: "خدمة كبار الشخصيات VIP", 
+                    title_en: "VIP Chauffeur Service", 
+                    desc: "سيارات فاخرة من أحدث الطرازات مع سائقين محترفين بزي رسمي لخدمة وفود الشركات والمناسبات الخاصة والأعراس.", 
+                    image: "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&q=80&w=800", 
+                    order: 3 
+                }
+            ];
+            for (const s of defaultSpec) await addDoc(collection(db, "specialized_services"), s);
+        }
+    } catch (err) {
+        console.error("[FIREBASE] Seed error:", err);
     }
-    
-    // Use the provisioned database ID from config
-    const databaseId = config.firestoreDatabaseId || undefined;
-    
-    console.log(`[FIREBASE] Getting Firestore for project ${admin.app().options.projectId} and database: ${databaseId || '(default)'}`);
-    
-    // Using admin.app() to ensure we use the initialized one
-    const app = admin.app();
-    return getFirestore(app, databaseId);
-  } catch (error) {
-    console.error("Failed to get Firestore instance:", error);
-    return null;
-  }
 };
 
-// Initial test of database connection
-const db = getDb();
-if (db) {
-  console.log(`[FIREBASE] Firestore initialized successfully at startup. Target Database: ${path.join(process.cwd(), 'firebase-applet-config.json')}`);
-  
-  // Basic connectivity check
-  db.collection("test_connection").limit(1).get()
-    .then(() => console.log("[FIREBASE] Connectivity check: SUCCESS (Able to read)"))
-    .catch((err) => console.error("[FIREBASE] Connectivity check: FAILED (Read error)", err.message));
-} else {
-  console.error("[FIREBASE] Firestore failed to initialize at startup");
-}
+seedDestinations();
 
 // =====================
 // Email Notification (Resend)
@@ -205,15 +244,15 @@ async function startServer() {
 
   // Reports API (Professional Level)
   app.post("/api/reports/generate", async (req, res) => {
-    const currentDb = db || getDb();
-    if (!currentDb) return res.status(500).json({ success: false, message: "Database not initialized" });
+    if (!db) return res.status(500).json({ success: false, message: "Database not initialized" });
     const { startDate, endDate, type, adminId } = req.body;
 
     try {
-      const ordersSnap = await currentDb.collection("bookings")
-        .where("createdAt", ">=", startDate)
-        .where("createdAt", "<=", endDate)
-        .get();
+      const ordersSnap = await getDocs(query(
+        collection(db, "bookings"),
+        where("createdAt", ">=", startDate),
+        where("createdAt", "<=", endDate)
+      ));
 
       const orders = ordersSnap.docs.map(d => d.data());
 
@@ -234,11 +273,11 @@ async function startServer() {
         netProfit,
         totalOrders: orders.length,
         completedOrders: orders.filter(o => o.status === "completed").length,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: serverTimestamp(),
         createdBy: adminId
       };
 
-      const docRef = await currentDb.collection("reports").add(reportData);
+      const docRef = await addDoc(collection(db, "reports"), reportData);
       res.json({ id: docRef.id, ...reportData });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
@@ -247,17 +286,16 @@ async function startServer() {
 
   // Driver Approval API
   app.put("/api/drivers/:id/approve", async (req, res) => {
-    const currentDb = db || getDb();
-    if (!currentDb) return res.status(500).json({ success: false, message: "Database not initialized" });
+    if (!db) return res.status(500).json({ success: false, message: "Database not initialized" });
     try {
-      await currentDb.collection("drivers").doc(req.params.id).update({
+      await updateDoc(doc(db, "drivers", req.params.id), {
         status: "approved",
         adminStatus: "active",
         registrationStatus: "approved",
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        updatedAt: serverTimestamp()
       });
       
-      await currentDb.collection("users").doc(req.params.id).update({
+      await updateDoc(doc(db, "users", req.params.id), {
         role: "driver",
         driverApplicationStatus: "approved"
       });
@@ -270,17 +308,16 @@ async function startServer() {
 
   // Order Lifecycle endpoints as requested
   app.put("/api/orders/:id/status", async (req, res) => {
-    const currentDb = db || getDb();
-    if (!currentDb) return res.status(500).json({ success: false, message: "Database not initialized" });
+    if (!db) return res.status(500).json({ success: false, message: "Database not initialized" });
     const { status, driverId } = req.body;
     try {
       const updateData: any = {
         status,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        updatedAt: serverTimestamp()
       };
       if (driverId) updateData.driverId = driverId;
 
-      await currentDb.collection("bookings").doc(req.params.id).update(updateData);
+      await updateDoc(doc(db, "bookings", req.params.id), updateData);
       res.json({ success: true, message: `Order status updated to ${status}` });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
@@ -289,14 +326,13 @@ async function startServer() {
 
   // Create Trip API (used by frontend)
   app.post("/api/trips", async (req, res) => {
-    const currentDb = db || getDb();
-    if (!currentDb) return res.status(500).json({ success: false, message: "Database not initialized" });
+    if (!db) return res.status(500).json({ success: false, message: "Database not initialized" });
     try {
       const tripData = {
         ...req.body,
-        serverTimestamp: admin.firestore.FieldValue.serverTimestamp()
+        serverTimestamp: serverTimestamp()
       };
-      const docRef = await currentDb.collection("trips").add(tripData);
+      const docRef = await addDoc(collection(db, "trips"), tripData);
       res.json({ success: true, id: docRef.id });
     } catch (error: any) {
       console.error("Error creating trip:", error);
@@ -308,8 +344,7 @@ async function startServer() {
   app.post("/api/create-booking", async (req, res) => {
     console.log("[BOOKING] Received new booking request:", req.body);
     
-    const currentDb = db || getDb();
-    if (!currentDb) {
+    if (!db) {
       console.error("[BOOKING] Error: Firestore database not initialized");
       return res.status(500).json({ success: false, message: "Database not initialized" });
     }
@@ -328,10 +363,10 @@ async function startServer() {
         ...req.body,
         status: 'pending',
         source: 'web_form',
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
+        createdAt: serverTimestamp()
       };
       
-      const docRef = await currentDb.collection("bookings").add(bookingData);
+      const docRef = await addDoc(collection(db, "bookings"), bookingData);
       console.log("[BOOKING] Successfully saved with ID:", docRef.id);
 
       // 3. Generate Redirect Link
