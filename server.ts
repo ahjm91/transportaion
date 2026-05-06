@@ -229,7 +229,7 @@ async function startServer() {
 
   // Create Trip API (used by frontend)
   app.post("/api/trips", async (req, res) => {
-    if (!db) return res.status(500).send("Database not initialized");
+    if (!db) return res.status(500).json({ success: false, message: "Database not initialized" });
     try {
       const tripData = {
         ...req.body,
@@ -311,6 +311,24 @@ async function startServer() {
     res.json({ 
       success: true, 
       url: `/?pay_success=${tripId}` // Mock success redirection
+    });
+  });
+
+  // API 404 Handler (Should be before Vite middleware)
+  app.all("/api/*", (req, res) => {
+    res.status(404).json({ success: false, message: `API Route not found: ${req.method} ${req.url}` });
+  });
+
+  // Global Error Handler
+  app.use((err: any, req: any, res: any, next: any) => {
+    console.error("[SERVER ERROR]", err);
+    if (res.headersSent) {
+      return next(err);
+    }
+    res.status(500).json({ 
+      success: false, 
+      message: "Internal Server Error", 
+      error: process.env.NODE_ENV === "production" ? undefined : err.message 
     });
   });
 
