@@ -339,9 +339,9 @@ export const Services = React.memo(({ lang, services, siteSettings, t }: { key?:
       ? `مرحباً، أرغب في الاستفسار عن خدمة: *${title}*`
       : `Hello, I'm interested in the service: *${title}*`;
     
-    const rawWhatsapp = siteSettings.notificationWhatsapp || siteSettings.whatsapp || '97332325997';
+    const rawWhatsapp = siteSettings.notificationWhatsapp || siteSettings.whatsapp || '97333138113';
     const cleanWhatsapp = rawWhatsapp.replace(/\D/g, '').replace(/^0+/, ''); 
-    const finalWhatsapp = cleanWhatsapp.length === 8 ? `973${cleanWhatsapp}` : (cleanWhatsapp || '97332325997');
+    const finalWhatsapp = cleanWhatsapp.length === 8 ? `973${cleanWhatsapp}` : (cleanWhatsapp || '97333138113');
     
     window.open(`https://wa.me/${finalWhatsapp}?text=${encodeURIComponent(message)}`, '_blank');
   };
@@ -420,9 +420,9 @@ export const SpecializedServices = React.memo(({ lang, specializedServices, site
       ? `مرحباً، أرغب في الاستفسار عن خدمة: *${title}*`
       : `Hello, I'm interested in the service: *${title}*`;
     
-    const rawWhatsapp = siteSettings.notificationWhatsapp || siteSettings.whatsapp || '97332325997';
+    const rawWhatsapp = siteSettings.notificationWhatsapp || siteSettings.whatsapp || '97333138113';
     const cleanWhatsapp = rawWhatsapp.replace(/\D/g, '').replace(/^0+/, ''); 
-    const finalWhatsapp = cleanWhatsapp.length === 8 ? `973${cleanWhatsapp}` : (cleanWhatsapp || '97332325997');
+    const finalWhatsapp = cleanWhatsapp.length === 8 ? `973${cleanWhatsapp}` : (cleanWhatsapp || '97333138113');
     
     window.open(`https://wa.me/${finalWhatsapp}?text=${encodeURIComponent(message)}`, '_blank');
   };

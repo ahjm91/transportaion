@@ -187,9 +187,9 @@ function App() {
     heroSubtitle: 'فخامة التنقل',
     heroDescription: 'نقدم لك أرقى خدمات التوصيل واللوميزين في مملكة البحرين وجميع دول الخليج.',
     heroImage: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&q=80&w=1920',
-    phone: '+973 32325997',
-    whatsapp: '97332325997',
-    notificationWhatsapp: '97332325997',
+    phone: '+973 33138113',
+    whatsapp: '97333138113',
+    notificationWhatsapp: '97333138113',
     footerAbout: 'نحن متخصصون في تقديم خدمات النقل العائلي والفاخر.',
     footerAddress: 'مملكة البحرين وجميع دول الخليج',
     instagram: '',
@@ -1045,14 +1045,15 @@ function App() {
 
       // Handle WhatsApp redirection as priority
       if (result.whatsappLink) {
-        window.location.href = result.whatsappLink;
-        return; // Stop further execution as we are redirecting
+        window.open(result.whatsappLink, '_blank');
+        setIsBooking(false);
+        return; 
       } else if (bookingMode === 'custom' || bookingMode === 'fixed') {
         const message = lang === 'ar' 
           ? `طلب حجز جديد (#${result.bookingId}):\nالاسم: ${bookingData.customerName}\nمن: ${bookingData.pickup}\nإلى: ${bookingData.dropoff}\nالتاريخ: ${bookingData.date}`
           : `New Booking Request (#${result.bookingId}):\nName: ${bookingData.customerName}\nFrom: ${bookingData.pickup}\nTo: ${bookingData.dropoff}\nDate: ${bookingData.date}`;
         
-        const washare = `https://wa.me/${siteSettings.notificationWhatsapp || siteSettings.whatsapp || '97332325997'}?text=${encodeURIComponent(message)}`;
+        const washare = `https://wa.me/${siteSettings.notificationWhatsapp || siteSettings.whatsapp || '97333138113'}?text=${encodeURIComponent(message)}`;
         window.open(washare, '_blank');
       }
 

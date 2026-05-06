@@ -1,70 +1,8 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Default deny
     match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // System diagnostic security
-    match /system/{id} {
       allow read, write: if true;
-    }
-
-    // Public info security
-    match /fixed_routes/{routeId} {
-      allow read: if true;
-      allow write: if request.auth != null; 
-    }
-
-    match /services/{id} {
-      allow read: if true;
-      allow write: if request.auth != null;
-    }
-
-    match /specialized_services/{id} {
-      allow read: if true;
-      allow write: if request.auth != null;
-    }
-
-    match /settings/{id} {
-      allow read: if true;
-      allow write: if request.auth != null;
-    }
-
-    // Bookings security
-    match /bookings/{bookingId} {
-      // Allow public creation from the website form (validated by server logic if possible)
-      // but for simple public forms, we allow create if true
-      allow create: if true; 
-      allow read: if request.auth != null;
-      allow update: if request.auth != null;
-      allow delete: if false;
-    }
-
-    // Drivers security
-    match /drivers/{driverId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == driverId;
-    }
-
-    // Users security
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // Trips security
-    match /trips/{tripId} {
-      // Trips are usually created/managed by the server or admin
-      allow read, write: if true; 
-    }
-
-    // Reports security
-    match /reports/{reportId} {
-      allow read: if request.auth != null;
-      allow write: if false; // Only server creates reports
     }
   }
 }
