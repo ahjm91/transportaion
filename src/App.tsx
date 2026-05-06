@@ -1005,10 +1005,20 @@ function App() {
         })
       });
 
-      const result = await response.json();
+      // Secure JSON parsing with error type check
+      const contentType = response.headers.get("content-type");
+      let result;
       
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to save booking');
+      if (contentType && contentType.includes("application/json")) {
+        result = await response.json();
+      } else {
+        const errorText = await response.text();
+        console.error('Non-JSON response received:', errorText);
+        throw new Error(lang === 'ar' ? 'حدث خطأ في اتصال السيرفر. يرجى المحاولة لاحقاً.' : 'Server connection error. Please try again later.');
+      }
+      
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || result.error || 'Failed to save booking');
       }
 
       console.log('Booking successfully saved to server:', result.bookingId);

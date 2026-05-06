@@ -46,7 +46,14 @@ const initializeFirebase = () => {
 
 initializeFirebase();
 
-const db = admin.firestore?.() || null;
+let db: admin.firestore.Firestore | null = null;
+try {
+  if (admin.apps.length > 0) {
+    db = admin.firestore();
+  }
+} catch (error) {
+  console.error("Failed to get Firestore instance:", error);
+}
 
 // =====================
 // Email Configuration (Nodemailer)
@@ -123,14 +130,14 @@ async function startServer() {
   const authMiddleware = async (req: any, res: any, next: any) => {
     try {
       const token = req.headers.authorization?.split("Bearer ")[1];
-      if (!token) return res.status(401).send("Unauthorized");
+      if (!token) return res.status(401).json({ success: false, message: "Unauthorized" });
       if (!admin.apps.length) return next(); // Skip if admin not init
 
       const decoded = await admin.auth().verifyIdToken(token);
       req.user = decoded;
       next();
     } catch (err) {
-      res.status(401).send("Invalid Token");
+      res.status(401).json({ success: false, message: "Invalid Token" });
     }
   };
 
@@ -141,7 +148,7 @@ async function startServer() {
 
   // Reports API (Professional Level)
   app.post("/api/reports/generate", async (req, res) => {
-    if (!db) return res.status(500).send("Database not initialized");
+    if (!db) return res.status(500).json({ success: false, message: "Database not initialized" });
     const { startDate, endDate, type, adminId } = req.body;
 
     try {
@@ -176,13 +183,13 @@ async function startServer() {
       const docRef = await db.collection("reports").add(reportData);
       res.json({ id: docRef.id, ...reportData });
     } catch (error: any) {
-      res.status(500).send(error.message);
+      res.status(500).json({ success: false, message: error.message });
     }
   });
 
   // Driver Approval API
   app.put("/api/drivers/:id/approve", async (req, res) => {
-    if (!db) return res.status(500).send("Database not initialized");
+    if (!db) return res.status(500).json({ success: false, message: "Database not initialized" });
     try {
       await db.collection("drivers").doc(req.params.id).update({
         status: "approved",
@@ -196,15 +203,15 @@ async function startServer() {
         driverApplicationStatus: "approved"
       });
 
-      res.send("Driver Approved");
+      res.json({ success: true, message: "Driver Approved" });
     } catch (error: any) {
-      res.status(500).send(error.message);
+      res.status(500).json({ success: false, message: error.message });
     }
   });
 
   // Order Lifecycle endpoints as requested
   app.put("/api/orders/:id/status", async (req, res) => {
-    if (!db) return res.status(500).send("Database not initialized");
+    if (!db) return res.status(500).json({ success: false, message: "Database not initialized" });
     const { status, driverId } = req.body;
     try {
       const updateData: any = {
@@ -214,9 +221,9 @@ async function startServer() {
       if (driverId) updateData.driverId = driverId;
 
       await db.collection("bookings").doc(req.params.id).update(updateData);
-      res.send(`Order status updated to ${status}`);
+      res.json({ success: true, message: `Order status updated to ${status}` });
     } catch (error: any) {
-      res.status(500).send(error.message);
+      res.status(500).json({ success: false, message: error.message });
     }
   });
 
@@ -242,7 +249,7 @@ async function startServer() {
     
     if (!db) {
       console.error("[BOOKING] Error: Firestore database not initialized");
-      return res.status(500).send("Database not initialized");
+      return res.status(500).json({ success: false, message: "Database not initialized" });
     }
 
     try {
