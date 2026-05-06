@@ -6,6 +6,7 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 import { Resend } from 'resend';
 import axios from 'axios';
 import fs from 'fs';
@@ -15,38 +16,50 @@ const __dirname = path.dirname(__filename);
 
 // Initialize Firebase Admin
 const initializeFirebase = () => {
-  if (admin.apps.length > 0) return admin.app();
-
   const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
   let config: any = {};
   if (fs.existsSync(configPath)) {
     try {
       config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     } catch (e) {
-      console.error("Failed to parse firebase-applet-config.json", e);
+      console.error("[FIREBASE] Failed to parse firebase-applet-config.json", e);
     }
   }
 
   const projectId = config.projectId || process.env.FIREBASE_PROJECT_ID;
 
+  if (admin.apps.length > 0) {
+    const existingApp = admin.app();
+    if (existingApp.options.projectId === projectId) {
+      return existingApp;
+    }
+    console.log(`[FIREBASE] Project ID mismatch (got ${existingApp.options.projectId}, want ${projectId}). Re-initializing...`);
+  }
+
   try {
-    // Try default credentials (Cloud Run / AI Studio env)
+    // Standard initialization for GCP/Cloud Run
     const app = admin.initializeApp({
       credential: admin.credential.applicationDefault(),
       projectId: projectId
     });
-    console.log(`Firebase Admin initialized with applicationDefault for project: ${projectId || 'unknown'}`);
+    console.log(`[FIREBASE] Admin initialized with applicationDefault for project: ${projectId}`);
     return app;
-  } catch (err) {
-    console.warn("Firebase Admin applicationDefault failed, trying projectId only...", err);
+  } catch (err: any) {
+    console.warn("[FIREBASE] applicationDefault failed. Attempting projectId only initialization...", err.message);
+    
+    // If we already have an app with this project ID, just use it
+    if (admin.apps.length > 0 && admin.app().options.projectId === projectId) {
+      return admin.app();
+    }
+
     if (projectId) {
       const app = admin.initializeApp({
         projectId: projectId
       });
-      console.log(`Firebase Admin initialized with projectId: ${projectId}`);
+      console.log(`[FIREBASE] Admin initialized with projectId only: ${projectId}. Note: Admin bypass might not work.`);
       return app;
     } else {
-      console.error("CRITICAL: Failed to initialize Firebase Admin. No projectId found.");
+      console.error("[FIREBASE] CRITICAL: No projectId found for initialization.");
       return null;
     }
   }
@@ -54,30 +67,47 @@ const initializeFirebase = () => {
 
 const firebaseApp = initializeFirebase();
 
-let db: admin.firestore.Firestore | null = null;
-try {
-  if (admin.apps.length > 0) {
+// Helper to get Firestore instance
+const getDb = () => {
+  try {
     const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
     const config = fs.existsSync(configPath) ? JSON.parse(fs.readFileSync(configPath, 'utf8')) : {};
-    
-    if (config.firestoreDatabaseId) {
-      console.log(`Initialising Firestore with database ID: ${config.firestoreDatabaseId}`);
-      // @ts-ignore - databaseId is supported in newer firebase-admin but types might be stale
-      db = admin.firestore(config.firestoreDatabaseId);
+    const expectedProjectId = config.projectId || process.env.FIREBASE_PROJECT_ID;
+
+    if (admin.apps.length > 0) {
+      if (admin.app().options.projectId !== expectedProjectId) {
+        console.log(`[FIREBASE] Project ID mismatch. Expected ${expectedProjectId}, got ${admin.app().options.projectId}. Re-initializing...`);
+        // Note: delete() is async, but for simplicity we'll just re-init if possible or proceed
+      }
     } else {
-      db = admin.firestore();
+      initializeFirebase();
     }
     
-    if (db) {
-      console.log("Firestore initialized successfully");
-    } else {
-      console.error("Firestore initialization returned null");
-    }
-  } else {
-    console.error("Firebase Admin apps list is empty after initialization attempts");
+    // Use the provisioned database ID from config
+    const databaseId = config.firestoreDatabaseId || undefined;
+    
+    console.log(`[FIREBASE] Getting Firestore for project ${admin.app().options.projectId} and database: ${databaseId || '(default)'}`);
+    
+    // Using admin.app() to ensure we use the initialized one
+    const app = admin.app();
+    return getFirestore(app, databaseId);
+  } catch (error) {
+    console.error("Failed to get Firestore instance:", error);
+    return null;
   }
-} catch (error) {
-  console.error("Failed to get Firestore instance:", error);
+};
+
+// Initial test of database connection
+const db = getDb();
+if (db) {
+  console.log(`[FIREBASE] Firestore initialized successfully at startup. Target Database: ${path.join(process.cwd(), 'firebase-applet-config.json')}`);
+  
+  // Basic connectivity check
+  db.collection("test_connection").limit(1).get()
+    .then(() => console.log("[FIREBASE] Connectivity check: SUCCESS (Able to read)"))
+    .catch((err) => console.error("[FIREBASE] Connectivity check: FAILED (Read error)", err.message));
+} else {
+  console.error("[FIREBASE] Firestore failed to initialize at startup");
 }
 
 // =====================
@@ -175,11 +205,12 @@ async function startServer() {
 
   // Reports API (Professional Level)
   app.post("/api/reports/generate", async (req, res) => {
-    if (!db) return res.status(500).json({ success: false, message: "Database not initialized" });
+    const currentDb = db || getDb();
+    if (!currentDb) return res.status(500).json({ success: false, message: "Database not initialized" });
     const { startDate, endDate, type, adminId } = req.body;
 
     try {
-      const ordersSnap = await db.collection("bookings")
+      const ordersSnap = await currentDb.collection("bookings")
         .where("createdAt", ">=", startDate)
         .where("createdAt", "<=", endDate)
         .get();
@@ -207,7 +238,7 @@ async function startServer() {
         createdBy: adminId
       };
 
-      const docRef = await db.collection("reports").add(reportData);
+      const docRef = await currentDb.collection("reports").add(reportData);
       res.json({ id: docRef.id, ...reportData });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
@@ -216,16 +247,17 @@ async function startServer() {
 
   // Driver Approval API
   app.put("/api/drivers/:id/approve", async (req, res) => {
-    if (!db) return res.status(500).json({ success: false, message: "Database not initialized" });
+    const currentDb = db || getDb();
+    if (!currentDb) return res.status(500).json({ success: false, message: "Database not initialized" });
     try {
-      await db.collection("drivers").doc(req.params.id).update({
+      await currentDb.collection("drivers").doc(req.params.id).update({
         status: "approved",
         adminStatus: "active",
         registrationStatus: "approved",
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
       
-      await db.collection("users").doc(req.params.id).update({
+      await currentDb.collection("users").doc(req.params.id).update({
         role: "driver",
         driverApplicationStatus: "approved"
       });
@@ -238,7 +270,8 @@ async function startServer() {
 
   // Order Lifecycle endpoints as requested
   app.put("/api/orders/:id/status", async (req, res) => {
-    if (!db) return res.status(500).json({ success: false, message: "Database not initialized" });
+    const currentDb = db || getDb();
+    if (!currentDb) return res.status(500).json({ success: false, message: "Database not initialized" });
     const { status, driverId } = req.body;
     try {
       const updateData: any = {
@@ -247,7 +280,7 @@ async function startServer() {
       };
       if (driverId) updateData.driverId = driverId;
 
-      await db.collection("bookings").doc(req.params.id).update(updateData);
+      await currentDb.collection("bookings").doc(req.params.id).update(updateData);
       res.json({ success: true, message: `Order status updated to ${status}` });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
@@ -256,13 +289,14 @@ async function startServer() {
 
   // Create Trip API (used by frontend)
   app.post("/api/trips", async (req, res) => {
-    if (!db) return res.status(500).json({ success: false, message: "Database not initialized" });
+    const currentDb = db || getDb();
+    if (!currentDb) return res.status(500).json({ success: false, message: "Database not initialized" });
     try {
       const tripData = {
         ...req.body,
         serverTimestamp: admin.firestore.FieldValue.serverTimestamp()
       };
-      const docRef = await db.collection("trips").add(tripData);
+      const docRef = await currentDb.collection("trips").add(tripData);
       res.json({ success: true, id: docRef.id });
     } catch (error: any) {
       console.error("Error creating trip:", error);
@@ -274,7 +308,8 @@ async function startServer() {
   app.post("/api/create-booking", async (req, res) => {
     console.log("[BOOKING] Received new booking request:", req.body);
     
-    if (!db) {
+    const currentDb = db || getDb();
+    if (!currentDb) {
       console.error("[BOOKING] Error: Firestore database not initialized");
       return res.status(500).json({ success: false, message: "Database not initialized" });
     }
@@ -296,7 +331,7 @@ async function startServer() {
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       };
       
-      const docRef = await db.collection("bookings").add(bookingData);
+      const docRef = await currentDb.collection("bookings").add(bookingData);
       console.log("[BOOKING] Successfully saved with ID:", docRef.id);
 
       // 3. Generate Redirect Link

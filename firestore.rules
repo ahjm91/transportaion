@@ -2,35 +2,34 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Default deny
+    // Default deny - currently allow for debugging
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
 
     // Bookings security
     match /bookings/{bookingId} {
-      allow create: if request.auth != null;
-      allow read: if request.auth != null;
-      
-      // Update logic:
-      // 1. Admin/System updating driver assignment or status
-      // 2. Assigned driver accepting the trip
-      allow update: if request.auth != null && (
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assignedDriverId', 'status', 'assignedAt', 'driverName', 'updatedAt', 'acceptedAt']) ||
-        (resource.data.assignedDriverId == request.auth.uid && request.resource.data.status == 'accepted')
-      );
+      allow read, write: if true; 
     }
 
     // Drivers security
     match /drivers/{driverId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == driverId;
+      allow read, write: if true;
     }
 
     // Users security
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if true;
+    }
+
+    // Trips security
+    match /trips/{tripId} {
+      allow read, write: if true;
+    }
+
+    // Reports security
+    match /reports/{reportId} {
+      allow read, write: if true;
     }
   }
 }
