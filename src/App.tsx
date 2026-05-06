@@ -1043,9 +1043,10 @@ function App() {
         return;
       }
 
-      // Handle WhatsApp redirection if needed for non-realtime
+      // Handle WhatsApp redirection as priority
       if (result.whatsappLink) {
-        window.open(result.whatsappLink, '_blank');
+        window.location.href = result.whatsappLink;
+        return; // Stop further execution as we are redirecting
       } else if (bookingMode === 'custom' || bookingMode === 'fixed') {
         const message = lang === 'ar' 
           ? `طلب حجز جديد (#${result.bookingId}):\nالاسم: ${bookingData.customerName}\nمن: ${bookingData.pickup}\nإلى: ${bookingData.dropoff}\nالتاريخ: ${bookingData.date}`

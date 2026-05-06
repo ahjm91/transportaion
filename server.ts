@@ -15,42 +15,66 @@ const __dirname = path.dirname(__filename);
 
 // Initialize Firebase Admin
 const initializeFirebase = () => {
-  if (admin.apps.length > 0) return;
+  if (admin.apps.length > 0) return admin.app();
+
+  const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+  let config: any = {};
+  if (fs.existsSync(configPath)) {
+    try {
+      config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    } catch (e) {
+      console.error("Failed to parse firebase-applet-config.json", e);
+    }
+  }
+
+  const projectId = config.projectId || process.env.FIREBASE_PROJECT_ID;
 
   try {
     // Try default credentials (Cloud Run / AI Studio env)
-    admin.initializeApp({
+    const app = admin.initializeApp({
       credential: admin.credential.applicationDefault(),
+      projectId: projectId
     });
-    console.log("Firebase Admin initialized with applicationDefault");
+    console.log(`Firebase Admin initialized with applicationDefault for project: ${projectId || 'unknown'}`);
+    return app;
   } catch (err) {
-    console.warn("Firebase Admin applicationDefault failed, trying config file...");
-    const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
-    if (fs.existsSync(configPath)) {
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      admin.initializeApp({
-        projectId: config.projectId,
-        // We can't use credential without service account, 
-        // but projectId allows basic Firestore ops in some envs
+    console.warn("Firebase Admin applicationDefault failed, trying projectId only...", err);
+    if (projectId) {
+      const app = admin.initializeApp({
+        projectId: projectId
       });
-      console.log("Firebase Admin initialized with projectId from config file");
-    } else if (process.env.FIREBASE_PROJECT_ID) {
-      admin.initializeApp({
-        projectId: process.env.FIREBASE_PROJECT_ID
-      });
-      console.log("Firebase Admin initialized with FIREBASE_PROJECT_ID env var");
+      console.log(`Firebase Admin initialized with projectId: ${projectId}`);
+      return app;
     } else {
-      console.error("CRITICAL: Failed to initialize Firebase Admin. Persistence will fail.");
+      console.error("CRITICAL: Failed to initialize Firebase Admin. No projectId found.");
+      return null;
     }
   }
 };
 
-initializeFirebase();
+const firebaseApp = initializeFirebase();
 
 let db: admin.firestore.Firestore | null = null;
 try {
   if (admin.apps.length > 0) {
-    db = admin.firestore();
+    const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+    const config = fs.existsSync(configPath) ? JSON.parse(fs.readFileSync(configPath, 'utf8')) : {};
+    
+    if (config.firestoreDatabaseId) {
+      console.log(`Initialising Firestore with database ID: ${config.firestoreDatabaseId}`);
+      // @ts-ignore - databaseId is supported in newer firebase-admin but types might be stale
+      db = admin.firestore(config.firestoreDatabaseId);
+    } else {
+      db = admin.firestore();
+    }
+    
+    if (db) {
+      console.log("Firestore initialized successfully");
+    } else {
+      console.error("Firestore initialization returned null");
+    }
+  } else {
+    console.error("Firebase Admin apps list is empty after initialization attempts");
   }
 } catch (error) {
   console.error("Failed to get Firestore instance:", error);
