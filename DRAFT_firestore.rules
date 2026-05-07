@@ -9,7 +9,6 @@ service cloud.firestore {
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
     function isAdmin() { 
-      // Safe check for site settings admin list
       return isSignedIn() && 
              get(/databases/$(database)/documents/settings/site).data.adminEmails.hasAny([request.auth.token.email]); 
     }
@@ -65,15 +64,14 @@ service cloud.firestore {
         return data.customerName is string && data.customerName.size() <= 100 &&
                data.phone is string && data.phone.size() <= 20 &&
                data.date is string &&
-               data.status in ['Requested', 'Confirmed', 'Completed', 'Cancelled'] &&
-               (!('userId' in data) || data.userId is string);
+               data.status in ['Requested', 'Confirmed', 'Completed', 'Cancelled'];
       }
 
       allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
-      allow get: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid) || (resource.data.phone == request.auth.token.email);
+      allow get: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid) || (resource.data.phone == request.auth.token.email); // Phone/Email matching
       allow create: if isValidTrip(incoming()) && 
-                      (incoming().userId == request.auth.uid || !isSignedIn()); 
-      allow update: if isAdmin() || 
+                      (incoming().userId == request.auth.uid || !isSignedIn()); // Allow guest booking
+      allow update: if (isAdmin()) || 
                       (isSignedIn() && existing().userId == request.auth.uid && 
                        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'notes']) && 
                        incoming().status == 'Cancelled');
@@ -92,7 +90,7 @@ service cloud.firestore {
     // 7. REAL-TIME BOOKINGS
     // ---------------------------------------------------------
     match /bookings/{bookingId} {
-      allow read: if true; 
+      allow read: if true; // Publicly tracked (usually requires more security, but following current app flow)
       allow create: if true;
       allow update, delete: if isAdmin();
     }

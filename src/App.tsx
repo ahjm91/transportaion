@@ -681,6 +681,7 @@ function App() {
   useEffect(() => {
     const unsubscribeServices = onSnapshot(collection(db, 'services'), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
+      console.log(`[CLIENT] Services loaded: ${data.length} items`);
       setServices(data);
     }, (error) => {
       console.error('Firestore services listener error:', error);
@@ -688,6 +689,7 @@ function App() {
 
     const unsubscribeSpecialized = onSnapshot(collection(db, 'specialized_services'), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SpecializedService));
+      console.log(`[CLIENT] Specialized services loaded: ${data.length} items`);
       setSpecializedServices(data.sort((a, b) => (a.order || 0) - (b.order || 0)));
     }, (error) => {
       console.error('Firestore specialized services listener error:', error);

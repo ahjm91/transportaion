@@ -78,7 +78,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onClose, lang, defaultMo
       }
       onClose();
     } catch (err: any) {
-      setError(lang === 'ar' ? 'فشل التحقق من البيانات. تأكد من البريد وكلمة المرور.' : 'Authentication failed. Please check your credentials.');
+      if (err.code === 'auth/operation-not-allowed') {
+        setError(lang === 'ar' 
+          ? 'خيار الدخول بالبريد الرقمي غير مفعل في Firebase. يرجى تفعيله من لوحة التحكم.' 
+          : 'Email/Password auth is not enabled in Firebase Console.');
+      } else {
+        setError(lang === 'ar' ? 'فشل التحقق من البيانات. تأكد من البريد وكلمة المرور.' : 'Authentication failed. Please check your credentials.');
+      }
       console.error(err);
     } finally {
       setLoading(false);

@@ -15,7 +15,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 import { initializeApp as initializeClientApp } from 'firebase/app';
-import { getFirestore as getClientFirestore, collection, addDoc, serverTimestamp, doc, updateDoc, query, where, getDocs, limit, setDoc } from 'firebase/firestore';
+import { getFirestore as getClientFirestore, collection, addDoc, serverTimestamp, doc, updateDoc, query, where, getDocs, limit, setDoc, getDoc } from 'firebase/firestore';
 
 // Initialize Firebase (Client SDK for Server-side to bypass IAM)
 const initializeFirebase = () => {
@@ -24,9 +24,11 @@ const initializeFirebase = () => {
 
   // Initialize Admin for Auth and potentially other things
   if (admin.apps.length === 0) {
+    console.log(`[FIREBASE] Initializing Admin SDK for Project: ${config.projectId}`);
     admin.initializeApp({
       projectId: config.projectId
     });
+    console.log(`[FIREBASE] Admin SDK Initialized.`);
   }
 
   // Initialize Client SDK
@@ -47,46 +49,50 @@ const db = initializeFirebase();
 // =============================================================================
 const seedDestinations = async () => {
     try {
-        const routesCol = collection(db, "fixed_routes");
-        const snapshot = await getDocs(routesCol);
+        const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        const dbId = config.firestoreDatabaseId;
         
-        if (snapshot.empty) {
+        console.log(`[FIREBASE] Starting seeding checks for database: ${dbId}`);
+        
+        // Use Admin SDK for seeding - much more reliable on server
+        const adminDb = admin.firestore(dbId);
+        
+        const routesSnap = await adminDb.collection("fixed_routes").limit(1).get();
+        console.log(`[FIREBASE] Fixed routes snapshot empty: ${routesSnap.empty}`);
+        
+        if (routesSnap.empty) {
             console.log("[FIREBASE] Seeding Master Destinations...");
             const defaultRoutes = [
-                // Bahrain Local/Airport
                 { pickup: "مطار البحرين", pickup_en: "Bahrain Airport", dropoff: "المنامة", dropoff_en: "Manama", price: 10 },
                 { pickup: "مطار البحرين", pickup_en: "Bahrain Airport", dropoff: "الرفاع", dropoff_en: "Riffa", price: 12 },
                 { pickup: "مطار البحرين", pickup_en: "Bahrain Airport", dropoff: "المحرق", dropoff_en: "Muharraq", price: 5 },
                 { pickup: "مطار البحرين", pickup_en: "Bahrain Airport", dropoff: "الزلاق", dropoff_en: "Zallaq", price: 15 },
-                
-                // Cross-Border KSA
                 { pickup: "المنامة", pickup_en: "Manama", dropoff: "جسر الملك فهد", dropoff_en: "King Fahd Causeway", price: 15 },
                 { pickup: "المنامة", pickup_en: "Manama", dropoff: "الخبر", dropoff_en: "Khobar", price: 35 },
                 { pickup: "المنامة", pickup_en: "Manama", dropoff: "الدمام", dropoff_en: "Dammam", price: 40 },
                 { pickup: "المنامة", pickup_en: "Manama", dropoff: "مطار الدمام", dropoff_en: "Dammam Airport (DMM)", price: 50 },
                 { pickup: "المنامة", pickup_en: "Manama", dropoff: "الرياض", dropoff_en: "Riyadh", price: 150 },
-                
-                // From KSA to Bahrain
                 { pickup: "الخبر", pickup_en: "Khobar", dropoff: "المنامة", dropoff_en: "Manama", price: 35 },
                 { pickup: "الدمام", pickup_en: "Dammam", dropoff: "مطار البحرين", dropoff_en: "Bahrain Airport", price: 45 },
-                
-                // UAE Routes
                 { pickup: "المنامة", pickup_en: "Manama", dropoff: "دبي", dropoff_en: "Dubai", price: 250 },
                 { pickup: "المنامة", pickup_en: "Manama", dropoff: "أبو ظبي", dropoff_en: "Abu Dhabi", price: 240 }
             ];
             
             for (const route of defaultRoutes) {
-                await addDoc(routesCol, route);
+                await adminDb.collection("fixed_routes").add(route);
             }
             console.log("[FIREBASE] Destinations Seeded Successfully.");
         }
 
         // Seed site settings (Master Config)
-        const settingsRef = doc(db, "settings", "site");
-        const settingsSnap = await getDoc(settingsRef);
-        if (!settingsSnap.exists()) {
+        const settingsRef = adminDb.collection("settings").doc("site");
+        const settingsSnap = await settingsRef.get();
+        console.log(`[FIREBASE] Site settings exists: ${settingsSnap.exists}`);
+        
+        if (!settingsSnap.exists) {
             console.log("[FIREBASE] Seeding Master Site Settings...");
-            await setDoc(settingsRef, {
+            await settingsRef.set({
                 companyName: 'GCC TAXI',
                 companyName_en: 'GCC TAXI',
                 heroTitle: 'GCC TAXI',
@@ -96,39 +102,80 @@ const seedDestinations = async () => {
                 whatsapp: '97333138113',
                 pricePerKm: 0.5,
                 baseFee: 2,
-                adminEmails: ['ahjm91@gmail.com'],
+                adminEmails: ['ahjm91@gmail.com', 'ali@gcctaxi.net'],
                 primaryColor: '#D4AF37',
-                secondaryColor: '#1A1A1A'
+                secondaryColor: '#1A1A1A',
+                showServicesSection: true,
+                showSpecializedSection: true,
+                showHeroSection: true,
+                showBookingSection: true,
+                layoutDensity: 'comfortable',
+                sectionOrder: ['hero', 'booking', 'services', 'specialized', 'about', 'cta']
+            });
+        } else {
+            console.log("[FIREBASE] Updating Master Settings Flags and Admin list...");
+            const currentSettings = (await settingsRef.get()).data();
+            const currentAdmins = currentSettings?.adminEmails || [];
+            const newAdmins = [...new Set([...currentAdmins, 'ahjm91@gmail.com', 'ali@gcctaxi.net'])];
+            
+            await settingsRef.update({
+                adminEmails: newAdmins,
+                showServicesSection: true,
+                showSpecializedSection: true,
+                showHeroSection: true,
+                showBookingSection: true
             });
         }
 
         // Seed Services
-        const servicesSnapshot = await getDocs(collection(db, "services"));
-        if (servicesSnapshot.empty) {
+        const servicesSnap = await adminDb.collection("services").limit(1).get();
+        console.log(`[FIREBASE] Services snapshot empty: ${servicesSnap.empty}`);
+        
+        if (servicesSnap.empty) {
             console.log("[FIREBASE] Seeding services...");
             const defaultServices = [
-                { name: "Luxury Sedan", name_en: "Luxury Sedan", description: "S-Class or similar", image: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2", features: ["VIP", "WiFi", "Water"] },
-                { name: "Family Van", name_en: "Family Van", description: "Large van for 7+ people", image: "https://images.unsplash.com/photo-1542296332-2e4473faf563", features: ["Spacious", "WiFi"] }
+                { 
+                    name: "Luxury Sedan", 
+                    name_en: "Luxury Sedan", 
+                    description: "فئة الرفاهية للنقل الفاخر والسريع", 
+                    description_en: "Luxury class for high-end rapid transport",
+                    image: "https://images.unsplash.com/photo-1563720223185-11003d516935?auto=format&fit=crop&q=80&w=800", 
+                    features: ["VIP", "WiFi", "Water"],
+                    features_en: ["VIP Support", "Fast WiFi", "Refreshments"]
+                },
+                { 
+                    name: "Family Van", 
+                    name_en: "Family Van", 
+                    description: "توصيل عائلي وجماعي يتسع لأكثر من 7 أشخاص", 
+                    description_en: "Family and group transport for 7+ people",
+                    image: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=800", 
+                    features: ["Spacious", "WiFi"],
+                    features_en: ["Extra Space", "In-car WiFi"]
+                }
             ];
-            for (const s of defaultServices) await addDoc(collection(db, "services"), s);
+            for (const s of defaultServices) await adminDb.collection("services").add(s);
         }
 
         // Seed Specialized Services (Landing Page Content)
-        const specSnapshot = await getDocs(collection(db, "specialized_services"));
-        if (specSnapshot.empty) {
+        const specializedSnap = await adminDb.collection("specialized_services").limit(1).get();
+        console.log(`[FIREBASE] Specialized services empty: ${specializedSnap.empty}`);
+        
+        if (specializedSnap.empty) {
             console.log("[FIREBASE] Seeding Master Specialized Services...");
             const defaultSpec = [
                 { 
                     title: "توصيل واستقبال المطار", 
                     title_en: "Airport Transfer", 
                     desc: "خدمة راقية من وإلى جميع مطارات دول الخليج العربي، مع استقبال خاص في صالات الانتظار ومتابعة دقيقة لمواعيد الرحلات.", 
-                    image: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&q=80&w=800", 
+                    desc_en: "VIP service to all GCC airports with personalized meet & greet and flight tracking.",
+                    image: "https://images.unsplash.com/photo-1436491865332-7a61a109c055?auto=format&fit=crop&q=80&w=800", 
                     order: 1 
                 },
                 { 
                     title: "رحلات جسر الملك فهد", 
                     title_en: "King Fahd Causeway Trips", 
                     desc: "تنقل يومي سلس وآمن بين مملكة البحرين والمملكة العربية السعودية (الخبر، الدمام، الجبيل، الرياض) بأفضل الأسعار.", 
+                    desc_en: "Safe daily travel between Bahrain and Saudi Arabia (Khobar, Dammam, Riyadh) at best rates.",
                     image: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&q=80&w=800", 
                     order: 2 
                 },
@@ -136,18 +183,51 @@ const seedDestinations = async () => {
                     title: "خدمة كبار الشخصيات VIP", 
                     title_en: "VIP Chauffeur Service", 
                     desc: "سيارات فاخرة من أحدث الطرازات مع سائقين محترفين بزي رسمي لخدمة وفود الشركات والمناسبات الخاصة والأعراس.", 
+                    desc_en: "Luxury fleet with professional suited drivers for corporate delegations and special events.",
                     image: "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&q=80&w=800", 
                     order: 3 
                 }
             ];
-            for (const s of defaultSpec) await addDoc(collection(db, "specialized_services"), s);
+            for (const s of defaultSpec) await adminDb.collection("specialized_services").add(s);
         }
+
+        // Seed Admin Users
+        const seedAdmins = async () => {
+            const adminEmails = ['ahjm91@gmail.com', 'ali@gcctaxi.net'];
+            const adminPassword = process.env.ADMIN_PASSWORD || 'gcc1425taxi*';
+            
+            for (const email of adminEmails) {
+                try {
+                    const user = await admin.auth().getUserByEmail(email);
+                    console.log(`[FIREBASE] Admin user ${email} exists. Updating password...`);
+                    await admin.auth().updateUser(user.uid, {
+                        password: adminPassword,
+                        emailVerified: true
+                    });
+                } catch (error: any) {
+                    if (error.code === 'auth/user-not-found') {
+                        console.log(`[FIREBASE] Creating admin user: ${email}`);
+                        await admin.auth().createUser({
+                            email: email,
+                            password: adminPassword,
+                            emailVerified: true,
+                            displayName: 'Admin'
+                        });
+                    } else if (error.code === 'auth/operation-not-allowed') {
+                        console.error(`[FIREBASE] CRITICAL: Email/Password provider is NOT allowed for project ${config.projectId}. Please check: https://console.firebase.google.com/project/${config.projectId}/authentication/providers`);
+                    } else {
+                        console.error(`[FIREBASE] Error seeding admin ${email}:`, error.message, error.code);
+                    }
+                }
+            }
+        };
+        await seedAdmins();
     } catch (err) {
         console.error("[FIREBASE] Seed error:", err);
     }
 };
 
-seedDestinations();
+// seedDestinations();
 
 // =====================
 // Email Notification (Resend)
@@ -240,6 +320,26 @@ async function startServer() {
   // Health Check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  // Debug Endpoint
+  app.get('/api/debug/db-counts', async (req, res) => {
+    try {
+      const servicesSnap = await getDocs(collection(db, "services"));
+      const specSnap = await getDocs(collection(db, "specialized_services"));
+      const routesSnap = await getDocs(collection(db, "fixed_routes"));
+      const settingsSnap = await getDocs(collection(db, "settings"));
+      
+      res.json({
+        services: servicesSnap.size,
+        specialized_services: specSnap.size,
+        fixed_routes: routesSnap.size,
+        settings_collections: settingsSnap.size,
+        databaseId: (db as any).databaseId
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // Reports API (Professional Level)
@@ -452,8 +552,10 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  app.listen(PORT, "0.0.0.0", async () => {
     console.log(`Server running on http://localhost:${PORT}`);
+    // Run seeding once server is up
+    await seedDestinations();
   });
 }
 
