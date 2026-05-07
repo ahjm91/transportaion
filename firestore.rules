@@ -84,8 +84,16 @@ service cloud.firestore {
     // 6. USERS
     // ---------------------------------------------------------
     match /users/{userId} {
+      function isValidUser(data) {
+        return data.name is string && data.name.size() <= 100 &&
+               data.email is string && data.email.size() <= 100;
+      }
       allow read: if isOwner(userId) || isAdmin();
-      allow write: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().role == 'customer';
+      allow update: if (isOwner(userId) && 
+                        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'photoURL', 'referralCode', 'driverApplicationStatus', 'driverApplicationData', 'availableRewards'])) || 
+                       isAdmin();
+      allow delete: if isAdmin();
     }
 
     // ---------------------------------------------------------
@@ -99,7 +107,7 @@ service cloud.firestore {
     
     match /drivers/{driverId} {
       allow read: if true;
-      allow write: if isAdmin() || isOwner(driverId);
+      allow write: if isAdmin() || (isOwner(driverId) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'location', 'lastUpdated', 'isAcceptingOrders']));
     }
   }
 }

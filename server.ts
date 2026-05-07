@@ -626,6 +626,127 @@ async function startServer() {
     });
   });
 
+  // Administrative User Management
+  app.post("/api/admin/users/update", async (req, res) => {
+    const { targetUid, updates } = req.body;
+    const token = req.headers.authorization?.split("Bearer ")[1];
+
+    if (!token) return res.status(401).json({ success: false, message: "Unauthorized" });
+
+    try {
+      // 1. Verify Requesting User is Admin
+      const decodedToken = await admin.auth().verifyIdToken(token);
+      const requesterEmail = decodedToken.email;
+
+      const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const adminDb = admin.firestore(config.firestoreDatabaseId);
+      
+      const settingsSnap = await adminDb.collection("settings").doc("site").get();
+      const adminEmails = settingsSnap.data()?.adminEmails || [];
+
+      if (!adminEmails.includes(requesterEmail)) {
+        return res.status(403).json({ success: false, message: "Forbidden: Not an admin" });
+      }
+
+      // 2. Perform Auth Updates
+      const authUpdates: any = {};
+      if (updates.email) authUpdates.email = updates.email;
+      if (updates.password) authUpdates.password = updates.password;
+      if (updates.name) authUpdates.displayName = updates.name;
+
+      if (Object.keys(authUpdates).length > 0) {
+        await admin.auth().updateUser(targetUid, authUpdates);
+      }
+
+      // 3. Perform Firestore Updates
+      const firestoreUpdates: any = {};
+      if (updates.name) firestoreUpdates.name = updates.name;
+      if (updates.email) firestoreUpdates.email = updates.email;
+      if (updates.phone) firestoreUpdates.phone = updates.phone;
+
+      if (Object.keys(firestoreUpdates).length > 0) {
+        await adminDb.collection("users").doc(targetUid).update(firestoreUpdates);
+        
+        // If they are a driver, update driver doc too
+        const driverSnap = await adminDb.collection("drivers").doc(targetUid).get();
+        if (driverSnap.exists) {
+          const driverUpdates: any = {};
+          if (updates.name) driverUpdates.name = updates.name;
+          if (updates.phone) driverUpdates.phone = updates.phone;
+          await adminDb.collection("drivers").doc(targetUid).update(driverUpdates);
+        }
+      }
+
+      res.json({ success: true, message: "User updated successfully" });
+    } catch (error: any) {
+      console.error("[ADMIN USER UPDATE ERROR]", error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.post("/api/admin/users/create", async (req, res) => {
+    const { name, email, phone, password } = req.body;
+    const token = req.headers.authorization?.split("Bearer ")[1];
+
+    if (!token) return res.status(401).json({ success: false, message: "Unauthorized" });
+
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(token);
+      const requesterEmail = decodedToken.email;
+
+      const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const adminDb = admin.firestore(config.firestoreDatabaseId);
+      
+      const settingsSnap = await adminDb.collection("settings").doc("site").get();
+      const adminEmails = settingsSnap.data()?.adminEmails || [];
+
+      if (!adminEmails.includes(requesterEmail)) {
+        return res.status(403).json({ success: false, message: "Forbidden" });
+      }
+
+      // Create in Firebase Auth
+      const userRecord = await admin.auth().createUser({
+        email,
+        password: password || '12345678',
+        displayName: name,
+        phoneNumber: (phone?.startsWith('+') && phone.length >= 8) ? phone : undefined
+      });
+
+      // Initialize Profile
+      const statsRef = adminDb.collection("settings").doc("stats");
+      const statsSnap = await statsRef.get();
+      let nextNum = 1250;
+      if (statsSnap.exists) {
+        nextNum = (statsSnap.data()?.lastMembershipNumber || 1249) + 1;
+      }
+      await statsRef.set({ lastMembershipNumber: nextNum }, { merge: true });
+
+      const newProfile = {
+        uid: userRecord.uid,
+        name,
+        email,
+        phone: phone || '',
+        role: 'customer',
+        createdAt: new Date().toISOString(),
+        membershipStatus: 'Bronze',
+        membershipNumber: nextNum,
+        isVerified: true,
+        cashbackBalance: 0,
+        referralCode: Math.random().toString(36).substring(2, 8).toUpperCase(),
+        wallet: { balance: 0, totalEarnings: 0, pendingPayouts: 0, lastUpdate: new Date().toISOString() }
+      };
+
+      await adminDb.collection("users").doc(userRecord.uid).set(newProfile);
+
+      res.json({ success: true, user: newProfile });
+    } catch (error: any) {
+      console.error("[ADMIN USER CREATE ERROR]", error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
   // API 404 Handler (Should be before Vite middleware)
   app.all("/api/*", (req, res) => {
     res.status(404).json({ success: false, message: `API Route not found: ${req.method} ${req.url}` });

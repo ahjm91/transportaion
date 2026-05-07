@@ -4,9 +4,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Car, Shield, Star, AlertTriangle, CheckCircle2, XCircle, 
   Search, Filter, MoreVertical, Eye, MapPin, Phone, 
-  Trash2, RotateCw, Loader2, MessageSquare
+  Trash2, RotateCw, Loader2, MessageSquare, Settings
 } from 'lucide-react';
-import { db } from '../../firebase';
+import { auth, db } from '../../firebase';
 import { 
   collection, query, where, getDocs, doc, 
   updateDoc, orderBy, limit, onSnapshot 
@@ -29,6 +29,51 @@ export const DriversTab = ({ allDrivers, users, safeUpdateDoc, lang }: DriversTa
   const [viewingRatingsFor, setViewingRatingsFor] = useState<Driver | null>(null);
   const [viewingApplication, setViewingApplication] = useState<UserProfile | null>(null);
   const [isApproving, setIsApproving] = useState(false);
+  
+  const [editingUser, setEditingUser] = React.useState<UserProfile | null>(null);
+  const [isUpdating, setIsUpdating] = React.useState(false);
+  const [editFormData, setEditFormData] = React.useState({
+    name: '',
+    email: '',
+    phone: '',
+    password: ''
+  });
+
+  const handleAdminUpdate = async () => {
+    if (!editingUser) return;
+    setIsUpdating(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const response = await fetch('/api/admin/users/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          targetUid: editingUser.uid,
+          updates: {
+            name: editFormData.name,
+            email: editFormData.email,
+            phone: editFormData.phone,
+            ...(editFormData.password ? { password: editFormData.password } : {})
+          }
+        })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        alert(lang === 'ar' ? 'تم تحديث البيانات بنجاح' : 'User updated successfully');
+        setEditingUser(null);
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (err: any) {
+      alert(lang === 'ar' ? `خطأ: ${err.message}` : `Error: ${err.message}`);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const pendingApplications = users.filter(u => u.driverApplicationStatus === 'pending');
   
@@ -261,6 +306,24 @@ export const DriversTab = ({ allDrivers, users, safeUpdateDoc, lang }: DriversTa
                   {lang === 'ar' ? 'التقييمات' : 'Ratings'}
                 </button>
                 <button 
+                  onClick={() => {
+                    const u = users.find(u => u.uid === driver.id);
+                    if (u) {
+                      setEditingUser(u);
+                      setEditFormData({
+                        name: u.name || '',
+                        email: u.email || '',
+                        phone: u.phone || '',
+                        password: ''
+                      });
+                    }
+                  }}
+                  className="flex-1 bg-blue-50 text-blue-600 p-3 rounded-xl font-black text-[10px] uppercase hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center gap-2"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  {lang === 'ar' ? 'تعديل البيانات' : 'Edit Info'}
+                </button>
+                <button 
                   onClick={() => handleStatusChange(driver.id, driver.adminStatus === 'suspended' ? 'active' : 'suspended')}
                   className={cn(
                     "flex-1 p-3 rounded-xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 border-2",
@@ -416,6 +479,79 @@ export const DriversTab = ({ allDrivers, users, safeUpdateDoc, lang }: DriversTa
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* User Edit Modal */}
+      {editingUser && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-dark/60 backdrop-blur-sm animate-in fade-in duration-300">
+           <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+              <div className="p-8 md:p-12 space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-2xl font-black text-dark">{lang === 'ar' ? 'تعديل بيانات العضو' : 'Edit Member Data'}</h3>
+                  <button onClick={() => setEditingUser(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                    <XCircle className="w-6 h-6 text-gray-400" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{lang === 'ar' ? 'الاسم' : 'Name'}</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-gray-50 border-none rounded-2xl p-4 font-bold text-dark"
+                      value={editFormData.name}
+                      onChange={e => setEditFormData({ ...editFormData, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{lang === 'ar' ? 'البريد الإلكتروني' : 'Email'}</label>
+                    <input 
+                      type="email" 
+                      className="w-full bg-gray-50 border-none rounded-2xl p-4 font-bold text-dark"
+                      value={editFormData.email}
+                      onChange={e => setEditFormData({ ...editFormData, email: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{lang === 'ar' ? 'رقم الهاتف' : 'Phone'}</label>
+                    <input 
+                      type="text" 
+                      className="w-full bg-gray-50 border-none rounded-2xl p-4 font-bold text-dark"
+                      value={editFormData.phone}
+                      onChange={e => setEditFormData({ ...editFormData, phone: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{lang === 'ar' ? 'كلمة المرور الجديدة (اختياري)' : 'New Password (Optional)'}</label>
+                    <input 
+                      type="password" 
+                      placeholder="••••••••"
+                      className="w-full bg-gray-50 border-none rounded-2xl p-4 font-bold text-dark"
+                      value={editFormData.password}
+                      onChange={e => setEditFormData({ ...editFormData, password: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-4 pt-4">
+                  <button 
+                    onClick={() => setEditingUser(null)}
+                    className="flex-1 py-4 bg-gray-100 text-gray-500 rounded-2xl font-black text-xs hover:bg-gray-200 transition-all font-black uppercase tracking-widest"
+                  >
+                    {lang === 'ar' ? 'إلغاء' : 'Cancel'}
+                  </button>
+                  <button 
+                    disabled={isUpdating}
+                    onClick={handleAdminUpdate}
+                    className="flex-1 py-4 bg-dark text-white rounded-2xl font-black text-xs hover:bg-gold hover:text-dark transition-all flex items-center justify-center gap-2"
+                  >
+                    {isUpdating && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {lang === 'ar' ? 'حفظ التعديلات' : 'Save Changes'}
+                  </button>
+                </div>
+              </div>
+           </div>
         </div>
       )}
 
