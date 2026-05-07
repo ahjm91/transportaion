@@ -96,9 +96,9 @@ export const PaymentModal = ({
         }
       } else {
         // Fallback to WhatsApp if no card gateway or WhatsApp selected
-        const rawWhatsapp = siteSettings.notificationWhatsapp || siteSettings.whatsapp || '97332325997';
+        const rawWhatsapp = siteSettings.notificationWhatsapp || siteSettings.whatsapp || '97333138113';
         const cleanWhatsapp = rawWhatsapp.replace(/\D/g, '').replace(/^0+/, ''); 
-        const finalWhatsapp = cleanWhatsapp.length === 8 ? `973${cleanWhatsapp}` : (cleanWhatsapp || '97332325997');
+        const finalWhatsapp = cleanWhatsapp.length === 8 ? `973${cleanWhatsapp}` : (cleanWhatsapp || '97333138113');
 
         const message = lang === 'ar' 
           ? `👋 *طلب دفع رحلة*\n\n` +
