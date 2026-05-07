@@ -240,6 +240,26 @@ const seedDestinations = async () => {
             }
         }
 
+        // --- REPAIR/SEED: ADMINS COLLECTION ---
+        const adminEmailsToSeed = ['ahjm91@gmail.com', 'ali@gcctaxi.net'];
+        for (const email of adminEmailsToSeed) {
+            try {
+                const userRecord = await admin.auth().getUserByEmail(email);
+                console.log(`[FIREBASE] Seeding admin role for: ${email} (${userRecord.uid})`);
+                await adminDb.collection("admins").doc(userRecord.uid).set({ 
+                    isAdmin: true, 
+                    email: email,
+                    updatedAt: new Date().toISOString() 
+                }, { merge: true });
+            } catch (authErr: any) {
+                if (authErr.code === 'auth/user-not-found') {
+                    console.log(`[FIREBASE] Admin user not found in Auth, skipping role seed for now: ${email}`);
+                } else {
+                    console.error(`[FIREBASE] Error seeking admin UID:`, authErr);
+                }
+            }
+        }
+
         // --- REPAIR/SEED: SERVICES ---
         const servicesSnap = await adminDb.collection("services").get();
         if (servicesSnap.empty) {

@@ -9,9 +9,9 @@ service cloud.firestore {
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
     function isAdmin() { 
-      // Safe check for site settings admin list
       return isSignedIn() && 
-             get(/databases/$(database)/documents/settings/site).data.adminEmails.hasAny([request.auth.token.email]); 
+             (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+              get(/databases/$(database)/documents/settings/site).data.adminEmails.hasAny([request.auth.token.email])); 
     }
     function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
     function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
@@ -108,6 +108,11 @@ service cloud.firestore {
     match /drivers/{driverId} {
       allow read: if true;
       allow write: if isAdmin() || (isOwner(driverId) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'location', 'lastUpdated', 'isAcceptingOrders']));
+    }
+
+    match /admins/{adminId} {
+      allow read: if isAdmin();
+      allow write: if false; // Only manageable via server/Admin SDK
     }
   }
 }
