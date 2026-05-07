@@ -197,7 +197,7 @@ export const BookingForm = ({
                       <input 
                         type="text" 
                         required
-                        placeholder="Manama, Bahrain"
+                        placeholder={t('manamaBahrain')}
                         className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold placeholder:text-gray-300"
                         value={bookingData.pickup}
                         onChange={e => setBookingData({ ...bookingData, pickup: e.target.value })}
@@ -211,7 +211,7 @@ export const BookingForm = ({
                       <input 
                         type="text" 
                         required
-                        placeholder="Dammam, KSA"
+                        placeholder={t('dammamKsa')}
                         className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-6 focus:ring-2 focus:ring-gold/20 transition-all font-bold placeholder:text-gray-300"
                         value={bookingData.dropoff}
                         onChange={e => setBookingData({ ...bookingData, dropoff: e.target.value })}

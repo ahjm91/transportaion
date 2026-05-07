@@ -53,14 +53,104 @@ const seedDestinations = async () => {
         const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
         const dbId = config.firestoreDatabaseId;
         
-        console.log(`[FIREBASE] Starting seeding checks for database: ${dbId}`);
-        
-        // Use Admin SDK for seeding - much more reliable on server
+        console.log(`[FIREBASE] Starting seeding/repair checks for database: ${dbId}`);
         const adminDb = admin.firestore(dbId);
+
+        // --- REPAIR & SEED: FIXED ROUTES ---
+        const routesSnap = await adminDb.collection("fixed_routes").get();
         
-        const routesSnap = await adminDb.collection("fixed_routes").limit(1).get();
-        console.log(`[FIREBASE] Fixed routes snapshot empty: ${routesSnap.empty}`);
-        
+        const routeTranslations: Record<string, string> = {
+            "Airport": "المطار",
+            "Bahrain Airport": "مطار البحرين",
+            "Bahrain International Airport": "مطار البحرين الدولي",
+            "Manama": "المنامة",
+            "Riffa": "الرفاع",
+            "Muharraq": "المحرق",
+            "Zallaq": "الزلاق",
+            "Seef": "السيف",
+            "Seef District": "ضاحية السيف",
+            "Juffair": "الجفير",
+            "Adliya": "العدلية",
+            "Hidd": "الحد",
+            "Budaiya": "البديع",
+            "Isa Town": "مدينة عيسى",
+            "Hamad Town": "مدينة حمد",
+            "Saar": "سار",
+            "Amwaj": "أمواج",
+            "Amwaj Islands": "جزر أمواج",
+            "Durrat Al Bahrain": "درة البحرين",
+            "Sitra": "سترة",
+            "Janabiya": "الجنبية",
+            "Tubli": "توبلي",
+            "Salmabad": "سلماباد",
+            "Busaiteen": "البسيتين",
+            "Galali": "قلالي",
+            "Diyar Al Muharraq": "ديار المحرق",
+            "Asry": "أسري",
+            "Alba": "ألبا",
+            "Bapco": "بابكو",
+            "Khalifa Port": "ميناء خليفة",
+            "King Fahd Causeway": "جسر الملك فهد",
+            "Saudi Arabia": "المملكة العربية السعودية",
+            "Khobar": "الخبر",
+            "Dammam": "الدمام",
+            "DMM": "مطار الدمام",
+            "DMM Airport": "مطار الدمام",
+            "Dhahran": "الظهران",
+            "Jubail": "الجبيل",
+            "Riyadh": "الرياض",
+            "Dubai": "دبي",
+            "Abu Dhabi": "أبو ظبي",
+            "Qassim": "القصيم",
+            "Hail": "حائل",
+            "Medina": "المدينة المنورة",
+            "Mecca": "مكة المكرمة",
+            "Jeddah": "جدة",
+            "Taif": "الطائف",
+            "Abha": "أبها",
+            "Jizan": "جيزان",
+            "Najran": "نجران",
+            "Tabuk": "تبوك",
+            "Arar": "عرعر",
+            "Sakaka": "سكاكا",
+            "Hafr Al Batin": "حفر الباطن",
+            "Khafji": "الخفجي",
+            "Nariyah": "النعيرية",
+            "Qatif": "القطيف",
+            "Ras Tanura": "رأس تنورة",
+            "Al Ahsa": "الأحساء",
+            "Hofuf": "الهفوف",
+            "Mubarraz": "المبرز",
+            "Abqaiq": "بقيق"
+        };
+
+        const standardizeName = (name: string, toAr: boolean) => {
+            const trimmed = name.trim();
+            if (toAr) {
+                // If it's already Arabic, return it
+                if (/[\u0600-\u06FF]/.test(trimmed)) return trimmed;
+                // Try translate common English names
+                for (const [en, ar] of Object.entries(routeTranslations)) {
+                    if (trimmed.toLowerCase() === en.toLowerCase()) return ar;
+                    if (trimmed.toLowerCase().includes(en.toLowerCase())) {
+                        return trimmed.replace(new RegExp(en, 'gi'), ar).replace(' - ', ' - ').replace(' (', ' (');
+                    }
+                }
+                return trimmed;
+            } else {
+                // Return English version if not Arabic
+                if (!/[\u0600-\u06FF]/.test(trimmed)) return trimmed;
+                // Try reverse translate
+                for (const [en, ar] of Object.entries(routeTranslations)) {
+                    if (trimmed === ar) return en;
+                    if (trimmed.includes(ar)) {
+                        return trimmed.replace(ar, en);
+                    }
+                }
+                return trimmed;
+            }
+        };
+
         if (routesSnap.empty) {
             console.log("[FIREBASE] Seeding Master Destinations...");
             const defaultRoutes = [
@@ -78,18 +168,44 @@ const seedDestinations = async () => {
                 { pickup: "المنامة", pickup_en: "Manama", dropoff: "دبي", dropoff_en: "Dubai", price: 250 },
                 { pickup: "المنامة", pickup_en: "Manama", dropoff: "أبو ظبي", dropoff_en: "Abu Dhabi", price: 240 }
             ];
-            
-            for (const route of defaultRoutes) {
-                await adminDb.collection("fixed_routes").add(route);
+            for (const route of defaultRoutes) await adminDb.collection("fixed_routes").add(route);
+        } else {
+            console.log("[FIREBASE] Auditing existing routes for language mixing...");
+            for (const doc of routesSnap.docs) {
+                const data = doc.data();
+                let needsUpdate = false;
+                const updates: any = {};
+
+                // 1. If pickup is English, move to pickup_en and find Arabic translation
+                if (!/[\u0600-\u06FF]/.test(data.pickup)) {
+                    updates.pickup_en = data.pickup;
+                    updates.pickup = standardizeName(data.pickup, true);
+                    if (updates.pickup !== data.pickup) needsUpdate = true;
+                } else if (!data.pickup_en) {
+                    updates.pickup_en = standardizeName(data.pickup, false);
+                    if (updates.pickup_en !== data.pickup) needsUpdate = true;
+                }
+
+                // 2. If dropoff is English, move to dropoff_en and find Arabic translation
+                if (!/[\u0600-\u06FF]/.test(data.dropoff)) {
+                    updates.dropoff_en = data.dropoff;
+                    updates.dropoff = standardizeName(data.dropoff, true);
+                    if (updates.dropoff !== data.dropoff) needsUpdate = true;
+                } else if (!data.dropoff_en) {
+                    updates.dropoff_en = standardizeName(data.dropoff, false);
+                    if (updates.dropoff_en !== data.dropoff) needsUpdate = true;
+                }
+
+                if (needsUpdate) {
+                    console.log(`[FIREBASE] Repairing route ${doc.id}: ${data.pickup} -> ${updates.pickup || data.pickup}`);
+                    await doc.ref.update(updates);
+                }
             }
-            console.log("[FIREBASE] Destinations Seeded Successfully.");
         }
 
-        // Seed site settings (Master Config)
+        // --- REPAIR: SITE SETTINGS ---
         const settingsRef = adminDb.collection("settings").doc("site");
         const settingsSnap = await settingsRef.get();
-        console.log(`[FIREBASE] Site settings exists: ${settingsSnap.exists}`);
-        
         if (!settingsSnap.exists) {
             console.log("[FIREBASE] Seeding Master Site Settings...");
             await settingsRef.set({
@@ -97,7 +213,9 @@ const seedDestinations = async () => {
                 companyName_en: 'GCC TAXI',
                 heroTitle: 'GCC TAXI',
                 heroSubtitle: 'فخامة التنقل',
+                heroSubtitle_en: 'Luxury Travel',
                 heroDescription: 'نقدم لك أرقى خدمات التوصيل واللوميزين في مملكة البحرين وجميع دول الخليج.',
+                heroDescription_en: 'We provide the finest transportation and limousine services in the Kingdom of Bahrain and all GCC countries.',
                 phone: '+973 33138113',
                 whatsapp: '97333138113',
                 pricePerKm: 0.5,
@@ -113,26 +231,18 @@ const seedDestinations = async () => {
                 sectionOrder: ['hero', 'booking', 'services', 'specialized', 'about', 'cta']
             });
         } else {
-            console.log("[FIREBASE] Updating Master Settings Flags and Admin list...");
-            const currentSettings = (await settingsRef.get()).data();
-            const currentAdmins = currentSettings?.adminEmails || [];
-            const newAdmins = [...new Set([...currentAdmins, 'ahjm91@gmail.com', 'ali@gcctaxi.net'])];
-            
-            await settingsRef.update({
-                adminEmails: newAdmins,
-                showServicesSection: true,
-                showSpecializedSection: true,
-                showHeroSection: true,
-                showBookingSection: true
-            });
+            const data = settingsSnap.data();
+            if (!data?.heroSubtitle_en || !data?.heroDescription_en) {
+                await settingsRef.update({
+                    heroSubtitle_en: data?.heroSubtitle_en || 'Luxury Travel',
+                    heroDescription_en: data?.heroDescription_en || 'We provide the finest transportation and limousine services in the Kingdom of Bahrain and all GCC countries.'
+                });
+            }
         }
 
-        // Seed Services
-        const servicesSnap = await adminDb.collection("services").limit(1).get();
-        console.log(`[FIREBASE] Services snapshot empty: ${servicesSnap.empty}`);
-        
+        // --- REPAIR/SEED: SERVICES ---
+        const servicesSnap = await adminDb.collection("services").get();
         if (servicesSnap.empty) {
-            console.log("[FIREBASE] Seeding services...");
             const defaultServices = [
                 { 
                     name: "Luxury Sedan", 
@@ -154,14 +264,21 @@ const seedDestinations = async () => {
                 }
             ];
             for (const s of defaultServices) await adminDb.collection("services").add(s);
+        } else {
+            for (const doc of servicesSnap.docs) {
+                const data = doc.data();
+                if (!data.name_en || !data.description_en) {
+                    await doc.ref.update({
+                        name_en: data.name_en || data.name,
+                        description_en: data.description_en || data.description
+                    });
+                }
+            }
         }
 
-        // Seed Specialized Services (Landing Page Content)
-        const specializedSnap = await adminDb.collection("specialized_services").limit(1).get();
-        console.log(`[FIREBASE] Specialized services empty: ${specializedSnap.empty}`);
-        
+        // --- REPAIR/SEED: SPECIALIZED SERVICES ---
+        const specializedSnap = await adminDb.collection("specialized_services").get();
         if (specializedSnap.empty) {
-            console.log("[FIREBASE] Seeding Master Specialized Services...");
             const defaultSpec = [
                 { 
                     title: "توصيل واستقبال المطار", 
@@ -189,39 +306,31 @@ const seedDestinations = async () => {
                 }
             ];
             for (const s of defaultSpec) await adminDb.collection("specialized_services").add(s);
+        } else {
+            for (const doc of specializedSnap.docs) {
+                const data = doc.data();
+                if (!data.title_en || !data.desc_en) {
+                    await doc.ref.update({
+                        title_en: data.title_en || data.title,
+                        desc_en: data.desc_en || data.desc
+                    });
+                }
+            }
         }
 
         // Seed Admin Users
-        const seedAdmins = async () => {
-            const adminEmails = ['ahjm91@gmail.com', 'ali@gcctaxi.net'];
-            const adminPassword = process.env.ADMIN_PASSWORD || 'gcc1425taxi*';
-            
-            for (const email of adminEmails) {
-                try {
-                    const user = await admin.auth().getUserByEmail(email);
-                    console.log(`[FIREBASE] Admin user ${email} exists. Updating password...`);
-                    await admin.auth().updateUser(user.uid, {
-                        password: adminPassword,
-                        emailVerified: true
-                    });
-                } catch (error: any) {
-                    if (error.code === 'auth/user-not-found') {
-                        console.log(`[FIREBASE] Creating admin user: ${email}`);
-                        await admin.auth().createUser({
-                            email: email,
-                            password: adminPassword,
-                            emailVerified: true,
-                            displayName: 'Admin'
-                        });
-                    } else if (error.code === 'auth/operation-not-allowed') {
-                        console.error(`[FIREBASE] CRITICAL: Email/Password provider is NOT allowed for project ${config.projectId}. Please check: https://console.firebase.google.com/project/${config.projectId}/authentication/providers`);
-                    } else {
-                        console.error(`[FIREBASE] Error seeding admin ${email}:`, error.message, error.code);
-                    }
+        const adminEmails = ['ahjm91@gmail.com', 'ali@gcctaxi.net'];
+        const adminPassword = process.env.ADMIN_PASSWORD || 'gcc1425taxi*';
+        for (const email of adminEmails) {
+            try {
+                const user = await admin.auth().getUserByEmail(email);
+                await admin.auth().updateUser(user.uid, { password: adminPassword, emailVerified: true });
+            } catch (error: any) {
+                if (error.code === 'auth/user-not-found') {
+                    await admin.auth().createUser({ email, password: adminPassword, emailVerified: true, displayName: 'Admin' });
                 }
             }
-        };
-        await seedAdmins();
+        }
     } catch (err) {
         console.error("[FIREBASE] Seed error:", err);
     }

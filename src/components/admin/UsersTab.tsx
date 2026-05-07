@@ -85,6 +85,41 @@ export const UsersTab = ({ users, allDrivers, isUsersLoading, safeUpdateDoc, lan
           {lang === 'ar' ? 'إدارة الأعضاء والولاء' : 'Member & Loyalty Management'}
         </h4>
         <div className="flex items-center gap-4">
+          <button 
+            onClick={async () => {
+              const name = prompt(lang === 'ar' ? 'اسم العضو الجديد:' : 'New Member Name:');
+              if (!name) return;
+              const email = prompt(lang === 'ar' ? 'البريد الإلكتروني:' : 'Email:');
+              if (!email) return;
+              const phone = prompt(lang === 'ar' ? 'رقم الهاتف:' : 'Phone:');
+              
+              try {
+                // We create a doc with a random ID if we don't have a UID from Auth
+                // Note: Realistically, users need to sign up for Auth, 
+                // but admins can "placeholder" them or use their email if they sign up later.
+                const tempId = 'man_' + Math.random().toString(36).substring(2, 9);
+                await setDoc(doc(db, 'users', tempId), {
+                  uid: tempId,
+                  name,
+                  email,
+                  phone: phone || '',
+                  role: 'customer',
+                  membershipStatus: 'Bronze',
+                  wallet: 0,
+                  cashbackBalance: 0,
+                  createdAt: new Date().toISOString(),
+                  isVerified: true
+                });
+                alert(lang === 'ar' ? 'تم إضافة العضو بنجاح' : 'Member added successfully');
+              } catch (err) {
+                console.error(err);
+              }
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-gold text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-gold/20 hover:bg-dark transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            {lang === 'ar' ? 'إضافة عضو' : 'Add Member'}
+          </button>
           <div className="relative">
             <Search className={cn("absolute top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400", lang === 'ar' ? "right-4" : "left-4")} />
             <input 
@@ -133,13 +168,25 @@ export const UsersTab = ({ users, allDrivers, isUsersLoading, safeUpdateDoc, lan
                                 {u.name?.charAt(0) || 'U'}
                               </div>
                             )}
-                            <div>
+                            <div className="flex-1">
                               <div className="flex items-center gap-2">
-                                <div className="text-dark font-black">{u.name}</div>
+                                <input 
+                                  type="text"
+                                  className="text-dark font-black bg-transparent border-none focus:ring-0 p-0 w-32"
+                                  value={u.name || ''}
+                                  onChange={e => safeUpdateDoc(doc(db, 'users', u.uid), { name: e.target.value })}
+                                />
                                 <div className="bg-gold/10 text-gold text-[8px] px-2 py-0.5 rounded-full font-bold">#{u.membershipNumber || '...'}</div>
                                 {u.role === 'driver' && <Car className="w-3 h-3 text-gold" />}
                               </div>
                               <div className="text-[10px] text-gray-300 font-mono mt-0.5">{u.email}</div>
+                              <input 
+                                type="text"
+                                className="text-[10px] text-gray-500 font-bold bg-transparent border-none focus:ring-0 p-0 w-32 block"
+                                value={u.phone || ''}
+                                placeholder={lang === 'ar' ? 'رقم الهاتف' : 'Phone'}
+                                onChange={e => safeUpdateDoc(doc(db, 'users', u.uid), { phone: e.target.value })}
+                              />
                               <div className="mt-1 flex items-center gap-2">
                                 {u.driverApplicationStatus === 'pending' ? (
                                   <button 

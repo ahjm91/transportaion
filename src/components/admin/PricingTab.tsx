@@ -257,9 +257,14 @@ export const PricingTab = ({
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-gold" />
-                    <p className="text-sm font-black text-dark">{route.pickup} ← {route.dropoff}</p>
+                    <p className="text-sm font-black text-dark">
+                      {lang === 'ar' 
+                        ? `${route.pickup} ← ${route.dropoff}` 
+                        : `${route.pickup_en || route.pickup} ← ${route.dropoff_en || route.dropoff}`
+                      }
+                    </p>
                   </div>
-                  {(route.pickup_en || route.dropoff_en) && (
+                  {(route.pickup_en || route.dropoff_en) && lang === 'ar' && (
                     <p className="text-[10px] font-mono text-gray-400 mr-3">
                       {route.pickup_en || '-'} ← {route.dropoff_en || '-'}
                     </p>

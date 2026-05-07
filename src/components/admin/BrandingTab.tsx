@@ -547,6 +547,53 @@ export const BrandingTab = ({ siteSettings, setSiteSettings, handleImageUpload, 
         </div>
       </section>
 
+      {/* Footer Content */}
+      <section className="bg-white p-10 rounded-[4rem] border border-gray-100 shadow-sm space-y-10">
+        <div className="flex items-center gap-3">
+          <div className="bg-gold/10 p-2 rounded-xl">
+            <Layers className="w-5 h-5 text-gold" />
+          </div>
+          <h4 className="text-xl font-black text-dark">{lang === 'ar' ? 'محتوى ذيل الصفحة (Footer)' : 'Footer Editorial Content'}</h4>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-8">
+          <div className="space-y-4 bg-gray-50/50 p-6 rounded-[2.5rem]">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{lang === 'ar' ? 'نبذة عن الشركة في الفوتر (AR)' : 'Footer About (AR)'}</label>
+            <textarea 
+              className="w-full bg-white border-none rounded-2xl p-4 font-bold text-dark h-32"
+              value={siteSettings.footerAbout || ''}
+              onChange={e => updateSettings({ footerAbout: e.target.value })}
+            />
+          </div>
+          <div className="space-y-4 bg-gray-50/50 p-6 rounded-[2.5rem]">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Footer About (EN)</label>
+            <textarea 
+              className="w-full bg-white border-none rounded-2xl p-4 font-bold text-dark h-32"
+              value={siteSettings.footerAbout_en || ''}
+              onChange={e => updateSettings({ footerAbout_en: e.target.value })}
+            />
+          </div>
+          <div className="space-y-4 bg-gray-50/50 p-6 rounded-[2.5rem]">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{lang === 'ar' ? 'العنوان في الفوتر (AR)' : 'Footer Address (AR)'}</label>
+            <input 
+              type="text" 
+              className="w-full bg-white border-none rounded-2xl p-4 font-black text-dark"
+              value={siteSettings.footerAddress || ''}
+              onChange={e => updateSettings({ footerAddress: e.target.value })}
+            />
+          </div>
+          <div className="space-y-4 bg-gray-50/50 p-6 rounded-[2.5rem]">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Footer Address (EN)</label>
+            <input 
+              type="text" 
+              className="w-full bg-white border-none rounded-2xl p-4 font-black text-dark"
+              value={siteSettings.footerAddress_en || ''}
+              onChange={e => updateSettings({ footerAddress_en: e.target.value })}
+            />
+          </div>
+        </div>
+      </section>
+
       {/* Hero & Content Management */}
       <section className="bg-white p-10 rounded-[4rem] border border-gray-100 shadow-sm space-y-10">
         <div className="flex items-center gap-3">

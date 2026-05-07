@@ -203,10 +203,34 @@ export const DriversTab = ({ allDrivers, users, safeUpdateDoc, lang }: DriversTa
                   )}
                 </div>
                 <div>
-                  <h5 className="font-black text-dark text-lg">{driver.name}</h5>
+                  <input 
+                    type="text"
+                    className="font-black text-dark text-lg bg-transparent border-none focus:ring-0 p-0 block w-full"
+                    value={driver.name}
+                    onChange={e => updateDoc(doc(db, 'drivers', driver.id), { name: e.target.value })}
+                  />
+                  <input 
+                    type="text"
+                    className="text-xs font-bold text-gold bg-transparent border-none focus:ring-0 p-0 block w-full"
+                    value={driver.phone}
+                    onChange={e => updateDoc(doc(db, 'drivers', driver.id), { phone: e.target.value })}
+                  />
                   <div className="flex items-center gap-2 text-[10px] text-gray-400 font-bold uppercase mt-1">
                     <Car className="w-3 h-3" />
-                    {driver.carType} • {driver.plateNumber || 'TBD'}
+                    <input 
+                      type="text"
+                      className="bg-transparent border-none focus:ring-0 p-0 w-20"
+                      value={driver.carType}
+                      onChange={e => updateDoc(doc(db, 'drivers', driver.id), { carType: e.target.value })}
+                    />
+                    <span>•</span>
+                    <input 
+                      type="text"
+                      className="bg-transparent border-none focus:ring-0 p-0 w-20"
+                      value={driver.plateNumber || ''}
+                      placeholder="Plate"
+                      onChange={e => updateDoc(doc(db, 'drivers', driver.id), { plateNumber: e.target.value })}
+                    />
                   </div>
                 </div>
               </div>

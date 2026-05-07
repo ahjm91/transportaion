@@ -156,7 +156,13 @@ export const Hero = React.memo(({
                         }}
                      >
                        <option value="">{t('selectDropoff')}</option>
-                       {fixedRoutes.map(r => <option key={r.id} value={r.id}>{lang === 'ar' ? `${r.pickup} - ${r.dropoff}` : `${r.pickup_en || r.pickup} - ${r.dropoff_en || r.dropoff}`}</option>)}
+                      {fixedRoutes.map(r => (
+                        <option key={r.id} value={r.id}>
+                          {lang === 'ar' 
+                            ? `${r.pickup} - ${r.dropoff}` 
+                            : `${r.pickup_en || r.pickup} - ${r.dropoff_en || r.dropoff}`}
+                        </option>
+                      ))}
                      </select>
                      <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
                        <ChevronDown className="w-5 h-5" />

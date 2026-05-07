@@ -15,3 +15,8 @@ The following Firestore collections contain **Master Settings** and must **NEVER
 ## Firebase Configuration
 - The app uses a hybrid initialization (Admin SDK + Client SDK on the server) to ensure maximum compatibility and bypass IAM role issues in the AI Studio preview environment.
 - Do not revert `server.ts` to standard `admin.initializeApp` without testing connectivity.
+
+## Baseline Reliability
+- The current implementation is considered the **Base Stable Version**.
+- **Admin Seeding**: The `server.ts` performs automatic seeding of admin accounts and base settings. This must remain intact as it ensures the app is always functional upon deployment.
+- **Error Handling**: The `auth/operation-not-allowed` logic in `AuthScreen.tsx` and `server.ts` is essential for diagnosing Firebase configuration issues.
